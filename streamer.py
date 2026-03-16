@@ -1,0 +1,616 @@
+"""
+streamer.py — Angel One SmartWebSocketV2 live feed handler.
+
+Subscribes to all Nifty 100 + Midcap 100 tokens, maintains an in-memory
+tick store, and exposes get_market_summary() for the FastAPI layer.
+"""
+
+import os
+import asyncio
+import logzero
+from logzero import logger
+import pyotp
+import threading
+from datetime import datetime, timezone
+from typing import Optional
+
+# Enable JSON logging if running in Cloud Run
+if os.environ.get("K_SERVICE"):
+    logzero.json()
+
+from SmartApi import SmartConnect
+from SmartApi.smartWebSocketV2 import SmartWebSocketV2
+
+
+
+# ── Token lists ───────────────────────────────────────────────────────────────
+# Exchange segment: 1 = NSE Cash
+NSE_SEGMENT = 1
+
+# Nifty 100 tokens (symbol_token : prev_close, name)
+# A representative subset - extend to full 100 using Angel One's scrip master.
+NIFTY100_TOKENS: dict[str, dict] = {
+    "10099": {"symbol": "GODREJCP", "prev_close": 0.0},
+    "10604": {"symbol": "BHARTIARTL", "prev_close": 0.0},
+    "10666": {"symbol": "PNB", "prev_close": 0.0},
+    "10794": {"symbol": "CANBK", "prev_close": 0.0},
+    "11195": {"symbol": "INDIGO", "prev_close": 0.0},
+    "11536": {"symbol": "TCS", "prev_close": 0.0},
+    "10447": {"symbol": "UNITDSPR", "prev_close": 0.0},
+    "13332": {"symbol": "SOLARINDS", "prev_close": 0.0},
+    "1394": {"symbol": "HINDUNILVR", "prev_close": 0.0},
+    "157": {"symbol": "APOLLOHOSP", "prev_close": 0.0},
+    "17963": {"symbol": "NESTLEIND", "prev_close": 0.0},
+    "10999": {"symbol": "MARUTI", "prev_close": 0.0},
+    "11630": {"symbol": "NTPC", "prev_close": 0.0},
+    "1232": {"symbol": "GRASIM", "prev_close": 0.0},
+    "1333": {"symbol": "HDFCBANK", "prev_close": 0.0},
+    "15355": {"symbol": "RECLTD", "prev_close": 0.0},
+    "11532": {"symbol": "ULTRACEMCO", "prev_close": 0.0},
+    "14732": {"symbol": "DLF", "prev_close": 0.0},
+    "1512": {"symbol": "INDHOTEL", "prev_close": 0.0},
+    "16675": {"symbol": "BAJAJFINSV", "prev_close": 0.0},
+    "1964": {"symbol": "TRENT", "prev_close": 0.0},
+    "21808": {"symbol": "SBILIFE", "prev_close": 0.0},
+    "2885": {"symbol": "RELIANCE", "prev_close": 0.0},
+    "305": {"symbol": "BAJAJHLDNG", "prev_close": 0.0},
+    "383": {"symbol": "BEL", "prev_close": 0.0},
+    "4668": {"symbol": "BANKBARODA", "prev_close": 0.0},
+    "2664": {"symbol": "PIDILITIND", "prev_close": 0.0},
+    "3432": {"symbol": "TATACONSUM", "prev_close": 0.0},
+    "3506": {"symbol": "TITAN", "prev_close": 0.0},
+    "3563": {"symbol": "ADANIGREEN", "prev_close": 0.0},
+    "467": {"symbol": "HDFCLIFE", "prev_close": 0.0},
+    "526": {"symbol": "BPCL", "prev_close": 0.0},
+    "317": {"symbol": "BAJFINANCE", "prev_close": 0.0},
+    "3787": {"symbol": "WIPRO", "prev_close": 0.0},
+    "4204": {"symbol": "MOTHERSON", "prev_close": 0.0},
+    "2303": {"symbol": "HAL", "prev_close": 0.0},
+    "3220": {"symbol": "LODHA", "prev_close": 0.0},
+    "3456": {"symbol": "TMPV", "prev_close": 0.0},
+    "4717": {"symbol": "GAIL", "prev_close": 0.0},
+    "4963": {"symbol": "ICICIBANK", "prev_close": 0.0},
+    "7229": {"symbol": "HCLTECH", "prev_close": 0.0},
+    "756871": {"symbol": "ENRIN", "prev_close": 0.0},
+    "7929": {"symbol": "ZYDUSLIFE", "prev_close": 0.0},
+    "910": {"symbol": "EICHERMOT", "prev_close": 0.0},
+    "10217": {"symbol": "ADANIENSOL", "prev_close": 0.0},
+    "1270": {"symbol": "AMBUJACEM", "prev_close": 0.0},
+    "14299": {"symbol": "PFC", "prev_close": 0.0},
+    "10940": {"symbol": "DIVISLAB", "prev_close": 0.0},
+    "14977": {"symbol": "POWERGRID", "prev_close": 0.0},
+    "11723": {"symbol": "JSWSTEEL", "prev_close": 0.0},
+    "13": {"symbol": "ABB", "prev_close": 0.0},
+    "1363": {"symbol": "HINDALCO", "prev_close": 0.0},
+    "17388": {"symbol": "ADANIPOWER", "prev_close": 0.0},
+    "18921": {"symbol": "VBL", "prev_close": 0.0},
+    "2029": {"symbol": "IRFC", "prev_close": 0.0},
+    "2031": {"symbol": "M&M", "prev_close": 0.0},
+    "22377": {"symbol": "MAXHEALTH", "prev_close": 0.0},
+    "1594": {"symbol": "INFY", "prev_close": 0.0},
+    "1660": {"symbol": "ITC", "prev_close": 0.0},
+    "17818": {"symbol": "LTM", "prev_close": 0.0},
+    "18143": {"symbol": "JIOFIN", "prev_close": 0.0},
+    "19913": {"symbol": "DMART", "prev_close": 0.0},
+    "1922": {"symbol": "KOTAKBANK", "prev_close": 0.0},
+    "20374": {"symbol": "COALINDIA", "prev_close": 0.0},
+    "3063": {"symbol": "VEDL", "prev_close": 0.0},
+    "3103": {"symbol": "SHREECEM", "prev_close": 0.0},
+    "3150": {"symbol": "SIEMENS", "prev_close": 0.0},
+    "3351": {"symbol": "SUNPHARMA", "prev_close": 0.0},
+    "3518": {"symbol": "TORNTPHARM", "prev_close": 0.0},
+    "509": {"symbol": "MAZDOCK", "prev_close": 0.0},
+    "25": {"symbol": "ADANIENT", "prev_close": 0.0},
+    "3045": {"symbol": "SBIN", "prev_close": 0.0},
+    "6733": {"symbol": "JINDALSTEL", "prev_close": 0.0},
+    "25270": {"symbol": "BAJAJHFL", "prev_close": 0.0},
+    "25844": {"symbol": "HYUNDAI", "prev_close": 0.0},
+    "3426": {"symbol": "TATAPOWER", "prev_close": 0.0},
+    "5097": {"symbol": "ETERNAL", "prev_close": 0.0},
+    "685": {"symbol": "CHOLAFIN", "prev_close": 0.0},
+    "694": {"symbol": "CIPLA", "prev_close": 0.0},
+    "760": {"symbol": "CGPOWER", "prev_close": 0.0},
+    "8479": {"symbol": "TVSMOTOR", "prev_close": 0.0},
+    "881": {"symbol": "DRREDDY", "prev_close": 0.0},
+    "9819": {"symbol": "HAVELLS", "prev_close": 0.0},
+    "13538": {"symbol": "TECHM", "prev_close": 0.0},
+    "13751": {"symbol": "NAUKRI", "prev_close": 0.0},
+    "15083": {"symbol": "ADANIPORTS", "prev_close": 0.0},
+    "1624": {"symbol": "IOC", "prev_close": 0.0},
+    "16669": {"symbol": "BAJAJ-AUTO", "prev_close": 0.0},
+    "17869": {"symbol": "JSWENERGY", "prev_close": 0.0},
+    "11483": {"symbol": "LT", "prev_close": 0.0},
+    "1424": {"symbol": "HINDZINC", "prev_close": 0.0},
+    "2475": {"symbol": "ONGC", "prev_close": 0.0},
+    "4306": {"symbol": "SHRIRAMFIN", "prev_close": 0.0},
+    "547": {"symbol": "BRITANNIA", "prev_close": 0.0},
+    "21770": {"symbol": "ICICIGI", "prev_close": 0.0},
+    "2181": {"symbol": "BOSCHLTD", "prev_close": 0.0},
+    "236": {"symbol": "ASIANPAINT", "prev_close": 0.0},
+    "3499": {"symbol": "TATASTEEL", "prev_close": 0.0},
+    "5900": {"symbol": "AXISBANK", "prev_close": 0.0},
+    "9480": {"symbol": "LICI", "prev_close": 0.0},
+}
+
+MIDCAP100_TOKENS: dict[str, dict] = {
+    "10738": {"symbol": "OFSS", "prev_close": 0.0},
+    "11184": {"symbol": "IDFCFIRSTB", "prev_close": 0.0},
+    "11373": {"symbol": "BIOCON", "prev_close": 0.0},
+    "13061": {"symbol": "360ONE", "prev_close": 0.0},
+    "11703": {"symbol": "ALKEM", "prev_close": 0.0},
+    "13611": {"symbol": "IRCTC", "prev_close": 0.0},
+    "14366": {"symbol": "IDEA", "prev_close": 0.0},
+    "14592": {"symbol": "FORTIS", "prev_close": 0.0},
+    "14947": {"symbol": "MOTILALOFS", "prev_close": 0.0},
+    "15141": {"symbol": "COLPAL", "prev_close": 0.0},
+    "15313": {"symbol": "IRB", "prev_close": 0.0},
+    "10753": {"symbol": "UNIONBANK", "prev_close": 0.0},
+    "13786": {"symbol": "TORNTPOWER", "prev_close": 0.0},
+    "15380": {"symbol": "MANKIND", "prev_close": 0.0},
+    "17438": {"symbol": "OIL", "prev_close": 0.0},
+    "12018": {"symbol": "SUZLON", "prev_close": 0.0},
+    "13285": {"symbol": "M&MFIN", "prev_close": 0.0},
+    "14309": {"symbol": "INDIANB", "prev_close": 0.0},
+    "14552": {"symbol": "PHOENIXLTD", "prev_close": 0.0},
+    "18365": {"symbol": "PERSISTENT", "prev_close": 0.0},
+    "21508": {"symbol": "COCHINSHIP", "prev_close": 0.0},
+    "23650": {"symbol": "MUTHOOTFIN", "prev_close": 0.0},
+    "19585": {"symbol": "BSE", "prev_close": 0.0},
+    "21690": {"symbol": "DIXON", "prev_close": 0.0},
+    "6066": {"symbol": "ATGL", "prev_close": 0.0},
+    "6705": {"symbol": "PAYTM", "prev_close": 0.0},
+    "3721": {"symbol": "TATACOMM", "prev_close": 0.0},
+    "422": {"symbol": "BHARATFORG", "prev_close": 0.0},
+    "20242": {"symbol": "OBEROIRLTY", "prev_close": 0.0},
+    "20293": {"symbol": "TATATECH", "prev_close": 0.0},
+    "3273": {"symbol": "SRF", "prev_close": 0.0},
+    "3363": {"symbol": "SUPREMEIND", "prev_close": 0.0},
+    "3411": {"symbol": "TATAELXSI", "prev_close": 0.0},
+    "4244": {"symbol": "HDFCAMC", "prev_close": 0.0},
+    "438": {"symbol": "BHEL", "prev_close": 0.0},
+    "4684": {"symbol": "SONACOMS", "prev_close": 0.0},
+    "1997": {"symbol": "LICHSGFIN", "prev_close": 0.0},
+    "25907": {"symbol": "WAAREEENER", "prev_close": 0.0},
+    "4745": {"symbol": "BANKINDIA", "prev_close": 0.0},
+    "7406": {"symbol": "GLENMARK", "prev_close": 0.0},
+    "8311": {"symbol": "BLUESTARCO", "prev_close": 0.0},
+    "9552": {"symbol": "RVNL", "prev_close": 0.0},
+    "772": {"symbol": "DABUR", "prev_close": 0.0},
+    "1181": {"symbol": "GODFRYPHLP", "prev_close": 0.0},
+    "10440": {"symbol": "LUPIN", "prev_close": 0.0},
+    "11287": {"symbol": "UPL", "prev_close": 0.0},
+    "11915": {"symbol": "YESBANK", "prev_close": 0.0},
+    "1348": {"symbol": "HEROMOTOCO", "prev_close": 0.0},
+    "14413": {"symbol": "PAGEIND", "prev_close": 0.0},
+    "18096": {"symbol": "JUBLFOOD", "prev_close": 0.0},
+    "13310": {"symbol": "KEI", "prev_close": 0.0},
+    "14418": {"symbol": "ASTRAL", "prev_close": 0.0},
+    "15332": {"symbol": "NMDC", "prev_close": 0.0},
+    "17029": {"symbol": "PATANJALI", "prev_close": 0.0},
+    "212": {"symbol": "ASHOKLEY", "prev_close": 0.0},
+    "2144": {"symbol": "BDL", "prev_close": 0.0},
+    "1901": {"symbol": "CUMMINSIND", "prev_close": 0.0},
+    "20825": {"symbol": "HUDCO", "prev_close": 0.0},
+    "21614": {"symbol": "ABCAPITAL", "prev_close": 0.0},
+    "25049": {"symbol": "PREMIERENE", "prev_close": 0.0},
+    "29135": {"symbol": "INDUSTOWER", "prev_close": 0.0},
+    "4503": {"symbol": "MPHASIS", "prev_close": 0.0},
+    "4749": {"symbol": "CONCOR", "prev_close": 0.0},
+    "24948": {"symbol": "LTF", "prev_close": 0.0},
+    "27176": {"symbol": "NTPCGREEN", "prev_close": 0.0},
+    "2955": {"symbol": "KALYANKJIL", "prev_close": 0.0},
+    "312": {"symbol": "TIINDIA", "prev_close": 0.0},
+    "4067": {"symbol": "MARICO", "prev_close": 0.0},
+    "6545": {"symbol": "NYKAA", "prev_close": 0.0},
+    "23489": {"symbol": "BHARTIHEXA", "prev_close": 0.0},
+    "24184": {"symbol": "PIIND", "prev_close": 0.0},
+    "25780": {"symbol": "APLAPOLLO", "prev_close": 0.0},
+    "275": {"symbol": "AUROPHARMA", "prev_close": 0.0},
+    "27969": {"symbol": "VMM", "prev_close": 0.0},
+    "2963": {"symbol": "SAIL", "prev_close": 0.0},
+    "6364": {"symbol": "NATIONALUM", "prev_close": 0.0},
+    "676": {"symbol": "EXIDEIND", "prev_close": 0.0},
+    "9590": {"symbol": "POLYCAB", "prev_close": 0.0},
+    "739": {"symbol": "COROMANDEL", "prev_close": 0.0},
+    "11262": {"symbol": "IGL", "prev_close": 0.0},
+    "17400": {"symbol": "NHPC", "prev_close": 0.0},
+    "20261": {"symbol": "IREDA", "prev_close": 0.0},
+    "20302": {"symbol": "PRESTIGE", "prev_close": 0.0},
+    "21238": {"symbol": "AUBANK", "prev_close": 0.0},
+    "2142": {"symbol": "MFSL", "prev_close": 0.0},
+    "1023": {"symbol": "FEDERALBNK", "prev_close": 0.0},
+    "11543": {"symbol": "COFORGE", "prev_close": 0.0},
+    "13528": {"symbol": "GMRAIRPORT", "prev_close": 0.0},
+    "1406": {"symbol": "HINDPETRO", "prev_close": 0.0},
+    "5258": {"symbol": "INDUSINDBK", "prev_close": 0.0},
+    "17875": {"symbol": "GODREJPROP", "prev_close": 0.0},
+    "17971": {"symbol": "SBICARD", "prev_close": 0.0},
+    "18457": {"symbol": "POWERINDIA", "prev_close": 0.0},
+    "22": {"symbol": "ACC", "prev_close": 0.0},
+    "2277": {"symbol": "MRF", "prev_close": 0.0},
+    "27066": {"symbol": "SWIGGY", "prev_close": 0.0},
+    "29251": {"symbol": "ITCHOTELS", "prev_close": 0.0},
+    "3718": {"symbol": "VOLTAS", "prev_close": 0.0},
+    "6656": {"symbol": "POLICYBZR", "prev_close": 0.0},
+    "9683": {"symbol": "KPITTECH", "prev_close": 0.0},
+}
+
+# Combined lookup: token → {symbol, prev_close, index}
+ALL_TOKENS: dict[str, dict] = {}
+for tok, meta in NIFTY100_TOKENS.items():
+    ALL_TOKENS[tok] = {**meta, "index": "nifty100"}
+for tok, meta in MIDCAP100_TOKENS.items():
+    if tok not in ALL_TOKENS:   # avoid overwriting with wrong index label
+        ALL_TOKENS[tok] = {**meta, "index": "midcap100"}
+
+# ── In-memory tick store ──────────────────────────────────────────────────────
+_tick_store: dict[str, dict] = {}
+_tv_fail_count = {}
+_tv_lock = threading.Lock()
+live_prices = {}
+_store_lock = threading.Lock()
+connected_clients = set()
+
+
+def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0):
+    meta = ALL_TOKENS.get(token)
+    if not meta:
+        return
+    prev = meta["prev_close"]
+    # Use close_price from tick if prev_close is 0 (placeholder)
+    if prev == 0.0 and close_price > 0:
+        prev = close_price
+        meta["prev_close"] = prev  # update for future ticks
+    prev_confirmed = prev > 0
+    change_pct = round(((ltp - prev) / prev) * 100, 2) if prev else 0.0
+    with _store_lock:
+        _tick_store[token] = {
+            "token":      token,
+            "symbol":     meta["symbol"],
+            "index":      meta["index"],
+            "ltp":        ltp,
+            "prev_close": prev,
+            "change_pct": change_pct,
+            "volume":     volume,
+            "prev_close_confirmed": prev_confirmed,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+
+def get_all_ticks() -> list:
+    """Return all processed ticks for scanning."""
+    with _store_lock:
+        return list(_tick_store.values())
+
+def get_market_summary(top_n: int = 5) -> dict:
+    """Compute top-N gainers and losers for each index."""
+    with _store_lock:
+        ticks = list(_tick_store.values())
+
+    nifty   = [t for t in ticks if t["index"] == "nifty100"]
+    midcap  = [t for t in ticks if t["index"] == "midcap100"]
+
+    def rank(items, reverse):
+        return sorted(items, key=lambda x: x["change_pct"], reverse=reverse)[:top_n]
+
+    return {
+        "nifty100": {
+            "gainers": rank(nifty, reverse=True),
+            "losers":  rank(nifty, reverse=False),
+        },
+        "midcap100": {
+            "gainers": rank(midcap, reverse=True),
+            "losers":  rank(midcap, reverse=False),
+        },
+        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "total_tokens_tracked": len(ticks),
+    }
+
+
+# ── WebSocket callback handlers ───────────────────────────────────────────────
+
+def _on_data(wsapp, message):
+    """Called for every incoming tick message."""
+    try:
+        # SmartWebSocketV2 delivers parsed dict with 'token', 'last_traded_price', etc.
+        token  = str(message.get("token", ""))
+        ltp    = message.get("last_traded_price", 0) / 100  # paise → rupees
+        volume = message.get("volume_trade_for_the_day", 0)
+        close_price = message.get("closed_price", 0)
+        if close_price:
+            close_price = close_price / 100  # paise → rupees
+        live_prices[token] = ltp
+        _update_tick(token, ltp, volume, close_price=close_price)
+    except Exception as exc:
+        logger.warning("Tick parse error: %s | raw=%s", exc, message)
+
+
+def _on_open(wsapp):
+    logger.info("WebSocket connection opened.")
+
+
+def _on_error(wsapp, error):
+    logger.error("WebSocket error: %s", error)
+
+
+def _on_close(wsapp):
+    logger.warning("WebSocket connection closed.")
+
+
+# ── MarketStreamer ─────────────────────────────────────────────────────────────
+
+class MarketStreamer:
+    """Manages Angel One auth, WebSocket subscription, and reconnection loop."""
+
+    RECONNECT_DELAY = 10  # seconds
+
+    def __init__(self, api_key: str, client_code: str, password: str, totp_secret: str):
+        self.api_key     = api_key
+        self.client_code = client_code
+        self.password    = password
+        self.totp_secret = totp_secret
+        self._running    = False
+        self._sws: Optional[SmartWebSocketV2] = None
+        self.is_connected = False
+
+    # ── Authentication ────────────────────────────────────────────────────────
+
+    def _login(self) -> tuple[str, str, str]:
+        """Authenticate and return (auth_token, feed_token, refresh_token)."""
+        totp = pyotp.TOTP(self.totp_secret).now()
+        smart = SmartConnect(api_key=self.api_key)
+        data  = smart.generateSession(self.client_code, self.password, totp)
+        if data["status"] is False:
+            raise RuntimeError(f"Angel One login failed: {data['message']}")
+        auth_token    = data["data"]["jwtToken"]
+        refresh_token = data["data"]["refreshToken"]
+        feed_token    = smart.getfeedToken()
+        logger.info("Angel One login successful for client: %s", self.client_code)
+        return auth_token, feed_token, refresh_token
+
+    # ── Subscription helper ───────────────────────────────────────────────────
+
+    def _build_token_list(self) -> list[dict]:
+        """Build subscription payload: list of {exchangeType, tokens}."""
+        all_toks = list(ALL_TOKENS.keys())
+        return [{"exchangeType": NSE_SEGMENT, "tokens": all_toks}]
+
+    # ── Main run loop ─────────────────────────────────────────────────────────
+
+    async def run(self):
+        self._running = True
+        reconnect_delay = 5  # initial backoff
+
+        while self._running:
+            try:
+                auth_token, feed_token, _ = await asyncio.to_thread(self._login)
+                token_list = self._build_token_list()
+
+                self._sws = SmartWebSocketV2(
+                    auth_token   = auth_token,
+                    api_key      = self.api_key,
+                    client_code  = self.client_code,
+                    feed_token   = feed_token,
+                    max_retry_attempt = 5,
+                )
+
+                # Set callbacks as attributes (library API pattern)
+                sws = self._sws
+
+                def _subscribe_on_open(wsapp):
+                    nonlocal reconnect_delay
+                    reconnect_delay = 5  # reset delay on successful connection
+                    _on_open(wsapp)
+                    # Use QUOTE mode (2) to get volume + close_price
+                    sws.subscribe("stock-feed", 2, token_list)
+                    self.is_connected = True
+
+                sws.on_open  = _subscribe_on_open
+                sws.on_data  = _on_data
+                sws.on_error = _on_error
+                sws.on_close = _on_close
+
+                logger.info("Starting WebSocket stream for %d tokens...", len(ALL_TOKENS))
+
+                # connect() is blocking; run in a thread so we stay async-friendly
+                asyncio.create_task(market_pusher())
+                asyncio.create_task(scan_loop())
+                await asyncio.to_thread(sws.connect)
+
+            except asyncio.CancelledError:
+                logger.info("Streamer cancelled.")
+                break
+            except Exception as exc:
+                logger.error("Streamer error: %s - reconnecting in %ds", exc, reconnect_delay)
+            finally:
+                self.is_connected = False
+
+            if self._running:
+                await asyncio.sleep(reconnect_delay)
+                reconnect_delay = min(reconnect_delay * 2, 120)
+
+    def stop(self):
+        logger.info("Graceful SIGTERM shutdown - closing Angel One WebSocket...")
+        self._running = False
+        self.is_connected = False
+        if self._sws:
+            try:
+                self._sws.close_connection()
+            except Exception as e:
+                logger.error(f"Error closing WebSocket: {e}")
+
+
+async def fetch_angel_one_historical(symbol, token, exchange='NSE'):
+    import historical
+    import pandas as pd
+    import datetime
+    import asyncio
+    
+    smart = historical._get_smart_connect()
+    to_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    from_date = (datetime.datetime.now() - datetime.timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
+    
+    def _fetch():
+        return smart.getCandleData({
+            "exchange": exchange,
+            "symboltoken": str(token),
+            "interval": "FIFTEEN_MINUTE",
+            "fromdate": from_date,
+            "todate": to_date
+        })
+    res = await asyncio.to_thread(_fetch)
+    if res and res.get('status') and res.get('data'):
+        df = pd.DataFrame(res['data'], columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+        return df
+    return None
+
+def process_symbol_data(df, symbol, price):
+    meta = None
+    token = None
+    for tok, m in ALL_TOKENS.items():
+        if m['symbol'] == symbol:
+            token = tok
+            meta = m
+            break
+            
+    if not meta or not token:
+        return None
+        
+    # If prev_close is missing, try to extract it from historical data
+    # (Assuming the last candle in df is the most recent available pre-market or previous day)
+    if meta['prev_close'] == 0.0 and df is not None and len(df) > 0:
+        try:
+            # For simplicity, if we have historical data, the first candle's close 
+            # might be a good enough 'previous close' if we don't have better.
+            # Ideally we'd look for the last candle of the *previous* trading day.
+            meta['prev_close'] = float(df['close'].iloc[0])
+            logger.info(f"[Metadata] Set {symbol} prev_close={meta['prev_close']} from historical")
+        except:
+            pass
+
+    _update_tick(token, price or 0.0)
+    with _store_lock:
+        return _tick_store.get(token)
+
+async def broadcast(data):
+    """Broadcast JSON to all connected dashboard clients."""
+    if not connected_clients:
+        return
+    
+    import json
+    msg = json.dumps(data)
+    
+    # Create list of tasks to send to all clients concurrently
+    tasks = []
+    for ws in list(connected_clients):
+        try:
+            tasks.append(ws.send_text(msg))
+        except Exception:
+            connected_clients.discard(ws)
+            
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    logger.info(f"[Broadcast] Partial update: {len(data.get('gainers', []))} gainers, {len(data.get('losers', []))} losers")
+
+async def fetch_symbol_safe(symbol, token, exchange='NSE'):
+    """
+    Fetch OHLC data with retry + singleton reset + yFinance fallback.
+    Memory safe - deletes DataFrames immediately after use.
+    """
+    import yfinance as yf
+    import gc
+
+    df = None
+
+    # Try Angel One historical API first (2 attempts)
+    for attempt in range(2):
+        try:
+            df = await fetch_angel_one_historical(symbol, token, exchange)
+            if df is not None and len(df) > 20:
+                _tv_fail_count[symbol] = 0
+                break
+        except Exception as e:
+            logger.error(f'[Angel Historical] {symbol} attempt {attempt+1}: {e}')
+            if attempt == 0:
+                import asyncio
+                await asyncio.sleep(1)
+            else:
+                _tv_fail_count[symbol] = _tv_fail_count.get(symbol, 0) + 1
+
+    # yFinance fallback
+    if df is None or len(df) <= 20:
+        try:
+            yf_sym = f'{symbol}.NS' if exchange == 'NSE' else f'{symbol}.BO'
+            df = yf.download(yf_sym, period='5d', interval='15m', progress=False)
+            if df is not None and len(df) > 20:
+                logger.info(f'[yFinance fallback] {symbol} OK')
+        except Exception as e:
+            logger.error(f'[yFinance] {symbol}: {e}')
+
+    # Use Angel One WebSocket live price if available
+    price = live_prices.get(token)
+    if price is None and df is not None and len(df) > 0:
+        price = float(df['close'].iloc[-1])
+
+    result = process_symbol_data(df, symbol, price)
+
+    del df
+    gc.collect()
+    return result
+
+async def market_pusher():
+    """
+    Periodically (every 2s) broadcasts the top 5 gainers/losers from the store.
+    This provides a consistent "Live" feel and is the single source of truth.
+    """
+    while True:
+        try:
+            summary = get_market_summary(top_n=5)
+            for idx in ["nifty100", "midcap100"]:
+                await broadcast({
+                    'type':    'full_update',
+                    'index':   idx,
+                    'gainers': summary[idx]["gainers"],
+                    'losers':  summary[idx]["losers"],
+                    'total':   summary.get('total_tokens_tracked', 200)
+                })
+        except Exception as e:
+            logger.error(f"[Pusher] Error: {e}")
+        
+        await asyncio.sleep(2)
+
+async def scan_loop():
+    """
+    Metadata scavenger loop. Focuses on filling missing prev_close/OHLC.
+    Does NOT broadcast; pusher handles that.
+    """
+    import time
+    import asyncio
+    symbols     = [(meta['symbol'], tok, meta['index']) for tok, meta in ALL_TOKENS.items()]
+    batch_size  = 10 # Aggressive at startup
+    
+    while True:
+        cycle_start = time.time()
+        batches      = [symbols[i:i+batch_size] for i in range(0, len(symbols), batch_size)]
+        
+        for batch in batches:
+            # Check if we even need to fetch (if prev_close is missing)
+            tasks = []
+            for sym, tok, idx in batch:
+                with _store_lock:
+                    tick = _tick_store.get(tok)
+                    # If missing tick OR missing prev_close, fetch it
+                    if not tick or not tick.get('prev_close_confirmed'):
+                        tasks.append(fetch_symbol_safe(sym, tok))
+            
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Short sleep between batches to avoid rate limits
+            await asyncio.sleep(0.5)
+
+        cycle_time = time.time() - cycle_start
+        logger.info(f'[Scan] Scavenger cycle complete | {cycle_time:.1f}s')
+        await asyncio.sleep(30) # Only scavenge every 30s after first pass
+

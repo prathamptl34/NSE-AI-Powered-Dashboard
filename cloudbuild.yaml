@@ -1,0 +1,32 @@
+steps:
+  # 1. Build the multi-stage Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '$_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$COMMIT_SHA', '.']
+
+  # 2. Push the image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '$_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$COMMIT_SHA']
+
+  # 3. Deploy to Cloud Run using the antigravity.yaml spec
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'services'
+      - 'replace'
+      - 'antigravity.yaml'
+      - '--platform=managed'
+      - '--region=$_REGION'
+      - '--image=$_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$COMMIT_SHA'
+
+images:
+  - '$_AR_HOSTNAME/$PROJECT_ID/$_AR_REPO/$_SERVICE_NAME:$COMMIT_SHA'
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE_NAME: stock-dashboard
+  _AR_HOSTNAME: us-central1-docker.pkg.dev
+  _AR_REPO: stock-dashboard-repo
+
+options:
+  logging: CLOUD_LOGGING_ONLY
