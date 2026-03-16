@@ -91,23 +91,39 @@ IMPORTANT: Write carefully. No spelling errors. No typos. Proofread before respo
         return f"Market scan complete. {stats_dict['bullish_count']} bullish, {stats_dict['bearish_count']} bearish signals detected across {stats_dict['total']} stocks."
 
 
+def validate_environment() -> bool:
+    """Validate all required environment variables are set."""
+    required_vars = ["ANGEL_API_KEY", "ANGEL_CLIENT_ID", "ANGEL_PASSWORD", "ANGEL_TOTP_SECRET", "GROQ_API_KEY"]
+    missing_vars = []
+    
+    for var in required_vars:
+        if not os.environ.get(var):
+            missing_vars.append(var)
+    
+    if missing_vars:
+        logger.error("\n" + "="*50)
+        logger.error("DEPLOYMENT FAILED - Missing Environment Variables")
+        logger.error("="*50)
+        logger.error(f"Missing variables: {', '.join(missing_vars)}")
+        logger.error("Please set these in Render Dashboard -> Environment tab")
+        logger.error("="*50 + "\n")
+        return False
+    
+    logger.info("✅ All required environment variables are set")
+    return True
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager. Validates env vars and starts/stops background async tasks."""
     global streamer
     
-    required_env_vars = ["ANGEL_API_KEY", "ANGEL_CLIENT_CODE", "ANGEL_PASSWORD", "ANGEL_TOTP_SECRET", "GROQ_API_KEY"]
-    for var in required_env_vars:
-        if not os.environ.get(var):
-            logger.error(f"FATAL ERROR: Missing required environment variable {var}")
-            # Ensure the exact error is logged before exit
-            print(f"FATAL ERROR: Missing required environment variable {var}", file=sys.stderr)
-            raise RuntimeError(f"Missing required environment variable {var}")
+    if not validate_environment():
+        raise RuntimeError("Missing required environment variables. See logs for details.")
             
     logger.info("Starting MarketStreamer background task...")
     streamer = MarketStreamer(
         api_key=os.environ["ANGEL_API_KEY"],
-        client_code=os.environ["ANGEL_CLIENT_CODE"],
+        client_code=os.environ["ANGEL_CLIENT_ID"],
         password=os.environ["ANGEL_PASSWORD"],
         totp_secret=os.environ["ANGEL_TOTP_SECRET"],
     )

@@ -30,7 +30,7 @@ def _get_smart_connect() -> SmartConnect:
     totp = pyotp.TOTP(os.environ["ANGEL_TOTP_SECRET"]).now()
     smart = SmartConnect(api_key=os.environ["ANGEL_API_KEY"])
     resp = smart.generateSession(
-        os.environ["ANGEL_CLIENT_CODE"],
+        os.environ["ANGEL_CLIENT_ID"],
         os.environ["ANGEL_PASSWORD"],
         totp,
     )
