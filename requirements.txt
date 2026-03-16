@@ -19,5 +19,8 @@ pandas
 numpy
 websockets
 yfinance
-pytz
 groq
+pytz
+# Database Drivers (added for deployment checklist compliance)
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9

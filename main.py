@@ -11,20 +11,25 @@ from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from dotenv import load_dotenv
 from datetime import datetime
-
-
-from logzero import logger
-
+from dotenv import load_dotenv
+import pytz
+import logging
+import sys
+import traceback
+import re
+from groq import Groq
+from signal_engine import calculate_all_signals, get_summary_stats
 from streamer import MarketStreamer, get_market_summary, get_all_ticks
 from historical import get_historical_summary
 from nse_holidays import is_trading_day
 
-import re
-from groq import Groq
-from signal_engine import calculate_all_signals, get_summary_stats
-import pytz
+# ── Logging Configuration ─────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -91,10 +96,12 @@ async def lifespan(app: FastAPI):
     """Lifecycle manager. Validates env vars and starts/stops background async tasks."""
     global streamer
     
-    required_env_vars = ["ANGEL_API_KEY", "ANGEL_CLIENT_CODE", "ANGEL_PASSWORD", "ANGEL_TOTP_SECRET"]
+    required_env_vars = ["ANGEL_API_KEY", "ANGEL_CLIENT_CODE", "ANGEL_PASSWORD", "ANGEL_TOTP_SECRET", "GROQ_API_KEY"]
     for var in required_env_vars:
         if not os.environ.get(var):
             logger.error(f"FATAL ERROR: Missing required environment variable {var}")
+            # Ensure the exact error is logged before exit
+            print(f"FATAL ERROR: Missing required environment variable {var}", file=sys.stderr)
             raise RuntimeError(f"Missing required environment variable {var}")
             
     logger.info("Starting MarketStreamer background task...")
@@ -117,25 +124,28 @@ async def lifespan(app: FastAPI):
 
 
 # ── App setup ─────────────────────────────────────────────────────────────────
-app = FastAPI(
-    title="Stock Dashboard API",
-    description="Live Nifty 100 & Midcap 100 Gainers/Losers",
-    version="1.0.0",
-    lifespan=lifespan,
-)
+try:
+    app = FastAPI(
+        title="Stock Dashboard API",
+        description="Live Nifty 100 & Midcap 100 Gainers/Losers",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-
-
-from streamer import connected_clients
-logger.info("WebSocket route /ws/stream is registered and sharing clients with streamer.py")
+    from streamer import connected_clients
+    logger.info("WebSocket route /ws/stream is registered and sharing clients with streamer.py")
+except Exception as e:
+    logger.error(f"FATAL INITIALIZATION ERROR: {e}")
+    traceback.print_exc()
+    sys.exit(3)
 
 
 @app.websocket("/ws/stream")
@@ -605,4 +615,13 @@ if os.path.isdir(BUILD_DIR):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # Render provides PORT env var. Fallback to 8000 for local.
+    port = int(os.environ.get("PORT", 8000))
+    logger.info(f"Starting uvicorn on port {port}")
+    
+    try:
+        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    except Exception as e:
+        logger.error(f"FATAL STARTUP ERROR: {e}")
+        traceback.print_exc()
+        sys.exit(3)
