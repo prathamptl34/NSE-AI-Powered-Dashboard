@@ -256,13 +256,31 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
     meta = ALL_TOKENS.get(token)
     if not meta:
         return
+
+    # SOURCE PRIORITY: Official close_price from WebSocket is authoritative
+    old_prev = meta.get("prev_close", 0.0)
+    was_confirmed = meta.get("prev_close_confirmed", False)
+
+    # 1. If WebSocket provides a close_price, it's the absolute truth for NSE
+    if close_price > 0:
+        # Update if not confirmed OR if there is a significant discrepancy (>0.1%)
+        # Note: We use 0.1% to allow for minor rounding diffs, but 0.5% as user suggested is safer
+        diff = abs(old_prev - close_price)
+        percent_diff = (diff / close_price) * 100 if close_price > 0 else 0
+        
+        if not was_confirmed or percent_diff > 0.1:
+            if was_confirmed and percent_diff > 0.1:
+                logger.info(f"[Metadata] Corrected {meta['symbol']} prev_close: {old_prev} -> {close_price} ({percent_diff:.2f}% diff)")
+            else:
+                logger.info(f"[Metadata] Set {meta['symbol']} prev_close to {close_price} from WebSocket (authoritative)")
+            
+            meta["prev_close"] = close_price
+            meta["prev_close_confirmed"] = True
+    
+    # Fallback to current meta if not updated
     prev = meta["prev_close"]
-    # Use close_price from tick if prev_close is 0 (placeholder)
-    if prev == 0.0 and close_price > 0:
-        prev = close_price
-        meta["prev_close"] = prev  # update for future ticks
-    prev_confirmed = prev > 0
-    change_pct = round(((ltp - prev) / prev) * 100, 2) if prev else 0.0
+    change_pct = round(((ltp - prev) / prev) * 100, 2) if prev > 0 else 0.0
+    
     with _store_lock:
         _tick_store[token] = {
             "token":      token,
@@ -272,7 +290,7 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
             "prev_close": prev,
             "change_pct": change_pct,
             "volume":     volume,
-            "prev_close_confirmed": prev_confirmed,
+            "prev_close_confirmed": meta.get("prev_close_confirmed", False),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -476,21 +494,43 @@ def process_symbol_data(df, symbol, price):
     if not meta or not token:
         return None
         
-    # If prev_close is missing, try to extract it from historical data
-    # (Assuming the last candle in df is the most recent available pre-market or previous day)
-    if meta['prev_close'] == 0.0 and df is not None and len(df) > 0:
+    # Better historical fallback: Use most recent completed trading day's close
+    if not meta.get('prev_close_confirmed', False) and df is not None and len(df) > 0:
         try:
-            # For simplicity, if we have historical data, the first candle's close 
-            # might be a good enough 'previous close' if we don't have better.
-            # Ideally we'd look for the last candle of the *previous* trading day.
-            meta['prev_close'] = float(df['close'].iloc[0])
-            logger.info(f"[Metadata] Set {symbol} prev_close={meta['prev_close']} from historical")
-        except:
-            pass
+            # Drop any rows that might be from 'today' to find the actual previous close
+            import pandas as pd
+            today_date = datetime.now().strftime("%Y-%m-%d")
+            # Assume 'timestamp' is in the index or column
+            if 'timestamp' in df.columns:
+                df['date_only'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y-%m-%d')
+                hist_df = df[df['date_only'] < today_date].copy()
+            else:
+                hist_df = df.copy()
+
+            if not hist_df.empty:
+                # The 'close' of the last candle of the most recent historical day
+                # Since df is usually 15m or 1d, we want the LAST record of the historical set
+                recent_close = float(hist_df['close'].iloc[-1])
+                meta['prev_close'] = recent_close
+                # Still marked as not 'confirmed' because WebSocket is better, but this is a better fallback
+                logger.info(f"[Historical] Set {symbol} prev_close={meta['prev_close']} from fallback")
+        except Exception as e:
+            logger.error(f"[Historical] Fallback error for {symbol}: {e}")
 
     _update_tick(token, price or 0.0)
     with _store_lock:
         return _tick_store.get(token)
+
+def get_prev_close_status():
+    """Returns a report of how many symbols have confirmed previous close prices."""
+    confirmed = sum(1 for m in ALL_TOKENS.values() if m.get('prev_close_confirmed'))
+    total = len(ALL_TOKENS)
+    return {
+        "confirmed": confirmed,
+        "total": total,
+        "pending": total - confirmed,
+        "health_pct": round((confirmed / total) * 100, 2) if total > 0 else 0
+    }
 
 async def broadcast(data):
     """Broadcast JSON to all connected dashboard clients."""
