@@ -19,7 +19,7 @@ import sys
 import traceback
 import re
 from groq import Groq
-from signal_engine import signal_engine
+from signal_engine import calculate_all_signals, get_summary_stats, get_sector
 from streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
 from historical import get_historical_summary
 from nse_holidays import is_trading_day
@@ -463,7 +463,7 @@ async def get_signal_scanner():
                 sector_biases = {}
 
             # Override signals with AI sector biases
-            from signal_engine import get_sector
+            # get_sector is now imported at top level
             for sig in signals:
                 sector = get_sector(sig['symbol'])
                 bias   = sector_biases.get(sector, 'NEUTRAL')
@@ -500,7 +500,7 @@ async def get_signal_scanner():
                         break
 
         # Add sector info to each signal for frontend display
-        from signal_engine import get_sector
+        # get_sector is now imported at top level
         for sig in signals:
             sig['sector'] = get_sector(sig['symbol'])
 
