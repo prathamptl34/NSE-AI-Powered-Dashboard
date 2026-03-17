@@ -19,8 +19,8 @@ import sys
 import traceback
 import re
 from groq import Groq
-from signal_engine import calculate_all_signals, get_summary_stats
-from streamer import MarketStreamer, get_market_summary, get_all_ticks
+from signal_engine import signal_engine
+from streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
 from historical import get_historical_summary
 from nse_holidays import is_trading_day
 
@@ -230,23 +230,27 @@ Sectors to rate: IT, BANKS, FMCG, METALS, AUTO, PHARMA, INFRA, ENERGY, FINANCE, 
 # ── API Routes ────────────────────────────────────────────────────────────────
 
 @app.get("/api/health")
-async def health():
-    """Liveness probe for Google Cloud Run / Antigravity."""
-    import streamer as sm
-    status = "streaming" if (streamer and streamer.is_connected) else "connecting"
+async def health_check():
+    """Liveness probe."""
     uptime_seconds = int(time.time() - START_TIME)
-    
-    symbols_tracked = len(sm.ALL_TOKENS) if hasattr(sm, 'ALL_TOKENS') else 0
-    live_price_count = len(sm.live_prices) if hasattr(sm, 'live_prices') else 0
+    status = "healthy"
+    if streamer and not streamer.is_connected:
+        status = "degraded (websocket disconnected)"
     
     return {
-        "status": status, 
-        "version": "1.0.0",
+        "status": status,
         "uptime": f"{uptime_seconds}s",
-        "websocket_status": status,
-        "symbols_tracked": symbols_tracked,
-        "live_price_count": live_price_count
+        "timestamp": datetime.now().isoformat(),
+        "data_status": get_prev_close_status()
     }
+
+@app.post("/api/force-refresh-metadata")
+async def force_refresh():
+    """Trigger the scavenger loop to re-fetch all prev_close values."""
+    from streamer import ALL_TOKENS
+    for tok in ALL_TOKENS.values():
+        tok["prev_close_confirmed"] = False
+    return {"message": "Metadata refresh triggered. Scavenger will update shortly."}
 
 
 @app.get("/api/market-summary")

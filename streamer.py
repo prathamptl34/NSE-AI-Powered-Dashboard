@@ -464,14 +464,15 @@ async def fetch_angel_one_historical(symbol, token, exchange='NSE'):
     import asyncio
     
     smart = historical._get_smart_connect()
+    # Fetch 5 days to ensure we have a previous trading day
     to_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    from_date = (datetime.datetime.now() - datetime.timedelta(days=5)).strftime("%Y-%m-%d %H:%M")
+    from_date = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
     
     def _fetch():
         return smart.getCandleData({
             "exchange": exchange,
             "symboltoken": str(token),
-            "interval": "FIFTEEN_MINUTE",
+            "interval": "ONE_DAY",  # Use ONE_DAY for absolute Previous Close accuracy
             "fromdate": from_date,
             "todate": to_date
         })
@@ -508,11 +509,16 @@ def process_symbol_data(df, symbol, price):
 
             if not hist_df.empty:
                 # The 'close' of the last candle of the most recent historical day
-                # Since df is usually 15m or 1d, we want the LAST record of the historical set
-                recent_close = float(hist_df['close'].iloc[-1])
+                # AND since interval is ONE_DAY, the records ARE the days.
+                # Sort to be absolutely sure
+                hist_df['dt'] = pd.to_datetime(hist_df['timestamp'])
+                hist_df = hist_df.sort_values('dt')
+                
+                # The last day in hist_df is the PREVIOUS trading day
+                recent_day = hist_df.iloc[-1]
+                recent_close = float(recent_day['close'])
                 meta['prev_close'] = recent_close
-                # Still marked as not 'confirmed' because WebSocket is better, but this is a better fallback
-                logger.info(f"[Historical] Set {symbol} prev_close={meta['prev_close']} from fallback")
+                logger.info(f"[Historical] Set {symbol} prev_close={meta['prev_close']} from {recent_day['timestamp'][:10]}")
         except Exception as e:
             logger.error(f"[Historical] Fallback error for {symbol}: {e}")
 
