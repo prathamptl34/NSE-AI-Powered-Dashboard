@@ -49,4 +49,4 @@ ENV PORT=7860
 EXPOSE 7860
 
 # Uvicorn with multiple workers
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2 --loop uvloop"]
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 2"]
