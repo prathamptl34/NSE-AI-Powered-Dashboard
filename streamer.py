@@ -28,7 +28,6 @@ from SmartApi.smartWebSocketV2 import SmartWebSocketV2
 NSE_SEGMENT = 1
 
 # Nifty 100 tokens (symbol_token : prev_close, name)
-# A representative subset - extend to full 100 using Angel One's scrip master.
 NIFTY100_TOKENS: dict[str, dict] = {
     "10099": {"symbol": "GODREJCP", "prev_close": 0.0},
     "10604": {"symbol": "BHARTIARTL", "prev_close": 0.0},
