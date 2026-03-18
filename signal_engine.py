@@ -5,6 +5,29 @@ AI (Claude) is only used for the summary narrative at the top.
 This keeps costs low and speed high.
 """
 
+FNO_STOCKS = {
+    # Nifty 50
+    "RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "HINDUNILVR",
+    "ITC", "SBIN", "BHARTIARTL", "KOTAKBANK", "LT", "AXISBANK",
+    "ASIANPAINT", "MARUTI", "NESTLEIND", "TITAN", "ULTRACEMCO",
+    "WIPRO", "HCLTECH", "SUNPHARMA", "BAJFINANCE", "BAJAJFINSV",
+    "TECHM", "NTPC", "POWERGRID", "ONGC", "COALINDIA", "TATAMOTORS",
+    "TATASTEEL", "JSWSTEEL", "HINDALCO", "ADANIENT", "ADANIPORTS",
+    "CIPLA", "DRREDDY", "DIVISLAB", "APOLLOHOSP", "EICHERMOT",
+    "HEROMOTOCO", "BAJAJ-AUTO", "M&M", "TATACONSUM", "BRITANNIA",
+    "GRASIM", "INDUSINDBK", "HDFCLIFE", "SBILIFE", "BPCL", "IOC",
+    # Midcap F&O
+    "DLF", "GODREJCP", "MUTHOOTFIN", "TVSMOTOR", "PERSISTENT",
+    "LTIM", "MPHASIS", "COFORGE", "PIIND", "DEEPAKNTR",
+    "SAIL", "NATIONALUM", "NMDC", "CONCOR", "SOLARINDS",
+    "VEDL", "ZYDUSLIFE", "TORNTPHARM", "IPCALAB", "ALKEM",
+    "CHOLAFIN", "ABCAPITAL", "MANAPPURAM", "PEL", "RECLTD",
+    "PFC", "IRCTC", "HAL", "BEL", "BHEL",
+    "GAIL", "PETRONET", "MGL", "IGL", "TRENT",
+    "ZOMATO", "NYKAA", "PAYTM", "POLICYBZR", "DELHIVERY",
+    "ETERNAL",
+}
+
 # Sector classification for NSE stocks
 STOCK_SECTORS = {
     # IT

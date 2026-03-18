@@ -19,7 +19,7 @@ import sys
 import traceback
 import re
 from groq import Groq
-from signal_engine import calculate_all_signals, get_summary_stats, get_sector
+from signal_engine import calculate_all_signals, get_summary_stats, get_sector, FNO_STOCKS
 from streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
 from historical import get_historical_summary
 from nse_holidays import is_trading_day
@@ -229,20 +229,9 @@ Sectors to rate: IT, BANKS, FMCG, METALS, AUTO, PHARMA, INFRA, ENERGY, FINANCE, 
 
 # ── API Routes ────────────────────────────────────────────────────────────────
 
-@app.get("/api/health")
-async def health_check():
-    """Liveness probe."""
-    uptime_seconds = int(time.time() - START_TIME)
-    status = "healthy"
-    if streamer and not streamer.is_connected:
-        status = "degraded (websocket disconnected)"
-    
-    return {
-        "status": status,
-        "uptime": f"{uptime_seconds}s",
-        "timestamp": datetime.now().isoformat(),
-        "data_status": get_prev_close_status()
-    }
+@app.api_route("/api/health", methods=["GET", "HEAD"])
+async def health():
+    return {"status": "ok", "version": "1.0.0"}
 
 @app.post("/api/force-refresh-metadata")
 async def force_refresh():
@@ -435,13 +424,15 @@ async def get_signal_scanner():
         # Map ticks to the format expected by signal_engine (ltp -> price)
         all_stocks = []
         for t in ticks:
+            symbol = t["symbol"]
             all_stocks.append({
-                "symbol":     t["symbol"],
+                "symbol":     symbol,
                 "price":      t["ltp"],
                 "prev_close": t["prev_close"],
                 "change_pct": t.get("change_pct", 0),
                 "volume":     t.get("volume", 0),
-                "avg_volume": t.get("avg_volume", 0)
+                "avg_volume": t.get("avg_volume", 0),
+                "is_fno":     symbol in FNO_STOCKS
             })
 
         # Calculate signals for all stocks (pure algorithm — instant, no API cost)
