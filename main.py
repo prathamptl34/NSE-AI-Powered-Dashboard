@@ -19,10 +19,13 @@ import sys
 import traceback
 import re
 from groq import Groq
-from signal_engine import calculate_all_signals, get_summary_stats, get_sector
-from streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
 from historical import get_historical_summary
 from nse_holidays import is_trading_day
+from signal_engine import calculate_all_signals, get_summary_stats, get_sector, FNO_STOCKS, calculate_price_levels, TECH_CACHE
+from streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status, NIFTY100_TOKENS, MIDCAP100_TOKENS
+import pandas as pd
+from tvDatafeed import TvDatafeed, Interval
+from concurrent.futures import ThreadPoolExecutor
 
 # ── Logging Configuration ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -43,13 +46,31 @@ START_TIME = time.time()
 # ── AI Setup (Groq SDK with LLaMA 3.3) ────────────────────────────────────────
 IST = pytz.timezone("Asia/Kolkata")
 
-def call_ai(prompt: str, max_tokens: int = 600) -> str:
+def is_market_open() -> bool:
+    """Check if NSE market is currently open (9:15 AM - 3:30 PM IST, Mon-Fri)."""
+    now = datetime.now(IST)
+    if now.weekday() >= 5: # Saturday/Sunday
+        return False
+    
+    market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
+    market_close = now.replace(hour=15, minute=30, second=0, microsecond=0)
+    return market_open <= now <= market_close
+
+# Module-level cache for "Offline" survival
+_last_market_data = {
+    "nifty100": {"gainers": [], "losers": []},
+    "midcap100": {"gainers": [], "losers": []},
+    "total_tokens_tracked": 0
+}
+
+def call_ai(prompt: str, max_tokens: int = 600, timeout: float = 15.0) -> str:
     """
     Tries models in order until one works.
     Groq free tier model availability changes — fallback chain is essential.
     """
     models = [
-        "llama-3.1-8b-instant",        # fastest, most reliable free tier
+        "llama-3.3-70b-versatile",      # primary — best quality, still free
+        "llama-3.1-8b-instant",         # fallback — fast
         "llama3-8b-8192",               # stable fallback
         "gemma2-9b-it",                 # Google model on Groq, very reliable
     ]
@@ -62,14 +83,14 @@ def call_ai(prompt: str, max_tokens: int = 600) -> str:
                 messages    = [{"role": "user", "content": prompt}],
                 max_tokens  = max_tokens,
                 temperature = 0.3,
-                timeout     = 10.0,
+                timeout     = timeout,
             )
             result = response.choices[0].message.content
             if result and len(result) > 20:
-                print(f"[Groq] Using model: {model}")
+                print(f"[AI] Success with model: {model}")
                 return result
         except Exception as e:
-            print(f"[Groq] {model} failed: {e}")
+            print(f"[AI] Model {model} failed: {e}")
             continue
 
     return "AI analysis temporarily unavailable. Please try again in a moment."
@@ -89,6 +110,77 @@ IMPORTANT: Write carefully. No spelling errors. No typos. Proofread before respo
     except Exception as e:
         logger.error(f"Scanner narrative error: {str(e)}")
         return f"Market scan complete. {stats_dict['bullish_count']} bullish, {stats_dict['bearish_count']} bearish signals detected across {stats_dict['total']} stocks."
+
+# ── Technical Data Fetcher (Phase 4) ──────────────────────────────────────────
+def fetch_stock_tech(symbol: str, tv: TvDatafeed):
+    """Fetch Daily, Hourly, and 15min data for a single stock."""
+    try:
+        # 1. Daily for ATR(14), EMA20, EMA50, RSI
+        df_d = tv.get_hist(symbol=symbol, exchange='NSE', interval=Interval.in_daily, n_bars=100)
+        if df_d is None or df_d.empty: return None
+        
+        # Calculate indicators
+        df_d['ema20'] = df_d['close'].ewm(span=20, adjust=False).mean()
+        df_d['ema50'] = df_d['close'].ewm(span=50, adjust=False).mean()
+        
+        # Simple RSI
+        delta = df_d['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        df_d['rsi'] = 100 - (100 / (1 + rs))
+        
+        # ATR(14)
+        high_low = df_d['high'] - df_d['low']
+        high_cp = (df_d['high'] - df_d['close'].shift()).abs()
+        low_cp = (df_d['low'] - df_d['close'].shift()).abs()
+        tr = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
+        df_d['atr'] = tr.rolling(window=14).mean()
+
+        # 2. Hourly for Swing High/Low
+        df_h = tv.get_hist(symbol=symbol, exchange='NSE', interval=Interval.in_1_hour, n_bars=50)
+        s_high = df_h['high'].max() if df_h is not None else None
+        s_low  = df_h['low'].min() if df_h is not None else None
+        
+        last = df_d.iloc[-1]
+        return {
+            "atr":   round(float(last['atr']), 2) if not pd.isna(last['atr']) else None,
+            "ema20": round(float(last['ema20']), 2),
+            "ema50": round(float(last['ema50']), 2),
+            "rsi":   round(float(last['rsi']), 1) if not pd.isna(last['rsi']) else 50,
+            "swing_high": round(float(s_high), 2) if s_high else None,
+            "swing_low":  round(float(s_low), 2) if s_low else None,
+            "ready": True
+        }
+    except Exception as e:
+        logger.error(f"Error fetching tech for {symbol}: {e}")
+        return None
+
+async def refresh_technical_data():
+    """Background task to populate TECH_CACHE."""
+    symbols = [v['symbol'] for v in NIFTY100_TOKENS.values()] + [v['symbol'] for v in MIDCAP100_TOKENS.values()]
+    symbols = list(set(symbols)) # Unique
+    
+    tv = TvDatafeed()
+    logger.info(f"Starting technical data refresh for {len(symbols)} stocks...")
+    
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        for i in range(0, len(symbols), 5):
+            batch = symbols[i:i+5]
+            futures = {executor.submit(fetch_stock_tech, sym, tv): sym for sym in batch}
+            
+            for future in futures:
+                sym = futures[future]
+                res = future.result()
+                if res:
+                    TECH_CACHE[sym] = res
+                    # Success log every 20 stocks
+                    if len(TECH_CACHE) % 20 == 0:
+                        logger.info(f"Technical Cache: {len(TECH_CACHE)}/{len(symbols)} loaded")
+            
+            await asyncio.sleep(0.3) # User-requested delay
+
+    logger.info("✅ Technical Cache Refresh Complete")
 
 
 def validate_environment() -> bool:
@@ -120,19 +212,20 @@ async def lifespan(app: FastAPI):
     if not validate_environment():
         raise RuntimeError("Missing required environment variables. See logs for details.")
             
-    logger.info("Starting MarketStreamer background task...")
-    streamer = MarketStreamer(
-        api_key=os.environ["ANGEL_API_KEY"],
-        client_code=os.environ["ANGEL_CLIENT_ID"],
-        password=os.environ["ANGEL_PASSWORD"],
-        totp_secret=os.environ["ANGEL_TOTP_SECRET"],
-    )
-    task = asyncio.create_task(streamer.run())
-    logger.info("MarketStreamer started.")
+    from streamer import start_streamer_with_reconnect
+    logger.info("Starting MarketStreamer reconnection loop...")
+    task = asyncio.create_task(start_streamer_with_reconnect())
+    
+    # Start technical refresh (Phase 4)
+    logger.info("Starting Technical Refresh task...")
+    tech_task = asyncio.create_task(refresh_technical_data())
+    
+    logger.info("Tasks created.")
     yield
-    logger.info("Shutting down MarketStreamer...")
-    streamer.stop()
+    logger.info("Shutting down background tasks...")
+    if streamer: streamer.stop()
     task.cancel()
+    tech_task.cancel()
     try:
         await task
     except asyncio.CancelledError:
@@ -229,20 +322,9 @@ Sectors to rate: IT, BANKS, FMCG, METALS, AUTO, PHARMA, INFRA, ENERGY, FINANCE, 
 
 # ── API Routes ────────────────────────────────────────────────────────────────
 
-@app.get("/api/health")
-async def health_check():
-    """Liveness probe."""
-    uptime_seconds = int(time.time() - START_TIME)
-    status = "healthy"
-    if streamer and not streamer.is_connected:
-        status = "degraded (websocket disconnected)"
-    
-    return {
-        "status": status,
-        "uptime": f"{uptime_seconds}s",
-        "timestamp": datetime.now().isoformat(),
-        "data_status": get_prev_close_status()
-    }
+@app.api_route("/api/health", methods=["GET", "HEAD"])
+async def health():
+    return {"status": "ok", "version": "1.0.0"}
 
 @app.post("/api/force-refresh-metadata")
 async def force_refresh():
@@ -253,24 +335,32 @@ async def force_refresh():
     return {"message": "Metadata refresh triggered. Scavenger will update shortly."}
 
 
+# Add simple in-memory cache with 25s TTL
+_market_cache = {"data": None, "ts": 0}
+CACHE_TTL = 25  # seconds
+
 @app.get("/api/market-summary")
-async def market_summary(request: Request):
+async def market_summary():
     """
     Returns top 5 gainers and losers for Nifty 100 and Nifty Midcap 100.
-
-    Response shape:
-    {
-      "nifty100": {
-        "gainers": [ { symbol, ltp, prev_close, change_pct, volume } ],
-        "losers":  [ ... ]
-      },
-      "midcap100": { "gainers": [...], "losers": [...] },
-      "last_updated": "<ISO timestamp>"
-    }
+    With simple TTL cache + "Last Known" survival if streamer is offline.
     """
-    if streamer is None:
-        raise HTTPException(status_code=503, detail="Streamer not initialised yet.")
-    return get_market_summary(top_n=5)
+    ws_connected = streamer and streamer.is_connected
+    
+    # Try fetch fresh data
+    data = get_market_summary(top_n=5)
+    
+    # Update global "Last Known" cache if we have real data
+    if data.get("total_tokens_tracked", 0) > 0:
+        global _last_market_data
+        _last_market_data = data
+
+    return {
+        **_last_market_data,
+        "ws_connected": ws_connected,
+        "last_update": datetime.now(IST).isoformat(),
+        "data_note": "live" if ws_connected else "last_known"
+    }
 
 
 @app.get("/api/market-summary/raw")
@@ -341,58 +431,84 @@ def extract_signal(text: str) -> str:
     return "NEUTRAL"
 
 
-@app.get("/api/ai-insight")
+@app.get("/api/cache-status")
+async def get_cache_status():
+    """Returns the status of the technical indicators cache."""
+    total_expected = len(NIFTY100_TOKENS) + len(MIDCAP100_TOKENS)
+    cached_count = len(TECH_CACHE)
+    ready = cached_count >= (total_expected * 0.8) # 80%+ coverage is "ready"
+    
+    return {
+        "cached_count": cached_count,
+        "total_expected": total_expected,
+        "ready": ready,
+        "progress_pct": round((cached_count / total_expected) * 100, 1) if total_expected > 0 else 0
+    }
 
-async def get_ai_insight(request: Request):
+@app.get("/api/ai-insight")
+async def get_ai_insight():
+    """
+    Calculates live dashboard stats and fetches AI market context.
+    Shows the power of combining live scraper with LLM analysis.
+    """
     try:
-        # Get live market data from existing streamer
-        summary = get_market_summary()
-        gainers = summary.get("nifty100", {}).get("gainers", [])[:5]
-        losers  = summary.get("nifty100", {}).get("losers",  [])[:5]
+        # Check if we have any real data or if market is open
+        if not _last_market_data or _last_market_data.get("total_tokens_tracked", 0) == 0:
+            return {
+                "signal": "NEUTRAL",
+                "insight": "Market data is currently unavailable. The feed to Angel One may be offline or the session has expired. Analysis will resume automatically when live data is restored.",
+                "timestamp": datetime.now(IST).strftime("%I:%M:%S %p IST"),
+                "gainers": [],
+                "losers": [],
+                "error": "no_data"
+            }
+
+        # 1. Get data from last known if streamer is lagging
+        summary = get_market_summary(top_n=10)
+        if summary.get("total_tokens_tracked", 0) == 0:
+            summary = _last_market_data
+
+        nifty   = summary.get("nifty100", {})
+        midcap  = summary.get("midcap100", {})
+        
+        gainers = (nifty.get("gainers", []) + midcap.get("gainers", []))
+        losers  = (nifty.get("losers", [])  + midcap.get("losers",  []))
+
+        if not gainers and not losers:
+            return {"insight": "Waiting for live data feed...", "signal": "NEUTRAL"}
+
+        # Sort combined lists to find overall top movers
+        gainers.sort(key=lambda x: x['change_pct'], reverse=True)
+        losers.sort(key=lambda x: x['change_pct']) # Most negative first
 
         top_gainer = gainers[0] if gainers else None
-        top_loser  = losers[0]  if losers  else None
+        top_loser  = losers[0] if losers else None
 
-        if not gainers:
-            return {"error": "No market data available yet."}
+        # Build prompts for AI
+        g_text = ", ".join([f"{s['symbol']} (+{s['change_pct']:.1f}%)" for s in gainers[:5]])
+        l_text = ", ".join([f"{s['symbol']} ({s['change_pct']:.1f}%)" for s in losers[:5]])
 
-        # Build market overview prompts
-        g_text = ", ".join([f"{g['symbol']} +{g['change_pct']:.2f}%" for g in gainers])
-        l_text = ", ".join([f"{l['symbol']} {l['change_pct']:.2f}%"  for l in losers])
-
-        main_prompt = f"""You are a senior NSE market analyst writing for professional traders.
-
+        main_prompt = f"""You are a top NSE equity strategist. Analyze current momentum.
 LIVE MARKET DATA:
-- Top Gainers (Nifty 100): {g_text}
-- Top Losers  (Nifty 100): {l_text}
+- Top Gainers: {g_text}
+- Top Losers: {l_text}
 
-Write a structured market analysis in EXACTLY this format.
-Do not add any other sections. Complete every sentence fully.
-Use clean English with zero spelling errors.
-
-MARKET SNAPSHOT:
-[Write exactly 2 complete sentences about overall market breadth and sentiment today.]
-
-SECTOR ANALYSIS:
-[Write exactly 2 complete sentences about which sectors are leading and which are lagging based on the movers above.]
-
-OUTLOOK:
-[Write exactly 2 complete sentences about short-term outlook, key index levels to watch, and what could trigger the next move.]
-
-SIGNAL: [Write only one word here: BULLISH or BEARISH or NEUTRAL or CAUTIOUS]"""
+Write a structured market analysis in EXACTLY this format:
+MARKET SNAPSHOT: [2 sentences]
+SECTOR ANALYSIS: [2 sentences]
+OUTLOOK: [2 sentences]
+SIGNAL: [One word: BULLISH, BEARISH, or NEUTRAL]"""
 
         # Build stock-level prompts
         g_prompt = f"""You are an NSE analyst. Write 3 clean sentences only.
 {top_gainer['symbol']} is up {top_gainer['change_pct']:.2f}% today on NSE.
-Explain: (1) the most likely specific catalyst, (2) what this means for the stock short-term.
-No typos. No bullet points. Complete sentences only.""" if top_gainer else None
+Explain potential catalysts and short-term outlook.""" if top_gainer else None
 
         l_prompt = f"""You are an NSE analyst. Write 3 clean sentences only.
-{top_loser['symbol']} is down {abs(top_loser['change_pct']):.2f}% today on NSE.
-Explain: (1) the most likely specific reason for the decline, (2) key risk level to watch.
-No typos. No bullet points. Complete sentences only.""" if top_loser else None
+{top_loser['symbol']} is down {top_loser['change_pct']:.2f}% today on NSE.
+Explain potential risks and key support levels.""" if top_loser else None
 
-        # Run all 3 AI calls in parallel via Groq
+        # Run AI calls
         tasks = [asyncio.to_thread(call_ai, main_prompt, 600)]
         if g_prompt: tasks.append(asyncio.to_thread(call_ai, g_prompt, 250))
         if l_prompt: tasks.append(asyncio.to_thread(call_ai, l_prompt, 250))
@@ -403,35 +519,34 @@ No typos. No bullet points. Complete sentences only.""" if top_loser else None
         gainer_insight = results[1] if len(results) > 1 else None
         loser_insight  = results[2] if len(results) > 2 else None
 
-        # Strip the signal word from the main insight text
-        lines  = main_insight.strip().split('\n')
-        signal = extract_signal(lines[-1]) if lines else "NEUTRAL"
-        clean_insight = '\n'.join(lines[:-1]).strip() if extract_signal(lines[-1]) != "NEUTRAL" or lines[-1].strip().upper() in ["BULLISH","BEARISH","CAUTIOUS","NEUTRAL"] else main_insight
+        # Extract signal
+        signal = "NEUTRAL"
+        if "SIGNAL:" in main_insight:
+            signal_part = main_insight.split("SIGNAL:")[-1].strip().upper()
+            if "BULLISH" in signal_part: signal = "BULLISH"
+            elif "BEARISH" in signal_part: signal = "BEARISH"
 
         return {
-            "insight":        clean_insight,
+            "insight":        main_insight,
             "signal":         signal,
             "timestamp":      datetime.now(IST).strftime("%I:%M:%S %p IST"),
             "gainer_insight": gainer_insight,
             "loser_insight":  loser_insight,
-            "gainers":        gainers,
-            "losers":         losers,
+            "gainers":        gainers[:10],
+            "losers":         losers[:10],
         }
 
     except Exception as e:
-        logger.error("AI Insight error: %s", e)
+        logger.error(f"AI Insight error: {e}")
         return {"error": str(e), "insight": None}
 
 
 @app.get("/api/signal-scanner")
-async def get_signal_scanner():
+async def signal_scanner():
     try:
         # Get all processed ticks from the streamer
         ticks = get_all_ticks()
-
-        if not ticks:
-            return {"error": "No stock data available. WebSocket may be connecting."}
-
+        
         # Map ticks to the format expected by signal_engine (ltp -> price)
         all_stocks = []
         for t in ticks:
@@ -444,79 +559,37 @@ async def get_signal_scanner():
                 "avg_volume": t.get("avg_volume", 0)
             })
 
-        # Calculate signals for all stocks (pure algorithm — instant, no API cost)
         signals = calculate_all_signals(all_stocks)
+        
+        # Enrich signals with F&O info
+        for s in signals:
+            s["is_fno"] = s["symbol"] in FNO_STOCKS
+            # Preserve Phase 4 logic if already present (added later, but kept for stability)
+            current_price = s["price"] or 0
+            signal_type = s["signal"]
+            score = s["score"]
+            levels = calculate_price_levels(s["symbol"], current_price, signal_type, score)
+            s.update(levels)
 
-        # Detect if market is closed (all stocks have 0% change)
-        changes = [abs(s.get('change_pct', 0)) for s in all_stocks]
-        market_closed = len(changes) > 10 and max(changes) < 0.01
-
-        # Get AI sector biases if market is closed
-        sector_biases = {}
-        if market_closed:
-            logger.info('[Scanner] Market closed — using AI sector biases')
-            try:
-                sector_biases = await asyncio.to_thread(get_ai_sector_biases)
-                logger.info(f'[Scanner] AI biases: {sector_biases}')
-            except Exception as e:
-                logger.error(f"Sector bias error: {e}")
-                sector_biases = {}
-
-            # Override signals with AI sector biases
-            # get_sector is now imported at top level
-            for sig in signals:
-                sector = get_sector(sig['symbol'])
-                bias   = sector_biases.get(sector, 'NEUTRAL')
-
-                if bias == 'BULLISH':
-                    sig['score']  = min(100, sig['score'] + 15)
-                    sig['signal'] = 'BULLISH' if sig['score'] >= 60 else 'NEUTRAL'
-                    sig['action'] = 'WATCH BUY' if sig['score'] >= 60 else 'HOLD'
-                    sig['reason'] = f'{sector} sector showing bullish bias · {sig["reason"]}'
-                elif bias == 'BEARISH':
-                    sig['score']  = max(0, sig['score'] - 15)
-                    sig['signal'] = 'BEARISH' if sig['score'] <= 40 else 'NEUTRAL'
-                    sig['action'] = 'WATCH SELL' if sig['score'] <= 40 else 'HOLD'
-                    sig['reason'] = f'{sector} sector under pressure · {sig["reason"]}'
-
-            # Re-sort after bias adjustment
-            order = {'BULLISH': 0, 'NEUTRAL': 1, 'BEARISH': 2}
-            signals.sort(key=lambda x: (order.get(x['signal'], 1), -x['score']))
-
-        stats = get_summary_stats(signals)
-        top_bullish = [s for s in signals if s["signal"] == "BULLISH"][:5]
-        top_bearish = [s for s in signals if s["signal"] == "BEARISH"][:5]
-
-        # AI calls for narrative and commentary (with timeouts handled in call_ai)
-        narrative = await asyncio.to_thread(generate_scanner_narrative, stats, top_bullish, top_bearish)
-        movers_raw = await asyncio.to_thread(generate_movers_commentary, top_bullish[:3], top_bearish[:3])
-
-        if movers_raw:
-            for item in movers_raw:
-                sym = item.get("symbol")
-                for sig in signals:
-                    if sig["symbol"] == sym:
-                        sig["ai_note"] = item.get("note", "")
-                        break
-
-        # Add sector info to each signal for frontend display
-        # get_sector is now imported at top level
-        for sig in signals:
-            sig['sector'] = get_sector(sig['symbol'])
-
+        if is_market_open():
+            stats = get_summary_stats(signals)
+            top_bullish = [s for s in signals if s["signal"] == "BULLISH"][:5]
+            top_bearish = [s for s in signals if s["signal"] == "BEARISH"][:5]
+            narrative = await asyncio.to_thread(generate_scanner_narrative, stats, top_bullish, top_bearish)
+        else:
+            narrative = (
+                "Market is currently closed. Signals are based on last known "
+                "prices from the previous session. Live signals resume at 9:15 AM IST."
+            )
         return {
-            "signals":      signals,
-            "stats":        stats,
-            "narrative":    narrative,
-            "timestamp":    datetime.now(IST).strftime("%I:%M:%S %p IST"),
-            "market_closed": market_closed,
-            "sector_biases": sector_biases,
-            "disclaimer":   "AI signals for informational purposes only. Not SEBI advice.",
+            "signals": signals,
+            "narrative": narrative,
+            "market_open": is_market_open(),
+            "timestamp": datetime.now(IST).strftime("%I:%M:%S %p IST")
         }
-
     except Exception as e:
-        logger.error("Signal Scanner error: %s", e)
-        return {"error": str(e)}
+        logger.error(f"[SCANNER] Error: {e}")
+        return {"signals": [], "narrative": f"Scanner error: {str(e)}", "error": str(e)}
 
 
 def generate_movers_commentary(top_bullish: list, top_bearish: list) -> list:
