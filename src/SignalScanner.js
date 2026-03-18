@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
 import { StockDeepDiveModal } from './StockDeepDive';
 
-const FILTERS = ["ALL", "BULLISH", "BEARISH", "NEUTRAL", "STRONG"];
+const FILTERS = ["ALL", "BULLISH", "BEARISH", "NEUTRAL", "STRONG", "F&O"];
 
 export default function SignalScanner({ onBack }) {
   const [signals,   setSignals]   = useState([]);
@@ -16,33 +16,65 @@ export default function SignalScanner({ onBack }) {
   const [detailStock, setDetailStock] = useState(null);
   const [sectorBiases, setSectorBiases] = useState({});
   const [marketClosed, setMarketClosed] = useState(false);
+  const [cacheStatus, setCacheStatus] = useState({ ready: true, progress_pct: 100 });
 
   useEffect(() => {
     const timer = setTimeout(() => {
       handleScan();
     }, 300);
-    return () => clearTimeout(timer);
+    
+    // Poll cache status every 10s (Phase 4)
+    const statusInterval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/cache-status");
+        const data = await res.json();
+        setCacheStatus(data);
+      } catch (e) {}
+    }, 10000);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(statusInterval);
+    };
   }, []); 
 
   const handleScan = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 35000); // 35s timeout
+    
     setLoading(true);
     setHasScanned(true);
     setError(null);
     try {
-      const res  = await fetch("/api/signal-scanner");
+      const res  = await fetch("/api/signal-scanner", { signal: controller.signal });
       const data = await res.json();
-      if (data.error) { setError(data.error); return; }
-      setSignals(data.signals || []);
-      setStats(data.stats || {});
-      setSectorBiases(data.sector_biases || {});
-      setMarketClosed(data.market_closed || false);
-      setHasScanned(true);
-      setNarrative(data.narrative || "");
-      setTimestamp(data.timestamp || "");
+      
+      if (data.error) { 
+        setError(data.error); 
+        return; 
+      }
+      
+      if (!data.signals || data.signals.length === 0) {
+        setError("No signal data available. Market may be closed or WebSocket connecting.");
+        setSignals([]);
+      } else {
+        setSignals(data.signals || []);
+        setStats(data.stats || {});
+        setSectorBiases(data.sector_biases || {});
+        setMarketClosed(data.market_closed || false);
+        setNarrative(data.narrative || "");
+        setTimestamp(data.timestamp || "");
+      }
     } catch (e) {
-      setError("Failed to connect to server. Is it running?");
+      if (e.name === 'AbortError') {
+        setError("Scan timed out (server took too long). Please try again.");
+      } else {
+        setError("Failed to connect to server or parse response.");
+      }
+      setSignals([]);
     } finally {
       setLoading(false);
+      clearTimeout(timeoutId);
     }
   };
 
@@ -52,6 +84,8 @@ export default function SignalScanner({ onBack }) {
     // Signal filter
     if (filter === "STRONG") {
       result = result.filter(s => s.score >= 75 || s.score <= 25);
+    } else if (filter === "F&O") {
+      result = result.filter(s => s.is_fno === true);
     } else if (filter !== "ALL") {
       result = result.filter(s => s.signal === filter);
     }
@@ -105,11 +139,24 @@ export default function SignalScanner({ onBack }) {
         </button>
       </div>
 
+      {/* Technical Cache Status Banner (Phase 4) */}
+      {!cacheStatus.ready && (
+        <div className="cache-status-banner">
+          <div className="cache-status-info">
+            <span className="spinner-small" style={{ borderTopColor: '#f59e0b' }} />
+            <span>AI Technical Cache: <strong>{cacheStatus.progress_pct}%</strong> Loaded</span>
+          </div>
+          <div className="cache-status-progress">
+            <div className="cache-status-fill" style={{ width: `${cacheStatus.progress_pct}%` }} />
+          </div>
+        </div>
+      )}
+
       {/* Narrative + Timestamp */}
       {narrative && (
-        <div className="scanner-narrative">
-          <span className="narrative-text">{narrative}</span>
-          <span className="narrative-time">{timestamp}</span>
+        <div className="scanner-summary-card">
+          <p className="scanner-summary-text">{narrative}</p>
+          <span className="scanner-summary-timestamp">{timestamp}</span>
         </div>
       )}
 
@@ -138,10 +185,12 @@ export default function SignalScanner({ onBack }) {
               >
                 {f} 
                 <span className="sc-filter-count">
-                  {f !== "ALL" && f !== "STRONG"
+                  {f !== "ALL" && f !== "STRONG" && f !== "F&O"
                     ? `(${signals.filter(s => s.signal === f).length})`
                     : f === "STRONG"
                     ? `(${signals.filter(s => s.score >= 75 || s.score <= 25).length})`
+                    : f === "F&O"
+                    ? `(${signals.filter(s => s.is_fno).length})`
                     : `(${signals.length})`
                   }
                 </span>
@@ -170,17 +219,22 @@ export default function SignalScanner({ onBack }) {
       {marketClosed && <SectorBiasStrip biases={sectorBiases} />}
 
       {/* Error */}
-      {error && <div className="scanner-error">{error}</div>}
+      {error && (
+        <div className="scanner-error-state">
+          <p>⚠️ {error}</p>
+          <button className="btn-rescan" onClick={handleScan}>
+            ↻ Try Again
+          </button>
+        </div>
+      )}
 
       {/* Empty state */}
       {!loading && signals.length === 0 && !error && (
-        <div className="scanner-empty">
-          <div className="scanner-empty-icon">◉</div>
-          <p className="scanner-empty-title">Ready to Scan</p>
-          <p className="scanner-empty-sub">
-            Click <strong>Scan Now</strong> to analyze all 200 stocks
-            and get live BULLISH / BEARISH / NEUTRAL signals instantly.
-          </p>
+        <div className="scanner-empty-state">
+          <p>No signals loaded yet.</p>
+          <button className="btn-rescan" onClick={handleScan}>
+            ↻ Scan Now
+          </button>
         </div>
       )}
 
@@ -283,6 +337,7 @@ const SignalCard = memo(function SignalCard({ stock, onClick }) {
           {stock.sector && stock.sector !== 'DIVERSIFIED' && (
             <span className="sc-card-sector">{stock.sector}</span>
           )}
+          {stock.is_fno && <span className="fno-badge">F&O</span>}
         </div>
         <span className="sc-card-signal-badge" style={{ background: sc.badge, color: sc.badgeText }}>
           {sc.icon} {stock.signal}
@@ -347,6 +402,7 @@ function SignalDetailModal({ stock, onClose }) {
   return (
     <div className="sdm-backdrop" onClick={handleBackdrop}>
       <div className="sdm-modal" style={{ borderTop: `4px solid ${accentColor}` }}>
+        <div className="modal-drag-handle" />
 
         {/* Header */}
         <div className="sdm-header">
@@ -384,31 +440,29 @@ function SignalDetailModal({ stock, onClose }) {
           </div>
         </div>
 
-        {/* Buy/Sell percentages */}
-        {(isBuy || isSell) && (
-          <div className="sdm-pct-row">
-            <div className="sdm-pct-card sdm-pct-target">
-              <span className="sdm-pct-label">{isBuy ? 'TARGET UPSIDE' : 'TARGET DOWNSIDE'}</span>
-              <span className="sdm-pct-value" style={{ color: isBuy ? '#16a34a' : '#dc2626' }}>
-                {isBuy ? '+' : '-'}{stock.potential_pct || '—'}%
-              </span>
-            </div>
-            <div className="sdm-pct-card sdm-pct-risk">
-              <span className="sdm-pct-label">RISK</span>
-              <span className="sdm-pct-value" style={{ color: '#dc2626' }}>
-                -{stock.risk_pct || '—'}%
-              </span>
-            </div>
-            <div className="sdm-pct-card sdm-pct-rr">
-              <span className="sdm-pct-label">RISK:REWARD</span>
-              <span className="sdm-pct-value" style={{ color: '#2563eb' }}>
-                {stock.potential_pct && stock.risk_pct
-                  ? `1:${(stock.potential_pct / stock.risk_pct).toFixed(1)}`
-                  : '—'}
-              </span>
-            </div>
+        {/* Price Levels Grid */}
+        <div className="price-levels-grid">
+          <div className="price-level-card entry">
+            <span className="level-label">ENTRY</span>
+            <span className="level-price">₹{stock.entry_price?.toLocaleString('en-IN') ?? stock.support?.toLocaleString('en-IN')}</span>
           </div>
-        )}
+          <div className="price-level-card target">
+            <span className="level-label">TARGET</span>
+            <span className="level-price">₹{stock.exit_price?.toLocaleString('en-IN') ?? stock.target?.toLocaleString('en-IN')}</span>
+            <span className="level-note">+{stock.reward_pct ?? stock.target_upside_pct}%</span>
+          </div>
+          <div className="price-level-card stoploss">
+            <span className="level-label">STOP LOSS</span>
+            <span className="level-price">₹{stock.stop_loss?.toLocaleString('en-IN')}</span>
+            <span className="level-note">-{stock.risk_pct}%</span>
+          </div>
+        </div>
+
+        {/* Risk:Reward ratio */}
+        <div className="rr-ratio-bar">
+          <span className="rr-label">Risk : Reward</span>
+          <span className="rr-value">1 : {stock.rr_ratio}</span>
+        </div>
 
         {/* Key Levels */}
         {stock.key_levels && stock.price > 0 && (
