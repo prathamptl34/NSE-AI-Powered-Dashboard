@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from datetime import datetime
+import requests
 from dotenv import load_dotenv
 import pytz
 import logging
@@ -53,7 +54,7 @@ def call_ai(prompt: str, max_tokens: int = 600) -> str:
         "llama3-8b-8192",               # stable fallback
         "gemma2-9b-it",                 # Google model on Groq, very reliable
     ]
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    client = Groq(api_key=os.getenv("GROQ_API_KEY").strip())
 
     for model in models:
         try:
@@ -92,24 +93,22 @@ IMPORTANT: Write carefully. No spelling errors. No typos. Proofread before respo
 
 
 def validate_environment() -> bool:
-    """Validate all required environment variables are set."""
-    required_vars = ["ANGEL_API_KEY", "ANGEL_CLIENT_ID", "ANGEL_PASSWORD", "ANGEL_TOTP_SECRET", "GROQ_API_KEY"]
-    missing_vars = []
-    
-    for var in required_vars:
-        if not os.environ.get(var):
-            missing_vars.append(var)
-    
-    if missing_vars:
-        logger.error("\n" + "="*50)
-        logger.error("DEPLOYMENT FAILED - Missing Environment Variables")
-        logger.error("="*50)
-        logger.error(f"Missing variables: {', '.join(missing_vars)}")
-        logger.error("Please set these in Render Dashboard -> Environment tab")
-        logger.error("="*50 + "\n")
+    """Validate all required env vars exist."""
+    required = ["ANGEL_API_KEY", "ANGEL_CLIENT_ID", "ANGEL_PASSWORD", "ANGEL_TOTP_SECRET", "GROQ_API_KEY"]
+    missing  = [r for r in required if r not in os.environ]
+
+    if missing:
+        logger.error("🛑 MISSING ENV VARS: %s", ", ".join(missing))
         return False
     
     logger.info("✅ All required environment variables are set")
+    try:
+        current_ip = requests.get('https://api.ipify.org').text
+        logger.info(f"🌍 OUTGOING SERVER IP: {current_ip}")
+        logger.info("👉 Copy this IP to your Angel One portal if you get a 'Static IP' error.")
+    except Exception as e:
+        logger.warning(f"Could not check outgoing IP: {e}")
+        
     return True
 
 @asynccontextmanager
@@ -122,10 +121,10 @@ async def lifespan(app: FastAPI):
             
     logger.info("Starting MarketStreamer background task...")
     streamer = MarketStreamer(
-        api_key=os.environ["ANGEL_API_KEY"],
-        client_code=os.environ["ANGEL_CLIENT_ID"],
-        password=os.environ["ANGEL_PASSWORD"],
-        totp_secret=os.environ["ANGEL_TOTP_SECRET"],
+        api_key=os.environ["ANGEL_API_KEY"].strip(),
+        client_code=os.environ["ANGEL_CLIENT_ID"].strip(),
+        password=os.environ["ANGEL_PASSWORD"].strip(),
+        totp_secret=os.environ["ANGEL_TOTP_SECRET"].strip(),
     )
     task = asyncio.create_task(streamer.run())
     logger.info("MarketStreamer started.")

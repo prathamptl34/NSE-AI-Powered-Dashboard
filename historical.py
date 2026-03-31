@@ -50,11 +50,11 @@ def _save_to_persistent_cache(key: str, data: dict):
 
 def _get_smart_connect() -> SmartConnect:
     """Authenticate and return a SmartConnect session."""
-    totp = pyotp.TOTP(os.environ["ANGEL_TOTP_SECRET"]).now()
-    smart = SmartConnect(api_key=os.environ["ANGEL_API_KEY"])
+    totp = pyotp.TOTP(os.environ["ANGEL_TOTP_SECRET"].strip()).now()
+    smart = SmartConnect(api_key=os.environ["ANGEL_API_KEY"].strip())
     resp = smart.generateSession(
-        os.environ["ANGEL_CLIENT_ID"],
-        os.environ["ANGEL_PASSWORD"],
+        os.environ["ANGEL_CLIENT_ID"].strip(),
+        os.environ["ANGEL_PASSWORD"].strip(),
         totp,
     )
     if not resp or resp.get("status") is False:
