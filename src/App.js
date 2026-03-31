@@ -59,9 +59,11 @@ function SkeletonList({ count = 10 }) {
   ));
 }
 
-// ── Sparkline Component ────────────────────────────────────────────────────────
+// ── Interactive Professional Sparkline ───────────────────────────────────────
 
 const Sparkline = React.memo(({ data, accent }) => {
+  const [hoverIdx, setHoverIdx] = useState(null);
+
   if (!data || data.length < 2) {
     return <div className="sparkline-placeholder">Accumulating data...</div>;
   }
@@ -69,41 +71,92 @@ const Sparkline = React.memo(({ data, accent }) => {
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
-  const width = 120;
-  const height = 40;
-  const padding = 2;
+  const width = 140;
+  const height = 45;
+  const paddingY = 5;
 
-  const points = data.map((val, i) => {
-    const x = (i / (data.length - 1)) * width;
-    const y = height - padding - ((val - min) / range) * (height - 2 * padding);
-    return `${x},${y}`;
-  }).join(' ');
+  // Smoothing function for professional curves
+  const getX = (i) => (i / (data.length - 1)) * width;
+  const getY = (val) => height - paddingY - ((val - min) / range) * (height - 2 * paddingY);
 
-  // Create area path by closing the polygon at the bottom
-  const areaPoints = `${points} ${width},${height} 0,${height}`;
-  
+  // Generate smooth bezier curve path
+  let pathD = `M ${getX(0)},${getY(data[0])}`;
+  for (let i = 1; i < data.length; i++) {
+    const currX = getX(i);
+    const currY = getY(data[i]);
+    const prevX = getX(i - 1);
+    const prevY = getY(data[i - 1]);
+    const cpX = (prevX + currX) / 2;
+    pathD += ` C ${cpX},${prevY} ${cpX},${currY} ${currX},${currY}`;
+  }
+
+  const areaD = `${pathD} L ${width},${height} L 0,${height} Z`;
   const color = accent === 'green' ? '#10b981' : '#ef4444';
 
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const idx = Math.round((x / rect.width) * (data.length - 1));
+    setHoverIdx(Math.max(0, Math.min(idx, data.length - 1)));
+  };
+
   return (
-    <div className="sparkline-container">
-      <svg width="100%" height="40" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+    <div 
+      className="sparkline-container" 
+      style={{ position: 'relative', width: '100%', height: '50px', marginLeft: '10px' }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setHoverIdx(null)}
+    >
+      <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
         <defs>
           <linearGradient id={`grad-${accent}`} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+            <stop offset="0%" stopColor={color} stopOpacity="0.5" />
             <stop offset="100%" stopColor={color} stopOpacity="0.0" />
           </linearGradient>
+          <filter id="glow">
+            <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
         </defs>
-        <polygon fill={`url(#grad-${accent})`} points={areaPoints} />
-        <polyline
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          points={points}
-          vectorEffect="non-scaling-stroke"
-        />
+        
+        {/* Soft Area Fill */}
+        <path d={areaD} fill={`url(#grad-${accent})`} />
+        
+        {/* Smooth Line */}
+        <path d={pathD} fill="none" stroke={color} strokeWidth="2" filter="url(#glow)" />
+
+        {/* Interactive Hover Crosshair & Dot */}
+        {hoverIdx !== null && (
+          <g>
+            <line x1={getX(hoverIdx)} y1="0" x2={getX(hoverIdx)} y2={height} stroke="var(--text-muted)" strokeDasharray="3,3" opacity="0.6" strokeWidth="1" />
+            <circle cx={getX(hoverIdx)} cy={getY(data[hoverIdx])} r="3.5" fill="var(--bg-main)" stroke={color} strokeWidth="2" />
+          </g>
+        )}
       </svg>
+
+      {/* Modern Tooltip Label */}
+      {hoverIdx !== null && (
+        <div style={{
+          position: 'absolute',
+          left: `calc(${(hoverIdx / (data.length - 1)) * 100}% - 20px)`,
+          top: '-20px',
+          background: 'var(--bg-elevated)',
+          color: 'var(--text-primary)',
+          fontSize: '10px',
+          fontWeight: 'bold',
+          padding: '3px 6px',
+          borderRadius: '4px',
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          zIndex: 10
+        }}>
+          ₹{data[hoverIdx].toFixed(2)}
+        </div>
+      )}
     </div>
   );
 });
@@ -124,7 +177,7 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
   return (
     <div
       className={`stock-card ${viewMode === 'chart' ? 'card-chart-mode' : ''} flash-${flash || 'none'}`}
-      style={{ animationDelay: `${rank * 0.04}s`, cursor: 'pointer' }}
+      style={{ animationDelay: `${rank * 0.04}s`, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
       onClick={() => onClick({
         symbol: stock.symbol,
         price: stock.ltp,
@@ -136,7 +189,7 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
         {String(rank).padStart(2, '0')}
       </div>
 
-      <div className="stock-meta">
+      <div className="stock-meta" style={{ minWidth: '90px' }}>
         <span className="stock-symbol">{stock.symbol}</span>
         <span className="stock-exchange">NSE</span>
       </div>

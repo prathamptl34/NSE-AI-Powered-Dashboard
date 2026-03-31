@@ -209,6 +209,7 @@ def calculate_signal(stock: dict) -> dict:
         "prev_close":   round(prev_close, 2) if prev_close else None,
         "change_pct":   change_pct,
         "vol_ratio":    vol_ratio,
+        "is_fno":       stock.get("is_fno", False),
         "potential_pct": potential_pct,
         "risk_pct":      risk_pct,
         "key_levels": {
