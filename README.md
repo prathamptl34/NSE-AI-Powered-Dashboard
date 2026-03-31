@@ -2,7 +2,7 @@
 title: Stock Dashboard
 emoji: 📈
 colorFrom: blue
-colorTo: black
+colorTo: green
 sdk: docker
 pinned: false
 ---
