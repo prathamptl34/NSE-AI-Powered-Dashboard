@@ -75,19 +75,13 @@ const Sparkline = React.memo(({ data, accent }) => {
   const height = 45;
   const paddingY = 5;
 
-  // Smoothing function for professional curves
   const getX = (i) => (i / (data.length - 1)) * width;
   const getY = (val) => height - paddingY - ((val - min) / range) * (height - 2 * paddingY);
 
-  // Generate smooth bezier curve path
+  // Generate straight line path for accurate financial look
   let pathD = `M ${getX(0)},${getY(data[0])}`;
   for (let i = 1; i < data.length; i++) {
-    const currX = getX(i);
-    const currY = getY(data[i]);
-    const prevX = getX(i - 1);
-    const prevY = getY(data[i - 1]);
-    const cpX = (prevX + currX) / 2;
-    pathD += ` C ${cpX},${prevY} ${cpX},${currY} ${currX},${currY}`;
+    pathD += ` L ${getX(i)},${getY(data[i])}`;
   }
 
   const areaD = `${pathD} L ${width},${height} L 0,${height} Z`;
@@ -125,8 +119,8 @@ const Sparkline = React.memo(({ data, accent }) => {
         {/* Soft Area Fill */}
         <path d={areaD} fill={`url(#grad-${accent})`} />
         
-        {/* Smooth Line */}
-        <path d={pathD} fill="none" stroke={color} strokeWidth="2" filter="url(#glow)" />
+        {/* Sharp Financial Line */}
+        <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#glow)" />
 
         {/* Interactive Hover Crosshair & Dot */}
         {hoverIdx !== null && (
@@ -177,7 +171,7 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
   return (
     <div
       className={`stock-card ${viewMode === 'chart' ? 'card-chart-mode' : ''} flash-${flash || 'none'}`}
-      style={{ animationDelay: `${rank * 0.04}s`, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+      style={{ animationDelay: `${rank * 0.04}s`, cursor: 'pointer' }}
       onClick={() => onClick({
         symbol: stock.symbol,
         price: stock.ltp,
