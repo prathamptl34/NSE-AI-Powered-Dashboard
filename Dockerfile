@@ -7,7 +7,7 @@ WORKDIR /app
 
 # Cache node_modules layer
 COPY package.json package-lock.json* ./
-RUN npm ci --silent
+RUN npm install
 
 # Copy source and build (resilient to flat structure)
 COPY . .
