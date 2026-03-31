@@ -21,7 +21,7 @@ import re
 from groq import Groq
 from signal_engine import calculate_all_signals, get_summary_stats, get_sector, FNO_STOCKS
 from streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
-from historical import get_historical_summary
+from historical import get_historical_summary, get_intraday_sparklines
 from nse_holidays import is_trading_day
 
 # ── Logging Configuration ─────────────────────────────────────────────────────
@@ -305,15 +305,18 @@ async def historical_summary(
     try:
         result = await asyncio.to_thread(get_historical_summary, date, index, top_n)
     except RuntimeError as e:
+        logger.error(f"Historical Auth Error: {e}")
         raise HTTPException(
             status_code=503,
-            detail={"error": "AUTH_FAILED", "message": str(e)}
+            detail={"error": "AUTH_FAILED", "message": f"Angel One login failed. Please check your credentials. Details: {str(e)}"}
         )
     except Exception as e:
-        logger.error("Historical fetch error: %s", e)
+        import traceback
+        logger.error(f"Historical fetch error: {e}")
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail={"error": "FETCH_ERROR", "message": "Failed to fetch historical data. Check logs."}
+            detail={"error": "FETCH_ERROR", "message": f"Failed to fetch historical data: {str(e)}"}
         )
 
     return result
@@ -328,6 +331,44 @@ def extract_signal(text: str) -> str:
         if word in text_upper:
             return word
     return "NEUTRAL"
+
+from streamer import ALL_TOKENS
+
+@app.get("/api/intraday-sparklines")
+async def api_intraday_sparklines(symbols: str):
+    """
+    Fetch 5-minute intraday prices for a comma-separated list of symbols.
+    """
+    try:
+        sym_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+        if not sym_list:
+            return {}
+            
+        # Map symbols to tokens
+        tokens_to_fetch = []
+        token_to_sym = {}
+        for token, meta in ALL_TOKENS.items():
+            if meta["symbol"] in sym_list:
+                tokens_to_fetch.append(token)
+                token_to_sym[token] = meta["symbol"]
+                
+        if not tokens_to_fetch:
+            return {}
+        
+        # Offload to a thread because it makes Angel One API calls + sleeps
+        results = await asyncio.to_thread(get_intraday_sparklines, tokens_to_fetch)
+        
+        # Map tokens back to symbols in response
+        sym_results = {}
+        for t, prices in results.items():
+            sym = token_to_sym.get(t)
+            if sym:
+                sym_results[sym] = prices
+                
+        return sym_results
+    except Exception as e:
+        logger.error(f"Sparkline fetch error: {e}")
+        return {}
 
 
 @app.get("/api/ai-insight")
@@ -626,12 +667,17 @@ if os.path.isdir(BUILD_DIR):
 
 if __name__ == "__main__":
     import uvicorn
-    # Render provides PORT env var. Fallback to 8000 for local.
     port = int(os.environ.get("PORT", 8000))
     logger.info(f"Starting uvicorn on port {port}")
     
     try:
-        uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+        uvicorn.run(
+            "main:app", 
+            host="0.0.0.0", 
+            port=port, 
+            reload=True,
+            reload_excludes=[".data/*", "historical_cache.json", "*.log"]
+        )
     except Exception as e:
         logger.error(f"FATAL STARTUP ERROR: {e}")
         traceback.print_exc()

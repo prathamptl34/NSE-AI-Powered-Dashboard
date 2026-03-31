@@ -72,3 +72,19 @@ def is_trading_day(date_str: str) -> tuple[bool, str]:
         return False, f"Data not available before {two_years_ago.strftime('%d %b %Y')}. Angel One provides ~2 years of history."
 
     return True, "Valid trading day."
+
+from datetime import timedelta
+
+def get_last_trading_day_str() -> str:
+    """
+    Returns the YYYY-MM-DD string of the most recent valid trading day,
+    including today if today is a trading day.
+    """
+    d = datetime.now()
+    for _ in range(10):  # Check up to 10 days back
+        date_str = d.strftime("%Y-%m-%d")
+        if is_trading_day(date_str)[0]:
+            return date_str
+        d -= timedelta(days=1)
+    
+    return datetime.now().strftime("%Y-%m-%d") # Fallback to today

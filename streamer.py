@@ -537,26 +537,23 @@ def get_prev_close_status():
         "health_pct": round((confirmed / total) * 100, 2) if total > 0 else 0
     }
 
+async def safe_send(ws, data):
+    try:
+        await ws.send_json(data)
+    except Exception:
+        connected_clients.discard(ws)
+
 async def broadcast(data):
     """Broadcast JSON to all connected dashboard clients."""
     if not connected_clients:
         return
     
-    import json
-    msg = json.dumps(data)
-    
     # Create list of tasks to send to all clients concurrently
-    tasks = []
-    for ws in list(connected_clients):
-        try:
-            tasks.append(ws.send_text(msg))
-        except Exception:
-            connected_clients.discard(ws)
-            
+    tasks = [safe_send(ws, data) for ws in list(connected_clients)]
     if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*tasks)
 
-    logger.info(f"[Broadcast] Partial update: {len(data.get('gainers', []))} gainers, {len(data.get('losers', []))} losers")
+    logger.info(f"[Broadcast] Partial update: {len(data.get('gainers', []))} gainers, {len(data.get('losers', []))} losers | Clients: {len(connected_clients)}")
 
 async def fetch_symbol_safe(symbol, token, exchange='NSE'):
     """

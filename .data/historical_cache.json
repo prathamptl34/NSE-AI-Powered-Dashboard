@@ -1,0 +1,294 @@
+{
+  "2026-03-05_nifty100_5": {
+    "data": {
+      "gainers": [
+        {
+          "token": "509",
+          "symbol": "MAZDOCK",
+          "index": "nifty100",
+          "open": 2179.9,
+          "high": 2414.9,
+          "low": 2178.8,
+          "close": 2352.5,
+          "prev_close": 2165.4,
+          "change_pct": 8.64,
+          "volume": 9407750,
+          "date": "2026-03-05"
+        },
+        {
+          "token": "11483",
+          "symbol": "LT",
+          "index": "nifty100",
+          "open": 3924.2,
+          "high": 4072.9,
+          "low": 3908.9,
+          "close": 4038.7,
+          "prev_close": 3882.6,
+          "change_pct": 4.02,
+          "volume": 4996312,
+          "date": "2026-03-05"
+        },
+        {
+          "token": "15355",
+          "symbol": "RECLTD",
+          "index": "nifty100",
+          "open": 330.35,
+          "high": 343.4,
+          "low": 329.5,
+          "close": 341.85,
+          "prev_close": 328.75,
+          "change_pct": 3.98,
+          "volume": 11657520,
+          "date": "2026-03-05"
+        },
+        {
+          "token": "18921",
+          "symbol": "VBL",
+          "index": "nifty100",
+          "open": 435.9,
+          "high": 448.5,
+          "low": 432.6,
+          "close": 445.75,
+          "prev_close": 429.75,
+          "change_pct": 3.72,
+          "volume": 6468494,
+          "date": "2026-03-05"
+        },
+        {
+          "token": "1363",
+          "symbol": "HINDALCO",
+          "index": "nifty100",
+          "open": 930.0,
+          "high": 983.5,
+          "low": 926.4,
+          "close": 954.95,
+          "prev_close": 921.8,
+          "change_pct": 3.6,
+          "volume": 16533658,
+          "date": "2026-03-05"
+        }
+      ],
+      "losers": [
+        {
+          "token": "756871",
+          "symbol": "ENRIN",
+          "index": "nifty100",
+          "open": 2942.0,
+          "high": 2987.9,
+          "low": 2830.5,
+          "close": 2863.9,
+          "prev_close": 2942.0,
+          "change_pct": -2.65,
+          "volume": 474634,
+          "date": "2026-03-05"
+        },
+        {
+          "token": "13538",
+          "symbol": "TECHM",
+          "index": "nifty100",
+          "open": 1358.0,
+          "high": 1366.7,
+          "low": 1319.3,
+          "close": 1333.3,
+          "prev_close": 1351.2,
+          "change_pct": -1.32,
+          "volume": 1210010,
+          "date": "2026-03-05"
+        },
+        {
+          "token": "17818",
+          "symbol": "LTM",
+          "index": "nifty100",
+          "open": 4385.0,
+          "high": 4412.0,
+          "low": 4260.0,
+          "close": 4306.4,
+          "prev_close": 4349.3,
+          "change_pct": -0.99,
+          "volume": 193854,
+          "date": "2026-03-05"
+        },
+        {
+          "token": "7229",
+          "symbol": "HCLTECH",
+          "index": "nifty100",
+          "open": 1378.2,
+          "high": 1378.2,
+          "low": 1332.5,
+          "close": 1354.1,
+          "prev_close": 1364.0,
+          "change_pct": -0.73,
+          "volume": 2217963,
+          "date": "2026-03-05"
+        },
+        {
+          "token": "1512",
+          "symbol": "INDHOTEL",
+          "index": "nifty100",
+          "open": 638.0,
+          "high": 641.85,
+          "low": 614.1,
+          "close": 629.7,
+          "prev_close": 633.75,
+          "change_pct": -0.64,
+          "volume": 4257521,
+          "date": "2026-03-05"
+        }
+      ],
+      "date": "2026-03-05",
+      "index": "nifty100",
+      "total_tokens_fetched": 100,
+      "tokens_with_data": 81,
+      "is_intraday": false,
+      "cached": false,
+      "fetch_duration_s": 88.65
+    },
+    "saved_at": "2026-03-31T13:10:02.023137"
+  },
+  "2026-03-18_nifty100_5": {
+    "data": {
+      "gainers": [
+        {
+          "token": "18143",
+          "symbol": "JIOFIN",
+          "index": "nifty100",
+          "open": 238.9,
+          "high": 250.5,
+          "low": 237.95,
+          "close": 248.2,
+          "prev_close": 237.6,
+          "change_pct": 4.46,
+          "volume": 19579987,
+          "date": "2026-03-18"
+        },
+        {
+          "token": "509",
+          "symbol": "MAZDOCK",
+          "index": "nifty100",
+          "open": 2367.4,
+          "high": 2465.0,
+          "low": 2363.0,
+          "close": 2456.9,
+          "prev_close": 2362.3,
+          "change_pct": 4.0,
+          "volume": 2070389,
+          "date": "2026-03-18"
+        },
+        {
+          "token": "10217",
+          "symbol": "ADANIENSOL",
+          "index": "nifty100",
+          "open": 1000.0,
+          "high": 1043.8,
+          "low": 1000.0,
+          "close": 1036.7,
+          "prev_close": 1000.6,
+          "change_pct": 3.61,
+          "volume": 1643508,
+          "date": "2026-03-18"
+        },
+        {
+          "token": "14299",
+          "symbol": "PFC",
+          "index": "nifty100",
+          "open": 420.95,
+          "high": 434.95,
+          "low": 418.5,
+          "close": 432.25,
+          "prev_close": 418.05,
+          "change_pct": 3.4,
+          "volume": 15012423,
+          "date": "2026-03-18"
+        },
+        {
+          "token": "5097",
+          "symbol": "ETERNAL",
+          "index": "nifty100",
+          "open": 235.8,
+          "high": 243.22,
+          "low": 234.04,
+          "close": 242.54,
+          "prev_close": 234.63,
+          "change_pct": 3.37,
+          "volume": 74981953,
+          "date": "2026-03-18"
+        }
+      ],
+      "losers": [
+        {
+          "token": "3063",
+          "symbol": "VEDL",
+          "index": "nifty100",
+          "open": 700.0,
+          "high": 700.0,
+          "low": 674.5,
+          "close": 679.0,
+          "prev_close": 699.35,
+          "change_pct": -2.91,
+          "volume": 11227748,
+          "date": "2026-03-18"
+        },
+        {
+          "token": "13332",
+          "symbol": "SOLARINDS",
+          "index": "nifty100",
+          "open": 14056.0,
+          "high": 14135.0,
+          "low": 13659.0,
+          "close": 13699.0,
+          "prev_close": 14034.0,
+          "change_pct": -2.39,
+          "volume": 193238,
+          "date": "2026-03-18"
+        },
+        {
+          "token": "1424",
+          "symbol": "HINDZINC",
+          "index": "nifty100",
+          "open": 538.8,
+          "high": 540.8,
+          "low": 529.35,
+          "close": 537.6,
+          "prev_close": 546.35,
+          "change_pct": -1.6,
+          "volume": 6387274,
+          "date": "2026-03-18"
+        },
+        {
+          "token": "20374",
+          "symbol": "COALINDIA",
+          "index": "nifty100",
+          "open": 462.25,
+          "high": 462.85,
+          "low": 449.2,
+          "close": 455.2,
+          "prev_close": 462.25,
+          "change_pct": -1.53,
+          "volume": 9539041,
+          "date": "2026-03-18"
+        },
+        {
+          "token": "11630",
+          "symbol": "NTPC",
+          "index": "nifty100",
+          "open": 385.0,
+          "high": 386.35,
+          "low": 377.6,
+          "close": 378.5,
+          "prev_close": 383.35,
+          "change_pct": -1.27,
+          "volume": 10681498,
+          "date": "2026-03-18"
+        }
+      ],
+      "date": "2026-03-18",
+      "index": "nifty100",
+      "total_tokens_fetched": 100,
+      "tokens_with_data": 87,
+      "is_intraday": false,
+      "cached": false,
+      "fetch_duration_s": 100.48
+    },
+    "saved_at": "2026-03-31T13:15:20.373375"
+  }
+}

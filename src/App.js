@@ -59,7 +59,56 @@ function SkeletonList({ count = 10 }) {
   ));
 }
 
-const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick }) {
+// ── Sparkline Component ────────────────────────────────────────────────────────
+
+const Sparkline = React.memo(({ data, accent }) => {
+  if (!data || data.length < 2) {
+    return <div className="sparkline-placeholder">Accumulating data...</div>;
+  }
+
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const range = max - min || 1;
+  const width = 120;
+  const height = 40;
+  const padding = 2;
+
+  const points = data.map((val, i) => {
+    const x = (i / (data.length - 1)) * width;
+    const y = height - padding - ((val - min) / range) * (height - 2 * padding);
+    return `${x},${y}`;
+  }).join(' ');
+
+  // Create area path by closing the polygon at the bottom
+  const areaPoints = `${points} ${width},${height} 0,${height}`;
+  
+  const color = accent === 'green' ? '#10b981' : '#ef4444';
+
+  return (
+    <div className="sparkline-container">
+      <svg width="100%" height="40" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`grad-${accent}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
+        <polygon fill={`url(#grad-${accent})`} points={areaPoints} />
+        <polyline
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={points}
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+    </div>
+  );
+});
+
+const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, viewMode, history }) {
   const [flash, setFlash] = useState(null);
   const prevPrice = useRef(stock.ltp);
 
@@ -74,7 +123,7 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick }
 
   return (
     <div
-      className={`stock-card flash-${flash || 'none'}`}
+      className={`stock-card ${viewMode === 'chart' ? 'card-chart-mode' : ''} flash-${flash || 'none'}`}
       style={{ animationDelay: `${rank * 0.04}s`, cursor: 'pointer' }}
       onClick={() => onClick({
         symbol: stock.symbol,
@@ -92,12 +141,17 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick }
         <span className="stock-exchange">NSE</span>
       </div>
 
-      <div className="stock-price-block">
-        <span className="stock-price">₹{formatINR(stock.ltp)}</span>
-        <span className="stock-prev">prev ₹{formatINR(stock.prev_close)}</span>
-      </div>
+      {viewMode === 'chart' ? (
+        <Sparkline data={history} accent={accent} />
+      ) : (
+        <div className="stock-price-block">
+          <span className="stock-price">₹{formatINR(stock.ltp)}</span>
+          <span className="stock-prev">prev ₹{formatINR(stock.prev_close)}</span>
+        </div>
+      )}
 
       <div className={`change-badge change-${accent}`}>
+        {viewMode === 'chart' && <span className="chart-price">₹{formatINR(stock.ltp)}</span>}
         <span className="change-arrow">{accent === 'green' ? '▲' : '▼'}</span>
         <span className="change-pct">{Math.abs(stock.change_pct).toFixed(2)}%</span>
       </div>
@@ -105,7 +159,7 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick }
   );
 });
 
-function Panel({ title, accent, data, type, lastUpdated, onStockClick }) {
+function Panel({ title, accent, data, type, lastUpdated, onStockClick, viewMode, historyMap }) {
   return (
     <section className={`panel panel-${accent}`}>
       <div className="panel-header">
@@ -123,6 +177,8 @@ function Panel({ title, accent, data, type, lastUpdated, onStockClick }) {
                 rank={i+1} 
                 accent={accent} 
                 onClick={onStockClick} 
+                viewMode={viewMode}
+                history={historyMap[s.symbol] || []}
               />
             ))
         }
@@ -145,6 +201,67 @@ export default function App() {
   const [wsStatus, setWsStatus] = useState('offline');
   const [lastUpdated, setLastUpdated] = useState('');
 
+  // ── Perspective View Mode
+  const [viewMode, setViewMode] = useState('normal'); // 'normal' | 'chart'
+  const [historyMap, setHistoryMap] = useState({}); // { symbol: [prices...] }
+
+  const fetchedIntradayRef = useRef(new Set());
+
+  useEffect(() => {
+    if (viewMode !== 'chart') return;
+    
+    const all = [...niftyData.gainers, ...niftyData.losers, ...midcapData.gainers, ...midcapData.losers];
+    const missingSymbols = all
+      .map(s => s.symbol)
+      .filter(sym => !fetchedIntradayRef.current.has(sym) && (!historyMap[sym] || historyMap[sym].length <= 2));
+      
+    if (missingSymbols.length === 0) return;
+    
+    missingSymbols.forEach(sym => fetchedIntradayRef.current.add(sym));
+    
+    const fetchIntraday = async () => {
+      try {
+        const res = await fetch(`/api/intraday-sparklines?symbols=${missingSymbols.join(',')}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        setHistoryMap(prev => {
+          const next = { ...prev };
+          Object.keys(data).forEach(sym => {
+            if (data[sym] && data[sym].length > 2) {
+              // Intraday API gives 5-min candles, keep up to last 50 for the chart
+              next[sym] = data[sym].slice(-50); 
+            }
+          });
+          return next;
+        });
+      } catch (e) {
+        console.error("Fetch intraday error", e);
+      }
+    };
+    
+    fetchIntraday();
+  }, [viewMode, niftyData, midcapData, historyMap]);
+
+  const updateHistory = useCallback((stocks) => {
+    setHistoryMap(prev => {
+      const next = { ...prev };
+      stocks.forEach(s => {
+        let h = next[s.symbol];
+        
+        if (!h) {
+          h = s.prev_close ? [s.prev_close, s.ltp] : [s.ltp, s.ltp];
+        } 
+        else if (h[h.length - 1] !== s.ltp) {
+          h = [...h, s.ltp].slice(-50); 
+        }
+        
+        next[s.symbol] = h;
+      });
+      return next;
+    });
+  }, []);
+
   // ── Historical State
   const [selectedDate, setSelectedDate] = useState("");
   const [historicalData, setHistoricalData] = useState(null);
@@ -159,15 +276,26 @@ export default function App() {
       const res = await fetch("/api/market-summary");
       if (!res.ok) return;
       const json = await res.json();
-      setNiftyData(json.nifty100 || { gainers: [], losers: [] });
-      setMidcapData(json.midcap100 || { gainers: [], losers: [] });
+      
+      const nData = json.nifty100 || { gainers: [], losers: [] };
+      const mData = json.midcap100 || { gainers: [], losers: [] };
+
+      setNiftyData(nData);
+      setMidcapData(mData);
       setLiveCount(json.total_tokens_tracked || 0);
       setLastUpdated(formatIST());
+      
+      // Update history for all stocks
+      if (viewMode === 'chart') {
+        const all = [...nData.gainers, ...nData.losers, ...mData.gainers, ...mData.losers];
+        updateHistory(all);
+      }
+
       if (wsStatus !== 'live') setWsStatus('live');
     } catch {
       setWsStatus('offline');
     }
-  }, [wsStatus]);
+  }, [wsStatus, viewMode, updateHistory]);
 
   useEffect(() => {
     fetchData();
@@ -193,13 +321,20 @@ export default function App() {
         try {
           const msg = JSON.parse(e.data);
           if (msg.type === 'partial_update' || msg.type === 'full_update') {
+            const currentData = { gainers: msg.gainers || [], losers: msg.losers || [] };
+            
             if (msg.index === 'nifty100') {
-              setNiftyData({ gainers: msg.gainers || [], losers: msg.losers || [] });
+              setNiftyData(currentData);
             } else if (msg.index === 'midcap100') {
-              setMidcapData({ gainers: msg.gainers || [], losers: msg.losers || [] });
+              setMidcapData(currentData);
             } else {
-              setNiftyData({ gainers: msg.gainers || [], losers: msg.losers || [] });
+              setNiftyData(currentData);
             }
+
+            if (viewMode === 'chart') {
+              updateHistory([...currentData.gainers, ...currentData.losers]);
+            }
+
             setLastUpdated(formatIST());
           }
         } catch (err) {}
@@ -258,9 +393,20 @@ export default function App() {
                 <span className="title-sub">NSE · Live Dashboard</span>
               </div>
             </div>
-            <div className="header-center" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-              <MarketClock />
+            
+            <div className="header-center">
+              <div className="view-toggle-container">
+                <span className={`toggle-label ${viewMode === 'normal' ? 'active' : ''}`}>Normal</span>
+                <button 
+                  className={`view-toggle-switch ${viewMode === 'chart' ? 'on' : ''}`}
+                  onClick={() => setViewMode(prev => prev === 'normal' ? 'chart' : 'normal')}
+                >
+                  <div className="toggle-handle" />
+                </button>
+                <span className={`toggle-label ${viewMode === 'chart' ? 'active' : ''}`}>Charts</span>
+              </div>
             </div>
+
             <div className="header-right">
               <button 
                 className="ai-insights-btn"
@@ -275,36 +421,68 @@ export default function App() {
                 ◉ Signal Scanner
               </button>
               <ConnectionDot status={wsStatus} />
-              <span className="symbol-count">{liveCount > 0 ? liveCount : '200'} symbols</span>
+              <MarketClock />
             </div>
           </header>
 
-          {/* NIFTY 100 */}
+          {/* LIVE BOARDS */}
           <div className="section-label">
             <span className="label-dot" />
             Nifty 100
           </div>
           <main className="panels-wrapper">
-            <Panel title="Top Gainers" accent="green" data={niftyData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} />
-            <Panel title="Top Losers"  accent="red"   data={niftyData.losers}  type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} />
+            <Panel 
+              title="Top Gainers" 
+              accent="green" 
+              data={niftyData.gainers} 
+              type="gainer" 
+              lastUpdated={lastUpdated} 
+              onStockClick={openExplain} 
+              viewMode={viewMode}
+              historyMap={historyMap}
+            />
+            <Panel 
+              title="Top Losers"  
+              accent="red"   
+              data={niftyData.losers}  
+              type="loser" 
+              lastUpdated={lastUpdated} 
+              onStockClick={openExplain} 
+              viewMode={viewMode}
+              historyMap={historyMap}
+            />
           </main>
 
-          {/* NIFTY MIDCAP 100 */}
           <div className="section-label">
             <span className="label-dot" style={{ background: '#7c3aed' }} />
             Nifty Midcap 100
           </div>
           <main className="panels-wrapper" style={{ marginBottom: '32px' }}>
-            <Panel title="Top Gainers" accent="green" data={midcapData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} />
-            <Panel title="Top Losers"  accent="red"   data={midcapData.losers}  type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} />
+            <Panel 
+              title="Top Gainers" 
+              accent="green" 
+              data={midcapData.gainers} 
+              type="gainer" 
+              lastUpdated={lastUpdated} 
+              onStockClick={openExplain} 
+              viewMode={viewMode}
+              historyMap={historyMap}
+            />
+            <Panel 
+              title="Top Losers"  
+              accent="red"   
+              data={midcapData.losers}  
+              type="loser" 
+              lastUpdated={lastUpdated} 
+              onStockClick={openExplain} 
+              viewMode={viewMode}
+              historyMap={historyMap}
+            />
           </main>
 
           {/* HISTORICAL DAY VIEW */}
           <div className="historical-layer">
-            <div className="historical-header">
-              Historical Day View
-            </div>
-
+            <div className="historical-header">Historical Day View</div>
             <div className="hist-controls">
               <div>
                 <span className="hist-label">Select Date</span>
@@ -381,6 +559,8 @@ export default function App() {
                   data={historicalData.gainers}
                   type="gainer"
                   lastUpdated={formatIST(new Date())}
+                  viewMode="normal"
+                  historyMap={{}}
                 />
                 <Panel
                   title="Top Losers"
@@ -388,6 +568,8 @@ export default function App() {
                   data={historicalData.losers}
                   type="loser"
                   lastUpdated={formatIST(new Date())}
+                  viewMode="normal"
+                  historyMap={{}}
                 />
               </div>
             )}

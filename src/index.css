@@ -82,19 +82,85 @@ button, a, .stock-card, .sc-filter-btn {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 12px 24px;
   background: var(--bg-header);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 100;
   box-shadow: var(--shadow-sm);
+  height: 64px;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ── View Toggle Switch ────────────────────────────────────────────────── */
+.view-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg);
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+
+.toggle-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: color 0.2s;
+}
+
+.toggle-label.active {
+  color: var(--blue);
+}
+
+.view-toggle-switch {
+  width: 44px;
+  height: 22px;
+  background: var(--border);
+  border-radius: 11px;
+  position: relative;
+  border: none;
+  cursor: pointer;
+  transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  min-height: auto;
+}
+
+.view-toggle-switch.on {
+  background: var(--blue);
+}
+
+.toggle-handle {
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.view-toggle-switch.on .toggle-handle {
+  transform: translateX(22px);
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
 }
 
 .logo-mark {
@@ -283,9 +349,42 @@ button, a, .stock-card, .sc-filter-btn {
   gap: 12px;
   padding: 12px 20px;
   border-bottom: 1px solid var(--border-light);
-  transition: background 0.15s ease;
+  transition: all 0.2s ease;
   animation: card-enter 0.3s ease forwards;
   opacity: 0;
+}
+
+.stock-card.card-chart-mode {
+  grid-template-columns: 32px 80px 1fr auto;
+  gap: 16px;
+  padding: 8px 20px;
+}
+
+/* ── Sparkline ────────────────────────────────────────────────────────── */
+.sparkline-container {
+  flex: 1;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.sparkline-placeholder {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.chart-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-right: 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 @keyframes card-enter {
@@ -562,6 +661,16 @@ button, a, .stock-card, .sc-filter-btn {
     padding: 8px 12px;
     grid-template-columns: 28px 1fr auto;
     gap: 8px;
+  }
+  
+  .stock-card.card-chart-mode {
+    grid-template-columns: 28px 60px 1fr auto;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+
+  .stock-card.card-chart-mode .sparkline-container {
+    height: 30px;
   }
   .stock-symbol { font-size: 13px; }
   .stock-price { font-size: 13px; }
