@@ -8,9 +8,9 @@ from datetime import datetime, timedelta, date, timezone
 from SmartApi import SmartConnect
 from cachetools import TTLCache
 
-# Import token dicts from existing streamer — do NOT redefine
-from streamer import NIFTY100_TOKENS, MIDCAP100_TOKENS
-from nse_holidays import is_trading_day, get_last_trading_day_str
+# Import token dicts from existing streamer
+from .streamer import NIFTY100_TOKENS, MIDCAP100_TOKENS
+from .nse_holidays import is_trading_day, get_last_trading_day_str
 
 logger = logging.getLogger(__name__)
 

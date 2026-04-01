@@ -20,10 +20,10 @@ import sys
 import traceback
 import re
 from groq import Groq
-from signal_engine import calculate_all_signals, get_summary_stats, get_sector, FNO_STOCKS
-from streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
-from historical import get_historical_summary, get_intraday_sparklines
-from nse_holidays import is_trading_day
+from backend.signal_engine import calculate_all_signals, get_summary_stats, get_sector, FNO_STOCKS
+from backend.streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
+from backend.historical import get_historical_summary, get_intraday_sparklines
+from backend.nse_holidays import is_trading_day
 
 # ── Logging Configuration ─────────────────────────────────────────────────────
 logging.basicConfig(

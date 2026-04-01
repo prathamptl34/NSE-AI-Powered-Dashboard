@@ -34,7 +34,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source
-COPY main.py streamer.py historical.py nse_holidays.py signal_engine.py ./
+COPY main.py ./
+COPY backend/ ./backend/
 COPY tokens.json* .env.example* ./
 
 # Copy compiled React build from stage 1

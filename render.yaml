@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: market-pulse
-    env: docker
-    plan: free
-    healthCheckPath: /api/signal-scanner
-    # Explicitly setting start command to avoid dashboard manual config errors
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1

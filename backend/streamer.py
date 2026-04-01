@@ -458,7 +458,7 @@ class MarketStreamer:
 
 
 async def fetch_angel_one_historical(symbol, token, exchange='NSE'):
-    import historical
+    from . import historical
     import pandas as pd
     import datetime
     import asyncio
