@@ -155,7 +155,7 @@ try:
         allow_headers=["*"],
     )
 
-    from streamer import connected_clients
+    from backend.streamer import connected_clients
     logger.info("WebSocket route /ws/stream is registered and sharing clients with streamer.py")
 except Exception as e:
     logger.error(f"FATAL INITIALIZATION ERROR: {e}")
@@ -235,7 +235,7 @@ async def health():
 @app.post("/api/force-refresh-metadata")
 async def force_refresh():
     """Trigger the scavenger loop to re-fetch all prev_close values."""
-    from streamer import ALL_TOKENS
+    from backend.streamer import ALL_TOKENS
     for tok in ALL_TOKENS.values():
         tok["prev_close_confirmed"] = False
     return {"message": "Metadata refresh triggered. Scavenger will update shortly."}
@@ -331,7 +331,7 @@ def extract_signal(text: str) -> str:
             return word
     return "NEUTRAL"
 
-from streamer import ALL_TOKENS
+from backend.streamer import ALL_TOKENS
 
 @app.get("/api/intraday-sparklines")
 async def api_intraday_sparklines(symbols: str):
