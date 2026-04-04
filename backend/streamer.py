@@ -11,7 +11,7 @@ import logzero
 from logzero import logger
 import pyotp
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 # Enable JSON logging if running in Cloud Run
@@ -21,7 +21,7 @@ if os.environ.get("K_SERVICE"):
 from SmartApi import SmartConnect
 from SmartApi.smartWebSocketV2 import SmartWebSocketV2
 
-
+from backend.fno_universe import FNO_SYMBOL_TOKEN_MAP
 
 # ── Token lists ───────────────────────────────────────────────────────────────
 # Exchange segment: 1 = NSE Cash
@@ -241,9 +241,13 @@ for tok, meta in NIFTY100_TOKENS.items():
 for tok, meta in MIDCAP100_TOKENS.items():
     if tok not in ALL_TOKENS:   # avoid overwriting with wrong index label
         ALL_TOKENS[tok] = {**meta, "index": "midcap100"}
+for tok, meta in FNO_SYMBOL_TOKEN_MAP.items():
+    if tok and tok not in ALL_TOKENS:
+        ALL_TOKENS[tok] = {**meta, "index": "fno_only"}
 
 # ── In-memory tick store ──────────────────────────────────────────────────────
 _tick_store: dict[str, dict] = {}
+_fno_tick_store: dict = {}
 _tv_fail_count = {}
 _tv_lock = threading.Lock()
 live_prices = {}
@@ -263,7 +267,6 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
     # 1. If WebSocket provides a close_price, it's the absolute truth for NSE
     if close_price > 0:
         # Update if not confirmed OR if there is a significant discrepancy (>0.1%)
-        # Note: We use 0.1% to allow for minor rounding diffs, but 0.5% as user suggested is safer
         diff = abs(old_prev - close_price)
         percent_diff = (diff / close_price) * 100 if close_price > 0 else 0
         
@@ -278,6 +281,7 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
     
     # Fallback to current meta if not updated
     prev = meta["prev_close"]
+    # Handle division by zero for initial load
     change_pct = round(((ltp - prev) / prev) * 100, 2) if prev > 0 else 0.0
     
     with _store_lock:
@@ -292,6 +296,9 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
             "prev_close_confirmed": meta.get("prev_close_confirmed", False),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
+        sym = meta.get("symbol")
+        if sym and sym in FNO_SYMBOL_TOKEN_MAP:
+            _fno_tick_store[sym] = _tick_store.get(token) or _fno_tick_store.get(sym)
 
 
 def get_all_ticks() -> list:
@@ -308,7 +315,9 @@ def get_market_summary(top_n: int = 5) -> dict:
     midcap  = [t for t in ticks if t["index"] == "midcap100"]
 
     def rank(items, reverse):
-        return sorted(items, key=lambda x: x["change_pct"], reverse=reverse)[:top_n]
+        # Filter items with non-None change_pct and basic price data
+        valid_items = [t for t in items if t.get("ltp", 0) > 0]
+        return sorted(valid_items, key=lambda x: x.get("change_pct", 0.0), reverse=reverse)[:top_n]
 
     return {
         "nifty100": {
@@ -369,6 +378,7 @@ class MarketStreamer:
         self._running    = False
         self._sws: Optional[SmartWebSocketV2] = None
         self.is_connected = False
+        self._tasks_started = False
 
     # ── Authentication ────────────────────────────────────────────────────────
 
@@ -398,6 +408,12 @@ class MarketStreamer:
         self._running = True
         reconnect_delay = 5  # initial backoff
 
+        # Start background tasks ONCE per lifespan
+        if not self._tasks_started:
+            asyncio.create_task(market_pusher())
+            asyncio.create_task(scan_loop())
+            self._tasks_started = True
+
         while self._running:
             try:
                 auth_token, feed_token, _ = await asyncio.to_thread(self._login)
@@ -408,7 +424,7 @@ class MarketStreamer:
                     api_key      = self.api_key,
                     client_code  = self.client_code,
                     feed_token   = feed_token,
-                    max_retry_attempt = 5,
+                    max_retry_attempt = 50,
                 )
 
                 # Set callbacks as attributes (library API pattern)
@@ -430,8 +446,6 @@ class MarketStreamer:
                 logger.info("Starting WebSocket stream for %d tokens...", len(ALL_TOKENS))
 
                 # connect() is blocking; run in a thread so we stay async-friendly
-                asyncio.create_task(market_pusher())
-                asyncio.create_task(scan_loop())
                 await asyncio.to_thread(sws.connect)
 
             except asyncio.CancelledError:
@@ -460,19 +474,18 @@ class MarketStreamer:
 async def fetch_angel_one_historical(symbol, token, exchange='NSE'):
     from . import historical
     import pandas as pd
-    import datetime
     import asyncio
     
     smart = historical._get_smart_connect()
-    # Fetch 5 days to ensure we have a previous trading day
-    to_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    from_date = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
+    # Fetch 7 days to ensure we have a previous trading day
+    to_date = datetime.now().strftime("%Y-%m-%d %H:%M")
+    from_date = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M")
     
     def _fetch():
         return smart.getCandleData({
             "exchange": exchange,
             "symboltoken": str(token),
-            "interval": "ONE_DAY",  # Use ONE_DAY for absolute Previous Close accuracy
+            "interval": "ONE_DAY",  
             "fromdate": from_date,
             "todate": to_date
         })
@@ -495,12 +508,11 @@ def process_symbol_data(df, symbol, price):
         return None
         
     # Better historical fallback: Use most recent completed trading day's close
-    if not meta.get('prev_close_confirmed', False) and df is not None and len(df) > 0:
+    if not meta.get('prev_close_confirmed', False) and df is not None and not df.empty:
         try:
-            # Drop any rows that might be from 'today' to find the actual previous close
             import pandas as pd
             today_date = datetime.now().strftime("%Y-%m-%d")
-            # Assume 'timestamp' is in the index or column
+            
             if 'timestamp' in df.columns:
                 df['date_only'] = pd.to_datetime(df['timestamp']).dt.strftime('%Y-%m-%d')
                 hist_df = df[df['date_only'] < today_date].copy()
@@ -508,17 +520,14 @@ def process_symbol_data(df, symbol, price):
                 hist_df = df.copy()
 
             if not hist_df.empty:
-                # The 'close' of the last candle of the most recent historical day
-                # AND since interval is ONE_DAY, the records ARE the days.
-                # Sort to be absolutely sure
                 hist_df['dt'] = pd.to_datetime(hist_df['timestamp'])
                 hist_df = hist_df.sort_values('dt')
                 
-                # The last day in hist_df is the PREVIOUS trading day
                 recent_day = hist_df.iloc[-1]
                 recent_close = float(recent_day['close'])
                 meta['prev_close'] = recent_close
-                logger.info(f"[Historical] Set {symbol} prev_close={meta['prev_close']} from {recent_day['timestamp'][:10]}")
+                meta['prev_close_confirmed'] = True
+                logger.debug(f"[Historical] Set {symbol} prev_close={meta['prev_close']} from {recent_day['timestamp'][:10]}")
         except Exception as e:
             logger.error(f"[Historical] Fallback error for {symbol}: {e}")
 
@@ -547,112 +556,102 @@ async def broadcast(data):
     """Broadcast JSON to all connected dashboard clients."""
     if not connected_clients:
         return
-    
-    # Create list of tasks to send to all clients concurrently
     tasks = [safe_send(ws, data) for ws in list(connected_clients)]
     if tasks:
         await asyncio.gather(*tasks)
 
-    logger.info(f"[Broadcast] Partial update: {len(data.get('gainers', []))} gainers, {len(data.get('losers', []))} losers | Clients: {len(connected_clients)}")
 
 async def fetch_symbol_safe(symbol, token, exchange='NSE'):
-    """
-    Fetch OHLC data with retry + singleton reset + yFinance fallback.
-    Memory safe - deletes DataFrames immediately after use.
-    """
+    """Fetch OHLC data with retry + yFinance fallback."""
     import yfinance as yf
     import gc
 
     df = None
 
-    # Try Angel One historical API first (2 attempts)
+    # Try Angel One historical API first
     for attempt in range(2):
         try:
             df = await fetch_angel_one_historical(symbol, token, exchange)
-            if df is not None and len(df) > 20:
-                _tv_fail_count[symbol] = 0
+            if df is not None and not df.empty:
                 break
         except Exception as e:
-            logger.error(f'[Angel Historical] {symbol} attempt {attempt+1}: {e}')
-            if attempt == 0:
-                import asyncio
-                await asyncio.sleep(1)
-            else:
-                _tv_fail_count[symbol] = _tv_fail_count.get(symbol, 0) + 1
+            logger.error(f'[Angel Historical] {symbol} error: {e}')
+            await asyncio.sleep(1)
 
     # yFinance fallback
-    if df is None or len(df) <= 20:
+    if df is None or df.empty:
         try:
             yf_sym = f'{symbol}.NS' if exchange == 'NSE' else f'{symbol}.BO'
-            df = yf.download(yf_sym, period='5d', interval='15m', progress=False)
-            if df is not None and len(df) > 20:
-                logger.info(f'[yFinance fallback] {symbol} OK')
+            df = await asyncio.to_thread(yf.download, yf_sym, period='5d', interval='1d', progress=False)
+            if df is not None and not df.empty:
+                logger.debug(f'[yFinance fallback] {symbol} OK')
         except Exception as e:
             logger.error(f'[yFinance] {symbol}: {e}')
 
-    # Use Angel One WebSocket live price if available
     price = live_prices.get(token)
-    if price is None and df is not None and len(df) > 0:
+    if price is None and df is not None and not df.empty:
         price = float(df['close'].iloc[-1])
 
     result = process_symbol_data(df, symbol, price)
-
     del df
     gc.collect()
     return result
 
 async def market_pusher():
-    """
-    Periodically (every 2s) broadcasts the top 5 gainers/losers from the store.
-    This provides a consistent "Live" feel and is the single source of truth.
-    """
+    """Periodically broadcasts the top 5 gainers/losers to all clients."""
     while True:
         try:
             summary = get_market_summary(top_n=5)
+            
+            # Prepare F&O Movers
+            fno_list = list(_fno_tick_store.values())
+            valid_fno = [v for v in fno_list if v and v.get("change_pct") is not None and v.get("ltp", 0) > 0]
+            fno_sorted = sorted(valid_fno, key=lambda x: x["change_pct"], reverse=True)
+            fno_movers = {
+                'gainers': fno_sorted[:5],
+                'losers': fno_sorted[-5:][::-1]
+            }
+
+            # The frontend (App.js) handles updates per index. 
+            # We broadcast one message per index to ensure state is updated correctly.
             for idx in ["nifty100", "midcap100"]:
                 await broadcast({
-                    'type':    'full_update',
-                    'index':   idx,
-                    'gainers': summary[idx]["gainers"],
-                    'losers':  summary[idx]["losers"],
-                    'total':   summary.get('total_tokens_tracked', 200)
+                    'type':       'full_update',
+                    'index':      idx,
+                    'gainers':    summary[idx]["gainers"],
+                    'losers':     summary[idx]["losers"],
+                    'fno_movers': fno_movers,
+                    'total':      summary.get('total_tokens_tracked', 200)
                 })
+
         except Exception as e:
             logger.error(f"[Pusher] Error: {e}")
         
         await asyncio.sleep(2)
 
 async def scan_loop():
-    """
-    Metadata scavenger loop. Focuses on filling missing prev_close/OHLC.
-    Does NOT broadcast; pusher handles that.
-    """
+    """Metadata scavenger loop. Focuses on filling missing prev_close/OHLC."""
     import time
-    import asyncio
-    symbols     = [(meta['symbol'], tok, meta['index']) for tok, meta in ALL_TOKENS.items()]
-    batch_size  = 10 # Aggressive at startup
-    
     while True:
         cycle_start = time.time()
-        batches      = [symbols[i:i+batch_size] for i in range(0, len(symbols), batch_size)]
+        to_fetch = []
         
-        for batch in batches:
-            # Check if we even need to fetch (if prev_close is missing)
-            tasks = []
-            for sym, tok, idx in batch:
-                with _store_lock:
-                    tick = _tick_store.get(tok)
-                    # If missing tick OR missing prev_close, fetch it
-                    if not tick or not tick.get('prev_close_confirmed'):
-                        tasks.append(fetch_symbol_safe(sym, tok))
-            
+        # Determine which tokens need historical data
+        for tok, meta in ALL_TOKENS.items():
+            with _store_lock:
+                tick = _tick_store.get(tok)
+                if not tick or not tick.get('prev_close_confirmed'):
+                    to_fetch.append((meta['symbol'], tok))
+        
+        # Fetch in small batches to respect rate limits
+        batch_size = 3
+        for i in range(0, len(to_fetch), batch_size):
+            batch = to_fetch[i : i + batch_size]
+            tasks = [fetch_symbol_safe(sym, tok) for sym, tok in batch]
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
-            
-            # Short sleep between batches to avoid rate limits
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(1.1) 
 
         cycle_time = time.time() - cycle_start
         logger.info(f'[Scan] Scavenger cycle complete | {cycle_time:.1f}s')
-        await asyncio.sleep(30) # Only scavenge every 30s after first pass
-
+        await asyncio.sleep(60) # Wait before next pass

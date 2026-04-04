@@ -20,26 +20,35 @@ _memory_cache: TTLCache = TTLCache(maxsize=50, ttl=3600)
 _PERSISTENT_CACHE_DIR = ".data"
 _PERSISTENT_CACHE_FILE = os.path.join(_PERSISTENT_CACHE_DIR, "historical_cache.json")
 _persist_lock = threading.Lock()
+_persist_cache_memory = None
 
 def _load_persistent_cache() -> dict:
+    global _persist_cache_memory
+    if _persist_cache_memory is not None:
+        return _persist_cache_memory
+        
     if not os.path.exists(_PERSISTENT_CACHE_DIR):
         os.makedirs(_PERSISTENT_CACHE_DIR, exist_ok=True)
     if not os.path.exists(_PERSISTENT_CACHE_FILE):
-        return {}
+        _persist_cache_memory = {}
+        return _persist_cache_memory
     try:
         with open(_PERSISTENT_CACHE_FILE, "r") as f:
-            return json.load(f)
+            _persist_cache_memory = json.load(f)
+            return _persist_cache_memory
     except Exception as e:
         logger.warning(f"Failed to load persistent cache: {e}")
         return {}
 
 def _save_to_persistent_cache(key: str, data: dict):
+    global _persist_cache_memory
     with _persist_lock:
         cache = _load_persistent_cache()
         cache[key] = {
             "data": data,
             "saved_at": datetime.now().isoformat()
         }
+        _persist_cache_memory = cache
         try:
             with open(_PERSISTENT_CACHE_FILE, "w") as f:
                 json.dump(cache, f, indent=2)
@@ -48,19 +57,44 @@ def _save_to_persistent_cache(key: str, data: dict):
 
 # ── Auth helper ───────────────────────────────────────────────────────────────
 
+_cached_smart = None
+_last_login_time = 0
+_login_lock = threading.Lock()
+
 def _get_smart_connect() -> SmartConnect:
-    """Authenticate and return a SmartConnect session."""
-    totp = pyotp.TOTP(os.environ["ANGEL_TOTP_SECRET"].strip()).now()
-    smart = SmartConnect(api_key=os.environ["ANGEL_API_KEY"].strip())
-    resp = smart.generateSession(
-        os.environ["ANGEL_CLIENT_ID"].strip(),
-        os.environ["ANGEL_PASSWORD"].strip(),
-        totp,
-    )
-    if not resp or resp.get("status") is False:
-        raise RuntimeError(f"Angel One login failed: {resp.get('message', 'Unknown error')}")
-    logger.info("Historical: Angel One login successful.")
-    return smart
+    """Authenticate and return a SmartConnect session (cached for 1h)."""
+    global _cached_smart, _last_login_time
+    
+    with _login_lock:
+        # Check if session is alive (TTL 1 hour)
+        if _cached_smart and (time.time() - _last_login_time < 3600):
+            try:
+                # Check for feedToken as a proxy for a valid session object
+                if getattr(_cached_smart, 'feedToken', None):
+                    return _cached_smart
+            except Exception:
+                pass
+            
+            logger.info("Historical: Cached session invalid. Re-logging in...")
+
+        try:
+            totp = pyotp.TOTP(os.environ["ANGEL_TOTP_SECRET"].strip()).now()
+            smart = SmartConnect(api_key=os.environ["ANGEL_API_KEY"].strip())
+            resp = smart.generateSession(
+                os.environ["ANGEL_CLIENT_ID"].strip(),
+                os.environ["ANGEL_PASSWORD"].strip(),
+                totp,
+            )
+            if not resp or resp.get("status") is False:
+                raise RuntimeError(f"Angel One login failed: {resp.get('message', 'Unknown error')}")
+            
+            logger.info("Historical: New Angel One login successful.")
+            _cached_smart = smart
+            _last_login_time = time.time()
+            return _cached_smart
+        except Exception as e:
+            logger.error(f"Historical: Login error: {e}")
+            raise
 
 
 # ── Date helpers ──────────────────────────────────────────────────────────────
@@ -219,11 +253,11 @@ def get_historical_summary(date_str: str, index: str, top_n: int = 5) -> dict:
     results = []
     errors = 0
     
-    # Accelerated to 10 workers for speed
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        # Reduced staggering to 0.05s
+    # Accelerated to 15 workers for lightning-fast cold fetches
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        # Reduced staggering to 0.03s for faster start
         future_to_token = {
-            executor.submit(_process_single_token, smart, t, m, date_str, index, i * 0.05): t 
+            executor.submit(_process_single_token, smart, t, m, date_str, index, i * 0.03): t 
             for i, (t, m) in enumerate(tokens.items())
         }
         

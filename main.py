@@ -269,6 +269,20 @@ async def market_summary_raw(request: Request):
     return get_market_summary(top_n=100)
 
 
+@app.get("/api/fno-movers")
+async def get_fno_movers():
+    from backend.streamer import _fno_tick_store
+    sorted_stocks = sorted(
+        [v for v in _fno_tick_store.values() if v and v.get("change_pct") is not None],
+        key=lambda x: x["change_pct"], reverse=True
+    )
+    return {
+        "gainers": sorted_stocks[:5],
+        "losers": sorted_stocks[-5:][::-1],
+        "timestamp": datetime.now().isoformat()
+    }
+
+
 @app.get("/api/historical-summary")
 async def historical_summary(
     request: Request,
@@ -666,7 +680,7 @@ if os.path.isdir(BUILD_DIR):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("API_PORT", 8001))
     logger.info(f"Starting uvicorn on port {port}")
     
     try:
@@ -675,7 +689,12 @@ if __name__ == "__main__":
             host="0.0.0.0", 
             port=port, 
             reload=True,
-            reload_excludes=[".data/*", "historical_cache.json", "*.log"]
+            reload_excludes=[
+                "**/.data/**", 
+                "**/historical_cache.json", 
+                "**/*.log",
+                "**/.git/**"
+            ]
         )
     except Exception as e:
         logger.error(f"FATAL STARTUP ERROR: {e}")

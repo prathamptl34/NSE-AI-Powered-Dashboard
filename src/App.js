@@ -3,6 +3,7 @@ import "./index.css";
 import InsightsPage from "./InsightsPage";
 import SignalScanner from "./SignalScanner";
 import { useStockExplain, StockDeepDiveModal } from './StockDeepDive';
+import FnoMoversTable from "./FnoMoversTable";
 
 // ── Utility functions ─────────────────────────────────────────────────────────
 
@@ -49,6 +50,30 @@ function ConnectionDot({ status }) {
     <div className={`conn-dot conn-${status}`}>
       <span className="dot-inner" />
       <span className="dot-label">{status === 'live' ? 'Live' : 'Offline'}</span>
+    </div>
+  );
+}
+
+function MarketPulseBanner({ insight, signal }) {
+  const isLoading = !insight;
+  return (
+    <div className="market-pulse-banner">
+      <div className="pulse-signal-box">
+        <span className="pulse-label">Pulse</span>
+        <div className={`signal-pill signal-${(signal || 'neutral').toLowerCase()}`}>
+          {signal || 'Detecting...'}
+        </div>
+      </div>
+      <div className="pulse-narrative">
+        {isLoading ? (
+          <div className="pulse-narrative-placeholder">
+            <div className="pulse-loading-dot" />
+            AI is analyzing current market momentum...
+          </div>
+        ) : (
+          insight
+        )}
+      </div>
     </div>
   );
 }
@@ -244,16 +269,108 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState('home');
   const [niftyData, setNiftyData] = useState({ gainers: [], losers: [] });
   const [midcapData, setMidcapData] = useState({ gainers: [], losers: [] });
-  const [liveCount, setLiveCount] = useState(0);
+  const [fnoMovers, setFnoMovers] = useState({ gainers: [], losers: [] });
   const [wsStatus, setWsStatus] = useState('offline');
-  const [lastUpdated, setLastUpdated] = useState('');
-
-  // ── Perspective View Mode
-  const [viewMode, setViewMode] = useState('normal'); // 'normal' | 'chart'
-  const [historyMap, setHistoryMap] = useState({}); // { symbol: [prices...] }
-
+  const [aiInsight, setAiInsight] = useState(null);
+  const [aiSignal, setAiSignal] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [viewMode, setViewMode] = useState('normal'); 
+  const [historyMap, setHistoryMap] = useState({});
   const fetchedIntradayRef = useRef(new Set());
+  const wsRef = useRef(null);
 
+  const fetchData = useCallback(async () => {
+    try {
+      // 1. Market Summary
+      let res;
+      try {
+        res = await fetch("/api/market-summary");
+      } catch (e) {
+        res = await fetch("http://127.0.0.1:8000/api/market-summary");
+      }
+      if (res.ok) {
+        const json = await res.json();
+        setNiftyData(json.nifty100 || { gainers: [], losers: [] });
+        setMidcapData(json.midcap100 || { gainers: [], losers: [] });
+        setLastUpdated(formatIST());
+      }
+
+      // 2. F&O Movers
+      try {
+        let fnoRes;
+        try { fnoRes = await fetch("/api/fno-movers"); }
+        catch (e) { fnoRes = await fetch("http://127.0.0.1:8000/api/fno-movers"); }
+        if (fnoRes.ok) {
+          const fnoJson = await fnoRes.json();
+          setFnoMovers({ gainers: fnoJson.gainers || [], losers: fnoJson.losers || [] });
+        }
+      } catch (e) {}
+
+      // 3. AI Insight Narrative
+      try {
+        let aiRes;
+        try { aiRes = await fetch("/api/ai-insight"); }
+        catch (e) { aiRes = await fetch("http://127.0.0.1:8000/api/ai-insight"); }
+        if (aiRes.ok) {
+          const aiJson = await aiRes.json();
+          if (aiJson.insight) setAiInsight(aiJson.insight);
+          if (aiJson.signal) setAiSignal(aiJson.signal);
+        }
+      } catch (e) {}
+
+      setWsStatus('live');
+    } catch (err) {
+      console.warn("Connection attempt failed.", err);
+      setWsStatus('offline');
+    }
+  }, []);
+
+  // Polling & WebSocket Manager
+  useEffect(() => {
+    fetchData();
+    const id = setInterval(fetchData, wsStatus === 'live' ? 10000 : 5000);
+
+    const connectWS = () => {
+      if (wsRef.current && (wsRef.current.readyState === 0 || wsRef.current.readyState === 1)) return;
+      
+      try {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        // Fallback: If on dev port 3000, point to backend 8000
+        const isDev = window.location.port === '3000';
+        const backendHost = isDev ? '127.0.0.1:8000' : window.location.host;
+        const ws = new WebSocket(`${proto}//${backendHost}/ws/stream`);
+        wsRef.current = ws;
+
+        ws.onopen = () => setWsStatus('live');
+        ws.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.type === 'full_update' || msg.type === 'partial_update') {
+              if (msg.index === 'nifty100') {
+                setNiftyData({ gainers: msg.gainers || [], losers: msg.losers || [] });
+              } else if (msg.index === 'midcap100') {
+                setMidcapData({ gainers: msg.gainers || [], losers: msg.losers || [] });
+              }
+              if (msg.fno_movers) {
+                setFnoMovers({ gainers: msg.fno_movers.gainers || [], losers: msg.fno_movers.losers || [] });
+              }
+              setLastUpdated(formatIST());
+              setWsStatus('live');
+            }
+          } catch (err) {}
+        };
+        ws.onerror = () => setWsStatus('offline');
+      } catch (e) {}
+    };
+
+    connectWS();
+    return () => {
+      clearInterval(id);
+      if (wsRef.current) wsRef.current.close();
+    };
+  }, [fetchData]);
+
+  // Intraday Sparkline Fetcher
   useEffect(() => {
     if (viewMode !== 'chart') return;
     
@@ -276,40 +393,17 @@ export default function App() {
           const next = { ...prev };
           Object.keys(data).forEach(sym => {
             if (data[sym] && data[sym].length > 2) {
-              // Intraday API gives 5-min candles, keep up to last 50 for the chart
               next[sym] = data[sym].slice(-50); 
             }
           });
           return next;
         });
-      } catch (e) {
-        console.error("Fetch intraday error", e);
-      }
+      } catch (e) {}
     };
     
     fetchIntraday();
   }, [viewMode, niftyData, midcapData, historyMap]);
 
-  const updateHistory = useCallback((stocks) => {
-    setHistoryMap(prev => {
-      const next = { ...prev };
-      stocks.forEach(s => {
-        let h = next[s.symbol];
-        
-        if (!h) {
-          h = s.prev_close ? [s.prev_close, s.ltp] : [s.ltp, s.ltp];
-        } 
-        else if (h[h.length - 1] !== s.ltp) {
-          h = [...h, s.ltp].slice(-50); 
-        }
-        
-        next[s.symbol] = h;
-      });
-      return next;
-    });
-  }, []);
-
-  // ── Historical State
   const [selectedDate, setSelectedDate] = useState("");
   const [historicalData, setHistoricalData] = useState(null);
   const [histLoading, setHistLoading] = useState(false);
@@ -317,88 +411,10 @@ export default function App() {
   const [histIndex, setHistIndex] = useState("nifty100");
   const [dateValidation, setDateValidation] = useState(null);
 
-  // Fallback Polling
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch("/api/market-summary");
-      if (!res.ok) return;
-      const json = await res.json();
-      
-      const nData = json.nifty100 || { gainers: [], losers: [] };
-      const mData = json.midcap100 || { gainers: [], losers: [] };
-
-      setNiftyData(nData);
-      setMidcapData(mData);
-      setLiveCount(json.total_tokens_tracked || 0);
-      setLastUpdated(formatIST());
-      
-      // Update history for all stocks
-      if (viewMode === 'chart') {
-        const all = [...nData.gainers, ...nData.losers, ...mData.gainers, ...mData.losers];
-        updateHistory(all);
-      }
-
-      if (wsStatus !== 'live') setWsStatus('live');
-    } catch {
-      setWsStatus('offline');
-    }
-  }, [wsStatus, viewMode, updateHistory]);
-
-  useEffect(() => {
-    fetchData();
-    // Faster polling fallback (2s) if WebSocket is not 'live', otherwise stay quiet (10s)
-    const id = setInterval(fetchData, wsStatus === 'live' ? 10000 : 2000);
-
-    let ws;
-    try {
-      const proto  = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      let wsHost = window.location.host;
-      if (wsHost.includes('localhost') || wsHost.includes('127.0.0.1')) {
-        // Use localhost explicitly for local development
-        wsHost = 'localhost:8000'; 
-      }
-      const wsUrl  = `${proto}//${wsHost}/ws/stream`;
-      console.log('Connecting to WS:', wsUrl);
-
-      ws = new WebSocket(wsUrl);
-      ws.onopen  = () => setWsStatus('live');
-      ws.onclose = () => {};
-      ws.onerror = () => {};
-      ws.onmessage = (e) => {
-        try {
-          const msg = JSON.parse(e.data);
-          if (msg.type === 'partial_update' || msg.type === 'full_update') {
-            const currentData = { gainers: msg.gainers || [], losers: msg.losers || [] };
-            
-            if (msg.index === 'nifty100') {
-              setNiftyData(currentData);
-            } else if (msg.index === 'midcap100') {
-              setMidcapData(currentData);
-            } else {
-              setNiftyData(currentData);
-            }
-
-            if (viewMode === 'chart') {
-              updateHistory([...currentData.gainers, ...currentData.losers]);
-            }
-
-            setLastUpdated(formatIST());
-          }
-        } catch (err) {}
-      };
-    } catch (e) {}
-
-    return () => {
-      clearInterval(id);
-      if (ws) ws.close();
-    };
-  }, [fetchData]);
-
-  // ── Historical Handlers
   const validateDate = useCallback(async (dateStr) => {
     if (!dateStr) { setDateValidation(null); return; }
     try {
-      const res  = await fetch(`/api/trading-day-check?date=${dateStr}`);
+      const res = await fetch(`/api/trading-day-check?date=${dateStr}`);
       const json = await res.json();
       setDateValidation(json);
     } catch {
@@ -412,9 +428,7 @@ export default function App() {
     setHistError(null);
     setHistoricalData(null);
     try {
-      const res  = await fetch(
-        `/api/historical-summary?date=${selectedDate}&index=${histIndex}&top_n=5`
-      );
+      const res = await fetch(`/api/historical-summary?date=${selectedDate}&index=${histIndex}&top_n=5`);
       const json = await res.json();
       if (!res.ok) {
         setHistError(json.detail?.message || "Failed to fetch historical data.");
@@ -430,6 +444,13 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {wsStatus === 'offline' && (
+        <div className="offline-notice">
+          <span>⚠️ Connection Lost. Reconnecting to Market Stream...</span>
+          <button className="retry-btn" onClick={() => fetchData()}>Retry Now</button>
+        </div>
+      )}
+
       {currentPage === 'home' ? (
         <div className="dashboard-plane">
           <header className="header">
@@ -459,11 +480,12 @@ export default function App() {
                 className="ai-insights-btn"
                 onClick={() => setCurrentPage('insights')}
               >
-                AI Insights
+                ✨ AI Insights
               </button>
               <button 
                 className="scanner-nav-btn"
                 onClick={() => setCurrentPage('scanner')}
+                style={{ background: 'var(--blue)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
               >
                 ◉ Signal Scanner
               </button>
@@ -472,154 +494,93 @@ export default function App() {
             </div>
           </header>
 
-          {/* LIVE BOARDS */}
-          <div className="section-label">
-            <span className="label-dot" />
-            Nifty 100
+          <div className="section-header">
+            <h2 className="section-title">Nifty 100</h2>
+            <div className="section-line" style={{ background: 'var(--blue)' }} />
           </div>
           <main className="panels-wrapper">
-            <Panel 
-              title="Top Gainers" 
-              accent="green" 
-              data={niftyData.gainers} 
-              type="gainer" 
-              lastUpdated={lastUpdated} 
-              onStockClick={openExplain} 
-              viewMode={viewMode}
-              historyMap={historyMap}
-            />
-            <Panel 
-              title="Top Losers"  
-              accent="red"   
-              data={niftyData.losers}  
-              type="loser" 
-              lastUpdated={lastUpdated} 
-              onStockClick={openExplain} 
-              viewMode={viewMode}
-              historyMap={historyMap}
-            />
+            <Panel title="Top Gainers" accent="green" data={niftyData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
+            <Panel title="Top Losers" accent="red" data={niftyData.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
           </main>
 
-          <div className="section-label">
-            <span className="label-dot" style={{ background: '#7c3aed' }} />
-            Nifty Midcap 100
+          <div className="section-header">
+            <h2 className="section-title">Nifty Midcap 100</h2>
+            <div className="section-line" style={{ background: '#a855f7' }} />
           </div>
-          <main className="panels-wrapper" style={{ marginBottom: '32px' }}>
-            <Panel 
-              title="Top Gainers" 
-              accent="green" 
-              data={midcapData.gainers} 
-              type="gainer" 
-              lastUpdated={lastUpdated} 
-              onStockClick={openExplain} 
-              viewMode={viewMode}
-              historyMap={historyMap}
-            />
-            <Panel 
-              title="Top Losers"  
-              accent="red"   
-              data={midcapData.losers}  
-              type="loser" 
-              lastUpdated={lastUpdated} 
-              onStockClick={openExplain} 
-              viewMode={viewMode}
-              historyMap={historyMap}
-            />
+          <main className="panels-wrapper">
+            <Panel title="Top Gainers" accent="green" data={midcapData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
+            <Panel title="Top Losers" accent="red" data={midcapData.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
           </main>
 
-          {/* HISTORICAL DAY VIEW */}
-          <div className="historical-layer">
-            <div className="historical-header">Historical Day View</div>
-            <div className="hist-controls">
-              <div>
-                <span className="hist-label">Select Date</span>
-                <input
-                  type="date"
-                  className="hist-input"
-                  value={selectedDate}
-                  max={new Date().toISOString().split("T")[0]}
-                  onChange={(e) => {
-                    setSelectedDate(e.target.value);
-                    setHistoricalData(null);
-                    setHistError(null);
-                    validateDate(e.target.value);
-                  }}
-                />
-                {dateValidation && selectedDate && (
-                  <div style={{
-                    fontSize: "12px",
-                    color: dateValidation.is_valid ? "var(--green)" : "var(--red)",
-                    marginTop: "6px",
-                    fontWeight: 500
-                  }}>
-                    {dateValidation.is_valid ? "✓ Valid trading day" : `✗ ${dateValidation.message}`}
-                  </div>
-                )}
-              </div>
+          <div className="section-header">
+            <h2 className="section-title">Equity F&O Segment</h2>
+            <div className="section-line" style={{ background: '#f97316' }} />
+          </div>
+          <main className="panels-wrapper" style={{ marginBottom: '40px' }}>
+            <Panel title="Top Gainers" accent="green" data={fnoMovers.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
+            <Panel title="Top Losers" accent="red" data={fnoMovers.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
+          </main>
 
-              <div>
-                <span className="hist-label">Index</span>
-                <div className="hist-btn-group">
-                  <button
-                    className={histIndex === "nifty100" ? "active" : ""}
-                    onClick={() => { setHistIndex("nifty100"); setHistoricalData(null); }}
-                  >
-                    Nifty 100
-                  </button>
-                  <button
-                    className={histIndex === "midcap100" ? "active" : ""}
-                    onClick={() => { setHistIndex("midcap100"); setHistoricalData(null); }}
-                  >
-                    Midcap 100
-                  </button>
+          <div className="historical-explorer">
+            <div className="hist-card">
+              <div className="hist-controls-box">
+                <div className="hist-field">
+                  <span className="hist-label">Select Date</span>
+                  <input 
+                    type="date" 
+                    className="hist-date-input"
+                    value={selectedDate}
+                    onChange={(e) => { setSelectedDate(e.target.value); validateDate(e.target.value); }}
+                  />
+                  {dateValidation && selectedDate && (
+                    <div className={`trading-day-bubble ${dateValidation.is_valid ? 'bubble-valid' : 'bubble-invalid'}`}>
+                      {dateValidation.is_valid ? "✓ Valid Trading Day" : `✗ ${dateValidation.message}`}
+                    </div>
+                  )}
                 </div>
-              </div>
 
-              <div>
-                <button
-                  className="hist-action-btn"
-                  onClick={fetchHistorical}
+                <div className="hist-field">
+                  <span className="hist-label">Market Index</span>
+                  <div className="hist-btn-group">
+                    <button className={histIndex === "nifty100" ? "active" : ""} onClick={() => { setHistIndex("nifty100"); setHistoricalData(null); }}>Nifty 100</button>
+                    <button className={histIndex === "midcap100" ? "active" : ""} onClick={() => { setHistIndex("midcap100"); setHistoricalData(null); }}>Midcap 100</button>
+                  </div>
+                </div>
+
+                <button 
+                  className="hist-action-btn" 
+                  onClick={fetchHistorical} 
                   disabled={!selectedDate || !dateValidation?.is_valid || histLoading}
                 >
-                  {histLoading ? "Loading..." : "Load Day"}
+                  {histLoading ? "Loading..." : "Explore History"}
                 </button>
               </div>
 
-              {historicalData?.cached && (
-                  <div style={{ marginLeft: "auto", fontSize: "12px", color: "var(--green)", fontWeight: 500 }}>
-                    ⚡ From cache
-                  </div>
+              {histError && <div style={{ color: "#ef4444", fontSize: "13px", textAlign: 'center', marginBottom: "24px", fontWeight: 600 }}>✗ Error: {histError}</div>}
+              
+              {historicalData && !histLoading && (
+                <div className="panels-wrapper" style={{ padding: 0 }}>
+                  <Panel 
+                    title={`${histIndex === "nifty100" ? "Nifty 100" : "Midcap 100"} Gainers`} 
+                    accent="green" 
+                    data={historicalData.gainers} 
+                    type="gainer" 
+                    lastUpdated={selectedDate} 
+                    viewMode="normal" 
+                    historyMap={{}} 
+                  />
+                  <Panel 
+                    title={`${histIndex === "nifty100" ? "Nifty 100" : "Midcap 100"} Losers`} 
+                    accent="red" 
+                    data={historicalData.losers} 
+                    type="loser" 
+                    lastUpdated={selectedDate} 
+                    viewMode="normal" 
+                    historyMap={{}} 
+                  />
+                </div>
               )}
             </div>
-
-            {histError && (
-              <div style={{ color: "var(--red)", fontSize: "13px", marginBottom: "16px", fontWeight: 500 }}>
-                ✗ {histError}
-              </div>
-            )}
-
-            {(historicalData && !histLoading) && (
-              <div className="panels-wrapper" style={{ padding: 0 }}>
-                <Panel
-                  title="Top Gainers"
-                  accent="green"
-                  data={historicalData.gainers}
-                  type="gainer"
-                  lastUpdated={formatIST(new Date())}
-                  viewMode="normal"
-                  historyMap={{}}
-                />
-                <Panel
-                  title="Top Losers"
-                  accent="red"
-                  data={historicalData.losers}
-                  type="loser"
-                  lastUpdated={formatIST(new Date())}
-                  viewMode="normal"
-                  historyMap={{}}
-                />
-              </div>
-            )}
           </div>
         </div>
       ) : currentPage === 'insights' ? (
