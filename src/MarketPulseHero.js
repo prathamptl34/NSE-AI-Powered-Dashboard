@@ -181,23 +181,25 @@ export default function MarketPulseHero({ niftyData, midcapData }) {
         }
         .speedometer-center {
           position: absolute;
-          bottom: -10px;
+          bottom: 0;
           display: flex;
           flex-direction: column;
           align-items: center;
           z-index: 3;
         }
         .sentiment-score {
-          font-size: 28px;
+          font-size: 32px;
           font-weight: 800;
           color: #fff;
-          margin-bottom: -2px;
+          margin-bottom: 2px;
+          line-height: 1;
         }
         .sentiment-label {
-          font-size: 12px;
-          font-weight: 700;
+          font-size: 11px;
+          font-weight: 800;
           text-transform: uppercase;
-          letter-spacing: 1px;
+          letter-spacing: 1.5px;
+          opacity: 0.9;
         }
         .hero-footer {
           margin-top: 40px;

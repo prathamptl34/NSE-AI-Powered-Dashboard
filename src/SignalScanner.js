@@ -295,9 +295,30 @@ export default function SignalScanner({ onBack }) {
       {/* Sector Bias */}
       {Object.keys(sectorBiases).length > 0 && <SectorBiasStrip biases={sectorBiases} />}
 
+      {/* Error State */}
+      {error && (
+        <div className="scanner-error-container">
+          <span style={{ fontSize: '24px', marginBottom: '12px', display: 'block' }}>⚠️</span>
+          <div style={{ color: 'var(--red)', fontWeight: '700', marginBottom: '8px' }}>Analysis Interrupted</div>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>{error}</p>
+          <button className="ai-back-btn" style={{ marginTop: '20px' }} onClick={handleScan}>Retry Analysis</button>
+        </div>
+      )}
+
       {/* Signal Scanner Body */}
       <div className="signal-scanner-body">
-        {groupedSignals.map(({ label, items }) => (
+        {!loading && hasScanned && !error && groupedSignals.length === 0 && (
+          <div className="scanner-empty-state">
+            <span className="empty-icon">🔭</span>
+            <div style={{ color: '#fff', fontWeight: '800', fontSize: '18px', marginBottom: '8px' }}>Scanning Complete</div>
+            <p className="empty-text">
+              No specific directional signals found matching the current criteria. 
+              The AI suggests maintaining a neutral stance or looking for volume breakouts.
+            </p>
+          </div>
+        )}
+
+        {!error && groupedSignals.map(({ label, items }) => (
           <React.Fragment key={label}>
              <div style={{ padding: '0 32px 16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: '1px' }}>{label} ({items.length})</div>
              <div className="signal-grid" style={{ marginBottom: '40px' }}>

@@ -571,9 +571,16 @@ async def get_signal_scanner():
         top_bullish = [s for s in signals if s["signal"] == "BULLISH"][:5]
         top_bearish = [s for s in signals if s["signal"] == "BEARISH"][:5]
 
-        # AI calls for narrative and commentary (with timeouts handled in call_ai)
-        narrative = await asyncio.to_thread(generate_scanner_narrative, stats, top_bullish, top_bearish)
-        movers_raw = await asyncio.to_thread(generate_movers_commentary, top_bullish[:3], top_bearish[:3])
+        # Parallelize AI calls for narrative and commentary
+        ai_tasks = [
+            asyncio.to_thread(generate_scanner_narrative, stats, top_bullish, top_bearish),
+            asyncio.to_thread(generate_movers_commentary, top_bullish[:3], top_bearish[:3])
+        ]
+        
+        ai_results = await asyncio.gather(*ai_tasks, return_exceptions=True)
+        
+        narrative = ai_results[0] if not isinstance(ai_results[0], Exception) else "Scan complete. Analyzing market breadth."
+        movers_raw = ai_results[1] if not isinstance(ai_results[1], (Exception, type(None))) else []
 
         if movers_raw:
             for item in movers_raw:

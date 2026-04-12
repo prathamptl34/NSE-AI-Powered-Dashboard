@@ -482,7 +482,8 @@ export default function App() {
               <div className="logo-mark">MP</div>
               <div className="header-title">
                 <span className="title-main">Market Pulse</span>
-                <span className="title-sub">NSE · Live Dashboard</span>
+                <span className="title-separator">•</span>
+                <span className="title-sub">NSE Live Dashboard</span>
               </div>
             </div>
             
