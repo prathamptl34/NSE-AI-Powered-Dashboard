@@ -583,6 +583,43 @@ body {
   margin-bottom: 36px;
   flex-wrap: wrap;
 }
+
+/* ─── Header Layout ──────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  background: hsla(var(--bg-hsl), 0.8);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-left, .header-center, .header-right {
+  display: flex;
+  align-items: center;
+}
+.header-left { gap: 16px; flex: 1; }
+.header-center { flex: 1; justify-content: center; }
+.header-right { gap: 16px; flex: 1; justify-content: flex-end; }
+
+.logo-mark {
+  font-size: 22px;
+  font-weight: 900;
+  color: #fff;
+  background: var(--blue);
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  letter-spacing: -1px;
+  box-shadow: var(--blue-glow);
+}
+
 .header-title { display: flex; align-items: center; gap: 10px; }
 .title-main { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
 .title-separator { color: var(--text-muted); font-size: 14px; opacity: 0.5; }
