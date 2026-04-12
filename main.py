@@ -580,7 +580,7 @@ async def get_signal_scanner():
         ai_results = await asyncio.gather(*ai_tasks, return_exceptions=True)
         
         narrative = ai_results[0] if not isinstance(ai_results[0], Exception) else "Scan complete. Analyzing market breadth."
-        movers_raw = ai_results[1] if not isinstance(ai_results[1], (Exception, type(None))) else []
+        movers_raw = ai_results[1] if isinstance(ai_results[1], list) else []
 
         if movers_raw:
             for item in movers_raw:

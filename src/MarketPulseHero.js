@@ -181,7 +181,7 @@ export default function MarketPulseHero({ niftyData, midcapData }) {
         }
         .speedometer-center {
           position: absolute;
-          bottom: 0;
+          bottom: 8px;
           display: flex;
           flex-direction: column;
           align-items: center;
