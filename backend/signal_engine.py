@@ -95,9 +95,11 @@ def get_sector(symbol: str) -> str:
     """Get sector for a symbol, default to DIVERSIFIED."""
     return STOCK_SECTORS.get(symbol.upper(), 'DIVERSIFIED')
 
-def calculate_signal(stock: dict) -> dict:
+def calculate_signal(stock: dict, candles_today: list = None, historical_candles: list = None) -> dict:
     """
     Input stock dict must have:
+      token, symbol, price, prev_close, change_pct,
+
       symbol, price, prev_close, change_pct,
       volume (optional), avg_volume (optional)
 
@@ -199,6 +201,10 @@ def calculate_signal(stock: dict) -> dict:
         potential_pct = 0
         risk_pct      = 0
 
+    smart_money = None
+    if candles_today and historical_candles:
+        smart_money = detect_absorption(stock.get("token"), candles_today, historical_candles)
+
     return {
         "symbol":       stock.get("symbol", ""),
         "signal":       signal,
@@ -212,6 +218,7 @@ def calculate_signal(stock: dict) -> dict:
         "is_fno":       stock.get("is_fno", False),
         "potential_pct": potential_pct,
         "risk_pct":      risk_pct,
+        "smart_money":   smart_money,
         "key_levels": {
             "support":    round(prev_close * 0.99, 2) if prev_close else None,
             "resistance": round(prev_close * 1.01, 2) if prev_close else None,
@@ -221,11 +228,19 @@ def calculate_signal(stock: dict) -> dict:
     }
 
 
+
 def calculate_all_signals(stocks: list) -> list:
     if not stocks:
         return []
 
-    results = [calculate_signal(s) for s in stocks if s.get('symbol')]
+    results = []
+    for s in stocks:
+        if s.get('symbol'):
+            results.append(calculate_signal(
+                s, 
+                candles_today=s.get("candles_today"), 
+                historical_candles=s.get("historical_candles")
+            ))
 
     # Always apply relative ranking to create meaningful spread
     changes = [s.get('change_pct', 0) for s in stocks if s.get('symbol')]
@@ -287,3 +302,54 @@ def get_summary_stats(signals: list) -> dict:
                          else "BEARISH" if len(bearish) > len(bullish) * 1.3
                          else "NEUTRAL",
     }
+
+def detect_absorption(token, candles_today, historical_candles):
+    # Gate 1: minimum 6 candles (30 mins elapsed)
+    if not candles_today or len(candles_today) < 6:
+        return None
+
+    last_candle = candles_today[-1]
+    candle_index = len(candles_today) - 1
+
+    # Gate 2: baseline volume from same time slot, last 5 sessions
+    from statistics import mean
+    same_time_volumes = [
+        day[candle_index]['volume'] 
+        for day in historical_candles[-5:] 
+        if len(day) > candle_index
+    ]
+    if len(same_time_volumes) < 3:  # need at least 3 days of history
+        return None
+
+    avg_volume = mean(same_time_volumes)
+    if avg_volume == 0:
+        return None
+    volume_ratio = last_candle['volume'] / avg_volume
+
+    # Sanity Cap: Ensure it's not a garbage spike or test artifact
+    if volume_ratio > 20:
+        return None
+
+    # Gate 3: absorption math
+    candle_range = last_candle['high'] - last_candle['low']
+    if candle_range <= 0:
+        return None
+
+    body_pct = abs(last_candle['close'] - last_candle['open']) / candle_range
+
+    if volume_ratio > 2.5 and body_pct < 0.25:
+        # Gate 4: direction context from last 10 candles
+        trend = candles_today[-10:]
+        avg_close = mean([c['close'] for c in trend])
+        direction = "ACCUMULATION" if last_candle['close'] < avg_close else "DISTRIBUTION"
+
+        return {
+            "signal": "SMART_MONEY",
+            "type": direction,
+            "price_level": last_candle['close'],
+            "volume_ratio": round(volume_ratio, 2),
+            "body_pct": round(body_pct, 2)
+        }
+
+    return None
+

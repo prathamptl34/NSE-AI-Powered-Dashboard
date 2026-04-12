@@ -163,7 +163,6 @@ async def lifespan(app: FastAPI):
     breakout_task = asyncio.create_task(poll_breakouts())
     
     # Start AI Insight Polling (Instant Fetch)
-    from main import generate_insight_payload_async
     async def poll_ai_insights():
         while True:
             try:
@@ -537,17 +536,23 @@ async def get_signal_scanner():
             return {"error": "No stock data available. WebSocket may be connecting."}
 
         # Map ticks to the format expected by signal_engine (ltp -> price)
+        from backend.streamer import get_intraday_candles
+        
         all_stocks = []
         for t in ticks:
             symbol = t["symbol"]
+            candles = get_intraday_candles(t["token"])
             all_stocks.append({
+                "token":      t["token"],
                 "symbol":     symbol,
                 "price":      t["ltp"],
                 "prev_close": t["prev_close"],
                 "change_pct": t.get("change_pct", 0),
                 "volume":     t.get("volume", 0),
                 "avg_volume": t.get("avg_volume", 0),
-                "is_fno":     symbol in FNO_STOCKS
+                "is_fno":     symbol in FNO_STOCKS,
+                "candles_today": candles,
+                "historical_candles": [] # Will be populated dynamically later
             })
 
         # Calculate signals for all stocks (pure algorithm — instant, no API cost)
