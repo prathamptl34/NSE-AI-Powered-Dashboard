@@ -60,153 +60,96 @@ export function useStockExplain() {
 export function StockDeepDiveModal({ stock, explanation, multiAgentData, loading, loadingMA, onClose }) {
   if (!stock) return null;
 
-  const isUp      = stock.change_pct >= 0;
-  const accentColor = isUp ? "#16a34a" : "#dc2626";
-  const bgColor     = isUp ? "#f0fdf4" : "#fef2f2";
-  const badgeBg     = isUp ? "#dcfce7" : "#fee2e2";
-
-  // Parse sections from AI response
-  const parseSection = (text, header) => {
-    if (!text) return "";
-    const regex = new RegExp(`${header}[:\\s]*([\\s\\S]*?)(?=WHY IT|WHAT TO|RISK:|$)`, 'i');
-    const match = text.match(regex);
-    return match ? match[1].trim() : "";
-  };
-
-  const whySection   = parseSection(explanation, "WHY IT'S MOVING");
-  const watchSection = parseSection(explanation, "WHAT TO WATCH");
-  const riskSection  = parseSection(explanation, "RISK");
+  const isUp = stock.change_pct >= 0;
+  const accent = isUp ? 'var(--green)' : 'var(--red)';
+  const dim    = isUp ? 'var(--green-dim)' : 'var(--red-dim)';
 
   const handleBackdrop = (e) => {
     if (e.target === e.currentTarget) onClose();
   };
 
   return (
-    <div className="deepdive-backdrop" onClick={handleBackdrop}>
-      <div className="deepdive-modal" style={{ borderTop: `3px solid ${accentColor}` }}>
+    <div className="sdm-backdrop" onClick={handleBackdrop}>
+      <style jsx>{`
+        .sdm-backdrop {
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.85); backdrop-filter: blur(12px);
+          z-index: 1000; display: flex; align-items: center; justify-content: center;
+        }
+        .sdm-modal {
+          width: 90%; max-width: 600px; max-height: 90vh;
+          background: var(--bg-soft); border-radius: var(--radius-lg);
+          border: 1px solid var(--glass-border); overflow-y: auto;
+          box-shadow: var(--shadow-premium); padding: 40px; position: relative;
+        }
+        .sdm-header { display: flex; justify-content: space-between; margin-bottom: 32px; align-items: flex-start; }
+        .sdm-symbol { font-size: 32px; font-weight: 800; color: #fff; display: block; letter-spacing: -1px; }
+        .sdm-price { font-size: 32px; font-weight: 800; color: #fff; text-align: right; display: block; }
+        
+        .sdm-ai-strip {
+          background: hsla(0,0%,100%,0.03); padding: 12px 20px; border-radius: 10px;
+          margin-bottom: 32px; display: flex; align-items: center; gap: 12px;
+          border: 1px solid var(--glass-border);
+        }
+        .ai-pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 10px var(--blue); }
+        .ai-label { font-size: 11px; font-weight: 800; color: var(--text-muted); letter-spacing: 1px; }
 
-        {/* Header */}
-        <div className="deepdive-header">
-          <div className="deepdive-header-left">
-            <span className="deepdive-symbol">{stock.symbol}</span>
-            <span className="deepdive-badge" style={{ background: badgeBg, color: accentColor }}>
-              {isUp ? "▲" : "▼"} {Math.abs(stock.change_pct).toFixed(2)}%
-            </span>
-          </div>
-          <div className="deepdive-header-right">
-            <span className="deepdive-price">₹{formatINR(stock.price)}</span>
-            {stock.prev_close > 0 && (
-              <span className="deepdive-prev">
-                <span style={{ opacity: 0.6, marginRight: '4px' }}>prev</span>
-                ₹{formatINR(stock.prev_close)}
-              </span>
-            )}
-          </div>
-          <button className="deepdive-close" onClick={onClose}>✕</button>
+        .sdm-section { margin-bottom: 32px; }
+        .sdm-section-title { font-size: 11px; font-weight: 800; color: var(--text-muted); margin-bottom: 12px; letter-spacing: 1px; }
+        .sdm-text { font-size: 16px; line-height: 1.7; color: var(--text-secondary); }
+
+        .sdm-ma-card {
+           background: hsla(0,0%,100%,0.02); border: 1px solid var(--glass-border);
+           border-radius: var(--radius-md); padding: 24px; margin-top: 40px;
+        }
+        .ma-consensus { padding: 8px 16px; border-radius: 8px; font-weight: 800; font-size: 14px; text-transform: uppercase; }
+      `}</style>
+
+      <div className="sdm-modal" style={{ borderTop: `4px solid ${accent}` }}>
+        <div className="sdm-header">
+           <div>
+             <span className="sdm-symbol">{stock.symbol}</span>
+             <span style={{ fontSize: '14px', fontWeight: '800', color: accent }}>
+               {isUp ? '▲' : '▼'} {Math.abs(stock.change_pct).toFixed(2)}%
+             </span>
+           </div>
+           <div>
+             <span className="sdm-price">₹{formatINR(stock.price)}</span>
+             <span style={{ display: 'block', textAlign: 'right', fontSize: '11px', color: 'var(--text-muted)' }}>LIVE CMP</span>
+           </div>
         </div>
 
-        {/* AI Label */}
-        <div className="deepdive-ai-bar">
-          <span className="deepdive-ai-dot" />
-          <span className="deepdive-ai-label">AI DEEP DIVE — GROQ LLaMA 3.3</span>
+        <div className="sdm-ai-strip">
+           <div className="ai-pulse" />
+           <span className="ai-label">NEURAL ENGINE ANALYSIS ACTIVE</span>
         </div>
 
-        {/* Content */}
-        <div className="deepdive-content">
+        <div className="sdm-content">
           {loading ? (
-            <div className="deepdive-loading">
-              <div className="deepdive-dots">
-                <span /><span /><span />
-              </div>
-              <p className="deepdive-loading-text">
-                Analyzing {stock.symbol} with live market context...
-              </p>
-            </div>
+             <div style={{ padding: '40px 0', textAlign: 'center' }}>
+               <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-muted)' }}>Synthesizing knowledge...</div>
+             </div>
           ) : (
-            <>
-              {/* Why Moving */}
-              {whySection ? (
-                <div className="deepdive-section">
-                  <div className="deepdive-section-label" style={{ color: accentColor }}>
-                    WHY IT'S MOVING
-                  </div>
-                  <p className="deepdive-section-text">{whySection}</p>
-                </div>
-              ) : (
-                <div className="deepdive-section">
-                  <p className="deepdive-section-text">{explanation}</p>
-                </div>
-              )}
+             <>
+               <div className="sdm-section">
+                  <div className="sdm-section-title" style={{ color: accent }}>AI INSIGHT</div>
+                  <p className="sdm-text">{explanation}</p>
+               </div>
 
-              {/* What to Watch */}
-              {watchSection && (
-                <div className="deepdive-section">
-                  <div className="deepdive-section-label">WHAT TO WATCH</div>
-                  <div className="deepdive-watch-list">
-                    {watchSection.split('\n')
-                      .filter(l => l.trim())
-                      .map((line, i) => (
-                        <div key={i} className="deepdive-watch-item">
-                          <span className="deepdive-watch-dot"
-                            style={{ background: accentColor }} />
-                          <span>{line.replace(/^[-•*]\s*/, '')}</span>
-                        </div>
-                      ))
-                    }
-                  </div>
-                </div>
-              )}
-
-              {/* Risk */}
-              {riskSection && (
-                <div className="deepdive-risk-box">
-                  <span className="deepdive-risk-label">⚠ RISK</span>
-                  <p className="deepdive-risk-text">{riskSection}</p>
-                </div>
-              )}
-
-              {/* TradingView Multi-Agent Analysis */}
-              {multiAgentData && (
-                <div className="deepdive-ma-card">
-                  <div className="deepdive-ma-header">
-                    <span className="deepdive-ma-label">TRADINGVIEW MULTI-AGENT DEBATE</span>
-                    <div className="deepdive-ma-consensus" data-stance={multiAgentData.consensus?.decision}>
-                      {multiAgentData.consensus?.decision}
+               {multiAgentData && (
+                 <div className="sdm-ma-card">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                       <span className="ai-label">MULTI-AGENT TECHNICAL DEBATE</span>
+                       <span className="ma-consensus" style={{ background: dim, color: accent }}>{multiAgentData.consensus?.decision}</span>
                     </div>
-                  </div>
-                  
-                  <div className="deepdive-ma-agents">
-                    {multiAgentData.agents?.map((agent, i) => (
-                      <div key={i} className="deepdive-ma-agent">
-                        <div className="ma-agent-top">
-                          <span className="ma-agent-name">{agent.agent_name}</span>
-                          <span className="ma-agent-stance" data-stance={agent.stance}>{agent.stance}</span>
-                        </div>
-                        <p className="ma-agent-reason">{agent.reasoning}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="deepdive-ma-summary">
-                    <strong>CONSENSUS:</strong> {multiAgentData.consensus?.summary}
-                  </div>
-                </div>
-              )}
-
-              {loadingMA && !multiAgentData && (
-                <div className="deepdive-ma-loading-shimmer">
-                  Running multi-agent technical debate...
-                </div>
-              )}
-            </>
+                    <p style={{ fontSize: '14px', color: var('--text-secondary'), lineHeight: '1.6' }}>{multiAgentData.consensus?.summary}</p>
+                 </div>
+               )}
+             </>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="deepdive-footer">
-          For informational purposes only. Not SEBI registered investment advice.
-        </div>
-
+        <button onClick={onClose} style={{ width: '100%', marginTop: '40px', padding: '14px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'transparent', color: '#fff', fontWeight: '800', cursor: 'pointer' }}>Close Deep Dive</button>
       </div>
     </div>
   );

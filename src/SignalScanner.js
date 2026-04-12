@@ -118,6 +118,146 @@ export default function SignalScanner({ onBack }) {
 
   return (
     <div className="scanner-page">
+      <style jsx>{`
+        .scanner-page {
+          min-height: 100vh;
+          background: var(--bg);
+          color: var(--text-primary);
+          padding-bottom: 80px;
+        }
+        .scanner-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 20px 32px;
+          background: hsla(var(--bg-hsl), 0.8);
+          backdrop-filter: blur(20px);
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          border-bottom: 1px solid var(--glass-border);
+        }
+        .ai-back-btn {
+          background: hsla(0,0%,100%,0.05);
+          border: 1px solid var(--glass-border);
+          color: var(--text-secondary);
+          padding: 8px 16px;
+          border-radius: var(--radius-sm);
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .ai-back-btn:hover { background: hsla(0,0%,100%,0.1); color: #fff; }
+        
+        .scanner-title-block { display: flex; flex-direction: column; align-items: center; }
+        .scanner-title { font-size: 18px; font-weight: 800; letter-spacing: -0.5px; }
+        .scanner-badge { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+
+        .scan-btn {
+          background: var(--blue);
+          color: #fff;
+          border: none;
+          padding: 10px 24px;
+          border-radius: var(--radius-sm);
+          font-weight: 700;
+          cursor: pointer;
+          box-shadow: var(--blue-glow);
+          transition: all 0.2s;
+        }
+        .scan-btn:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.1); }
+        .scan-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .scanner-summary-card {
+          margin: 32px;
+          padding: 24px;
+          background: hsla(var(--accent-blue), 0.05);
+          border: 1px solid hsla(var(--accent-blue), 0.2);
+          border-radius: var(--radius-md);
+          position: relative;
+        }
+        .scanner-summary-text { font-size: 15px; line-height: 1.6; color: var(--text-secondary); }
+        .scanner-summary-timestamp { display: block; margin-top: 12px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+
+        .signal-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          gap: 20px;
+          padding: 0 32px;
+        }
+
+        .signal-card {
+           background: var(--bg-card);
+           border-radius: var(--radius-md);
+           border: 1px solid var(--glass-border);
+           padding: 24px;
+           cursor: pointer;
+           transition: all 0.3s ease;
+           position: relative;
+        }
+        .signal-card:hover {
+          transform: translateY(-4px);
+          border-color: var(--glass-border-bright);
+          background: hsla(0,0%,100%,0.06);
+        }
+        .sc-card-symbol { font-size: 18px; font-weight: 800; color: #fff; }
+        .sc-card-signal-badge {
+          float: right;
+          font-size: 11px;
+          font-weight: 800;
+          padding: 4px 10px;
+          border-radius: 6px;
+          text-transform: uppercase;
+        }
+        .sc-card-score-row { margin: 16px 0; display: flex; align-items: center; gap: 10px; }
+        .sc-card-score-track { flex: 1; height: 6px; background: hsla(0,0%,100%,0.05); border-radius: 3px; }
+        .sc-card-score-fill { height: 100%; border-radius: 3px; }
+        .sc-card-score-num { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+
+        .sc-card-action {
+          display: block;
+          text-align: center;
+          padding: 8px;
+          border-radius: 6px;
+          font-weight: 800;
+          font-size: 13px;
+          margin-bottom: 16px;
+        }
+        .sc-card-reason { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+        .sector-bias-strip {
+          margin: 0 32px 32px;
+          padding: 16px;
+          background: hsla(0,0%,100%,0.02);
+          border-radius: var(--radius-md);
+          border: 1px dashed var(--glass-border);
+        }
+        .sector-bias-label { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px; display: block; }
+        .sector-bias-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .sector-bias-chip { font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px; }
+
+        .sdm-backdrop {
+          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+          background: rgba(0,0,0,0.8); backdrop-filter: blur(8px);
+          z-index: 1000; display: flex; align-items: center; justify-content: center;
+        }
+        .sdm-modal {
+          width: 90%; max-width: 500px; background: var(--bg-soft);
+          border-radius: var(--radius-lg); overflow: hidden;
+          box-shadow: var(--shadow-premium);
+          padding: 32px;
+        }
+        .sdm-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+        .sdm-symbol { font-size: 24px; font-weight: 800; color: #fff; display: block; }
+        .sdm-price { font-size: 24px; font-weight: 800; color: #fff; display: block; text-align: right; }
+
+        .price-levels-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; }
+        .price-level-card {
+           padding: 12px; border-radius: 10px; background: hsla(0,0%,100%,0.03);
+           display: flex; flex-direction: column; align-items: center;
+        }
+        .level-label { font-size: 10px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
+        .level-price { font-size: 14px; font-weight: 800; color: #fff; }
+      `}</style>
 
       {/* Header */}
       <div className="scanner-header">
@@ -131,26 +271,9 @@ export default function SignalScanner({ onBack }) {
           onClick={handleScan}
           disabled={loading}
         >
-          {loading ? (
-            <><span className="scan-spinner" /> SCANNING ALL 200...</>
-          ) : (
-            <>{hasScanned ? '↻ RESCAN' : '▶ SCANNING...'}</>
-          )}
+          {loading ? "SCANNING..." : hasScanned ? '↻ RESCAN' : '▶ SCAN NOW'}
         </button>
       </div>
-
-      {/* Technical Cache Status Banner (Phase 4) */}
-      {!cacheStatus.ready && (
-        <div className="cache-status-banner">
-          <div className="cache-status-info">
-            <span className="spinner-small" style={{ borderTopColor: '#f59e0b' }} />
-            <span>AI Technical Cache: <strong>{cacheStatus.progress_pct}%</strong> Loaded</span>
-          </div>
-          <div className="cache-status-progress">
-            <div className="cache-status-fill" style={{ width: `${cacheStatus.progress_pct}%` }} />
-          </div>
-        </div>
-      )}
 
       {/* Narrative + Timestamp */}
       {narrative && (
@@ -162,369 +285,143 @@ export default function SignalScanner({ onBack }) {
 
       {/* Summary Strip */}
       {stats && (
-        <div className="scanner-summary-strip">
-          <SummaryPill label="BULLISH" count={stats.bullish_count} color="green" />
-          <SummaryPill label="BEARISH" count={stats.bearish_count} color="red"   />
-          <SummaryPill label="NEUTRAL" count={stats.neutral_count} color="gray"  />
+        <div className="scanner-summary-strip" style={{ padding: '0 32px', marginBottom: '24px', display: 'flex', gap: '10px' }}>
+          <SummaryPill label="BULLISH" count={stats.bullish_count} color="emerald" />
+          <SummaryPill label="BEARISH" count={stats.bearish_count} color="rose"   />
           <SummaryPill label="STRONG"  count={stats.strong_count}  color="blue"  />
-          <span className="strip-bias" data-bias={stats.market_bias}>
-            Market: {stats.market_bias}
-          </span>
         </div>
       )}
 
-      {/* Filter Bar */}
-      {signals.length > 0 && (
-        <div className="sc-filter-bar">
-          <div className="sc-filter-buttons">
-            {FILTERS.map(f => (
-              <button
-                key={f}
-                className={`sc-filter-btn ${filter === f ? "sc-filter-active" : ""} ${f === 'BULLISH' ? 'sc-filter-bull' : f === 'BEARISH' ? 'sc-filter-bear' : ''}`}
-                onClick={() => setFilter(f)}
-              >
-                {f} 
-                <span className="sc-filter-count">
-                  {f !== "ALL" && f !== "STRONG" && f !== "F&O"
-                    ? `(${signals.filter(s => s.signal === f).length})`
-                    : f === "STRONG"
-                    ? `(${signals.filter(s => s.score >= 75 || s.score <= 25).length})`
-                    : f === "F&O"
-                    ? `(${signals.filter(s => s.is_fno).length})`
-                    : `(${signals.length})`
-                  }
-                </span>
-              </button>
-            ))}
-          </div>
+      {/* Sector Bias */}
+      {Object.keys(sectorBiases).length > 0 && <SectorBiasStrip biases={sectorBiases} />}
 
-          <div className="sc-search-box">
-            <span className="sc-search-icon">🔍</span>
-            <input
-              className="sc-search-input"
-              type="text"
-              placeholder="Search symbol..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              autoComplete="off"
-            />
-            {search && (
-              <button className="sc-search-clear" onClick={() => setSearch('')}>✕</button>
-            )}
-          </div>
-        </div>
-      )}
-
-      <MarketStatusBanner signals={signals} />
-      {marketClosed && <SectorBiasStrip biases={sectorBiases} />}
-
-      {/* Error */}
-      {error && (
-        <div className="scanner-error-state">
-          <p>⚠️ {error}</p>
-          <button className="btn-rescan" onClick={handleScan}>
-            ↻ Try Again
-          </button>
-        </div>
-      )}
-
-      {/* Empty state */}
-      {!loading && signals.length === 0 && !error && (
-        <div className="scanner-empty-state">
-          <p>No signals loaded yet.</p>
-          <button className="btn-rescan" onClick={handleScan}>
-            ↻ Scan Now
-          </button>
-        </div>
-      )}
-
-      {/* Signal Scanner Body with Grouped Headers */}
+      {/* Signal Scanner Body */}
       <div className="signal-scanner-body">
-        {groupedSignals.map(({ label, className, items }) => (
+        {groupedSignals.map(({ label, items }) => (
           <React.Fragment key={label}>
-            <div className={`signal-group-header ${className}`}>
-              <span>{label} <span>{items.length} stocks</span></span>
-            </div>
-            <div className="signal-grid">
-              {items.map(s => <SignalCard key={s.symbol} stock={s} onClick={setDetailStock} />)}
-            </div>
+             <div style={{ padding: '0 32px 16px', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: '1px' }}>{label} ({items.length})</div>
+             <div className="signal-grid" style={{ marginBottom: '40px' }}>
+               {items.map(s => <SignalCard key={s.symbol} stock={s} onClick={setDetailStock} />)}
+             </div>
           </React.Fragment>
         ))}
       </div>
 
-      {/* Disclaimer */}
-      <div className="scanner-disclaimer">
-        ⚠️ Algorithmic signals for informational purposes only.
-        Not SEBI registered investment advice. Do your own research.
-      </div>
-
-      <SignalDetailModal
-        stock={detailStock}
-        onClose={() => setDetailStock(null)}
-      />
-
-    </div>
-  );
-}
-
-/* ── Sub-components ── */
-
-// Add SectorBiasStrip component:
-function SectorBiasStrip({ biases }) {
-  if (!biases || Object.keys(biases).length === 0) return null;
-
-  const colorMap = {
-    BULLISH: { bg: '#f0fdf4', color: '#16a34a', border: '#bbf7d0' },
-    NEUTRAL: { bg: '#f9fafb', color: '#6b7280', border: '#e5e7eb' },
-    BEARISH: { bg: '#fef2f2', color: '#dc2626', border: '#fecaca' },
-  };
-
-  return (
-    <div className="sector-bias-strip">
-      <span className="sector-bias-label">◈ AI SECTOR BIAS</span>
-      <div className="sector-bias-chips">
-        {Object.entries(biases).filter(([s]) => s !== 'DIVERSIFIED').map(([sector, bias]) => {
-          const c = colorMap[bias] || colorMap.NEUTRAL;
-          return (
-            <span
-              key={sector}
-              className="sector-bias-chip"
-              style={{ background: c.bg, color: c.color, border: `1px solid ${c.border}` }}
-            >
-              {sector}
-            </span>
-          );
-        })}
-      </div>
+      <SignalDetailModal stock={detailStock} onClose={() => setDetailStock(null)} />
     </div>
   );
 }
 
 const SignalCard = memo(function SignalCard({ stock, onClick }) {
-  const getSignalConfig = (signal) => {
-    switch (signal) {
-      case 'BULLISH': return { icon: '▲', color: '#16a34a', badge: '#f0fdf4', badgeText: '#16a34a' };
-      case 'BEARISH': return { icon: '▼', color: '#dc2626', badge: '#fef2f2', badgeText: '#dc2626' };
-      default:        return { icon: '◈', color: '#6b7280', badge: '#f9fafb', badgeText: '#6b7280' };
-    }
+  const signalColor = stock.signal === 'BULLISH' ? 'var(--green)' : stock.signal === 'BEARISH' ? 'var(--red)' : 'var(--text-muted)';
+  const actionStyles = {
+    'BUY': { color: 'var(--green)', bg: 'var(--green-dim)' },
+    'SELL': { color: 'var(--red)', bg: 'var(--red-dim)' },
+    'WATCH BUY': { color: 'var(--blue)', bg: 'var(--blue-dim)' },
+    'WATCH SELL': { color: 'var(--red)', bg: 'hsla(var(--accent-rose), 0.05)' },
+    'HOLD': { color: 'var(--text-muted)', bg: 'hsla(0,0%,100%,0.04)' }
   };
-
-  const sc = getSignalConfig(stock.signal);
-  const isUp   = stock.change_pct > 0;
-  const isDown = stock.change_pct < 0;
-  const changeColor = isUp ? 'sc-up' : isDown ? 'sc-down' : 'sc-flat';
-
-  const actionConfig = {
-    'BUY':        { color: '#15803d', bg: '#dcfce7', label: '● BUY' },
-    'WATCH BUY':  { color: '#16a34a', bg: '#f0fdf4', label: '↑ WATCH BUY' },
-    'HOLD':       { color: '#6b7280', bg: '#f3f4f6', label: '→ HOLD' },
-    'WATCH SELL': { color: '#dc2626', bg: '#fef2f2', label: '↓ WATCH SELL' },
-    'SELL':       { color: '#991b1b', bg: '#fee2e2', label: '● SELL' },
-  };
-
-  const ac  = actionConfig[stock.action] || actionConfig['HOLD'];
+  const sa = actionStyles[stock.action] || actionStyles['HOLD'];
 
   return (
-    <div
-      className="signal-card"
-      style={{ borderTop: `3px solid ${sc.color}` }}
-      onClick={() => onClick(stock)}
-    >
-      {/* Top row */}
+    <div className="signal-card" onClick={() => onClick(stock)} style={{ borderTop: `3px solid ${signalColor}` }}>
       <div className="sc-card-top">
-        <div>
-          <span className="sc-card-symbol">{stock.symbol}</span>
-          {stock.sector && stock.sector !== 'DIVERSIFIED' && (
-            <span className="sc-card-sector">{stock.sector}</span>
-          )}
-          {stock.is_fno && <span className="fno-badge">F&O</span>}
-        </div>
-        <span className="sc-card-signal-badge" style={{ background: sc.badge, color: sc.badgeText }}>
-          {sc.icon} {stock.signal}
-        </span>
+        <span className="sc-card-symbol">{stock.symbol}</span>
+        <span className="sc-card-signal-badge" style={{ background: sa.bg, color: sa.color }}>{stock.signal}</span>
       </div>
-
-      {/* Score bar */}
+      
       <div className="sc-card-score-row">
         <div className="sc-card-score-track">
-          <div
-            className="sc-card-score-fill"
-            style={{
-              width: `${stock.score}%`,
-              background: stock.signal === 'BULLISH' ? '#16a34a'
-                        : stock.signal === 'BEARISH' ? '#dc2626'
-                        : '#d97706'
-            }}
-          />
+           <div className="sc-card-score-fill" style={{ width: `${stock.score}%`, background: signalColor }} />
         </div>
-        <span className="sc-card-score-num">{stock.score}</span>
+        <span className="sc-card-score-num">{stock.score}%</span>
       </div>
 
-      {/* Price row */}
-      <div className="sc-card-price-row">
-        <span className="sc-card-price">₹{formatINR(stock.price)}</span>
-        <span className={`sc-card-change ${isUp ? 'sc-up' : isDown ? 'sc-down' : 'sc-flat'}`}>
-          {isUp ? '▲' : isDown ? '▼' : '●'} {Math.abs(stock.change_pct || 0).toFixed(2)}%
+      <div className="sc-card-action" style={{ color: sa.color, background: sa.bg }}>{stock.action}</div>
+      <p className="sc-card-reason">{stock.reason}</p>
+      
+      <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>₹{stock.price.toLocaleString('en-IN')}</span>
+        <span style={{ fontSize: '12px', fontWeight: '800', color: stock.change_pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+          {stock.change_pct >= 0 ? '+' : ''}{stock.change_pct.toFixed(2)}%
         </span>
       </div>
-
-      {/* Action label */}
-      <div className="sc-card-action" style={{ color: ac.color, background: ac.bg }}>
-        {ac.label}
-      </div>
-
-      {/* Reason */}
-      <p className="sc-card-reason">{stock.reason}</p>
-
-      {/* Volume */}
-      {stock.vol_ratio >= 1.5 && stock.vol_ratio <= 50 && (
-        <span className="sc-card-vol">🔥 {stock.vol_ratio.toFixed(1)}x vol</span>
-      )}
     </div>
   );
 });
 
 function SignalDetailModal({ stock, onClose }) {
   if (!stock) return null;
-
-  const isUp   = stock.change_pct >= 0;
-  const isBuy  = stock.action === 'BUY' || stock.action === 'WATCH BUY';
-  const isSell = stock.action === 'SELL' || stock.action === 'WATCH SELL';
-
-  const accentColor = isBuy  ? '#16a34a'
-                    : isSell ? '#dc2626'
-                    : '#6b7280';
-
-  const handleBackdrop = (e) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
+  const accent = stock.signal === 'BULLISH' ? 'var(--green)' : stock.signal === 'BEARISH' ? 'var(--red)' : 'var(--blue)';
   return (
-    <div className="sdm-backdrop" onClick={handleBackdrop}>
-      <div className="sdm-modal" style={{ borderTop: `4px solid ${accentColor}` }}>
-        <div className="modal-drag-handle" />
-
-        {/* Header */}
+    <div className="sdm-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sdm-modal" style={{ borderTop: `4px solid ${accent}` }}>
         <div className="sdm-header">
-          <div className="sdm-header-left">
-            <span className="sdm-symbol">{stock.symbol}</span>
-            <span className="sdm-exchange">NSE</span>
-          </div>
-          <div className="sdm-header-right">
-            <span className="sdm-price">₹{formatINR(stock.price)}</span>
-            <span className={`sdm-change ${isUp ? 'sc-up' : 'sc-down'}`}>
-              {isUp ? '+' : ''}{(stock.change_pct || 0).toFixed(2)}%
-            </span>
-          </div>
-          <button className="sdm-close" onClick={onClose}>✕</button>
+           <div>
+             <span className="sdm-symbol">{stock.symbol}</span>
+             <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>{stock.sector}</span>
+           </div>
+           <div>
+             <span className="sdm-price">₹{stock.price.toLocaleString('en-IN')}</span>
+             <span style={{ display: 'block', textAlign: 'right', fontSize: '14px', fontWeight: '800', color: stock.change_pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
+               {stock.change_pct >= 0 ? '+' : ''}{stock.change_pct.toFixed(2)}%
+             </span>
+           </div>
         </div>
 
-        {/* Main Signal Card */}
-        <div className="sdm-signal-section" style={{ background: isBuy ? '#f0fdf4' : isSell ? '#fef2f2' : '#f9fafb' }}>
-          <div className="sdm-signal-label">AI SIGNAL</div>
-          <div className="sdm-signal-action" style={{ color: accentColor }}>
-            {stock.action === 'BUY'        ? '● STRONG BUY'   :
-             stock.action === 'WATCH BUY'  ? '↑ WATCH TO BUY' :
-             stock.action === 'SELL'       ? '● STRONG SELL'  :
-             stock.action === 'WATCH SELL' ? '↓ WATCH TO SELL':
-             '→ HOLD — No Clear Signal'}
-          </div>
-
-          {/* Confidence bar */}
-          <div className="sdm-confidence-row">
-            <span className="sdm-conf-label">SIGNAL CONFIDENCE</span>
-            <div className="sdm-conf-bar">
-              <div className="sdm-conf-fill" style={{ width: `${stock.score}%`, background: accentColor }} />
-            </div>
-            <span className="sdm-conf-num" style={{ color: accentColor }}>{stock.score}%</span>
+        <div style={{ background: 'hsla(0,0%,100%,0.02)', padding: '20px', borderRadius: '12px', marginBottom: '24px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>AI ANALYSIS</div>
+          <div style={{ fontSize: '20px', fontWeight: '800', color: accent }}>{stock.action} SIGNAL</div>
+          <div style={{ marginTop: '12px', height: '6px', background: 'hsla(0,0%,100%,0.05)', borderRadius: '3px' }}>
+             <div style={{ height: '100%', width: `${stock.score}%`, background: accent, borderRadius: '3px' }} />
           </div>
         </div>
 
-        {/* Price Levels Grid */}
         <div className="price-levels-grid">
-          <div className="price-level-card entry">
-            <span className="level-label">ENTRY</span>
-            <span className="level-price">₹{stock.entry_price?.toLocaleString('en-IN') ?? stock.support?.toLocaleString('en-IN')}</span>
-          </div>
-          <div className="price-level-card target">
-            <span className="level-label">TARGET</span>
-            <span className="level-price">₹{stock.exit_price?.toLocaleString('en-IN') ?? stock.target?.toLocaleString('en-IN')}</span>
-            <span className="level-note">+{stock.reward_pct ?? stock.target_upside_pct}%</span>
-          </div>
-          <div className="price-level-card stoploss">
-            <span className="level-label">STOP LOSS</span>
-            <span className="level-price">₹{stock.stop_loss?.toLocaleString('en-IN')}</span>
-            <span className="level-note">-{stock.risk_pct}%</span>
-          </div>
+           <div className="price-level-card">
+              <span className="level-label">SUPPORT</span>
+              <span className="level-price">₹{stock.support?.toLocaleString('en-IN') || '—'}</span>
+           </div>
+           <div className="price-level-card" style={{ background: 'hsla(var(--accent-emerald), 0.1)' }}>
+              <span className="level-label" style={{ color: 'var(--green)' }}>TARGET</span>
+              <span className="level-price" style={{ color: 'var(--green)' }}>₹{stock.target?.toLocaleString('en-IN') || '—'}</span>
+           </div>
+           <div className="price-level-card" style={{ background: 'hsla(var(--accent-rose), 0.1)' }}>
+              <span className="level-label" style={{ color: 'var(--red)' }}>STOP LOSS</span>
+              <span className="level-price" style={{ color: 'var(--red)' }}>₹{stock.stop_loss?.toLocaleString('en-IN') || '—'}</span>
+           </div>
         </div>
 
-        {/* Risk:Reward ratio */}
-        <div className="rr-ratio-bar">
-          <span className="rr-label">Risk : Reward</span>
-          <span className="rr-value">1 : {stock.rr_ratio}</span>
-        </div>
-
-        {/* Key Levels */}
-        {stock.key_levels && stock.price > 0 && (
-          <div className="sdm-levels">
-            <div className="sdm-section-label">KEY PRICE LEVELS</div>
-            <div className="sdm-levels-grid">
-              <div className="sdm-level sdm-level-support">
-                <span className="sdm-level-name">Support</span>
-                <span className="sdm-level-price">₹{formatINR(stock.key_levels.support)}</span>
-              </div>
-              <div className="sdm-level sdm-level-target">
-                <span className="sdm-level-name">Target</span>
-                <span className="sdm-level-price">₹{formatINR(stock.key_levels.target)}</span>
-              </div>
-              <div className="sdm-level sdm-level-sl">
-                <span className="sdm-level-name">Stop Loss</span>
-                <span className="sdm-level-price">₹{formatINR(stock.key_levels.stop_loss)}</span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Reasoning */}
-        <div className="sdm-reasoning">
-          <div className="sdm-section-label">SIGNAL REASONING</div>
-          <p className="sdm-reason-text">{stock.reason}</p>
-          {stock.ai_note && (
-            <div className="sdm-ai-note">
-              <span className="sdm-ai-icon">◈</span>
-              <p>{stock.ai_note}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Disclaimer */}
-        <div className="sdm-disclaimer">
-          ⚠️ Algorithmic signal. Not SEBI registered investment advice. Do your own research.
-        </div>
+        <div style={{ fontSize: '14px', lineHeight: '1.6', color: 'var(--text-secondary)' }}>{stock.reason}</div>
+        
+        <button onClick={onClose} style={{ width: '100%', marginTop: '32px', padding: '12px', borderRadius: '10px', border: '1px solid var(--glass-border)', background: 'transparent', color: '#fff', fontWeight: '700', cursor: 'pointer' }}>Close Analysis</button>
       </div>
     </div>
   );
 }
 
-function ScoreBar({ score, signal }) {
-  const color = signal === "BULLISH" ? "#16a34a"
-              : signal === "BEARISH" ? "#dc2626"
-              : "#d97706";
+function SectorBiasStrip({ biases }) {
   return (
-    <div className="score-bar-track">
-      <div
-        className="score-bar-fill"
-        style={{ width: `${score}%`, background: color }}
-      />
+    <div className="sector-bias-strip">
+       <span className="sector-bias-label">◈ AI SECTOR BIAS SUMMARY</span>
+       <div className="sector-bias-chips">
+         {Object.entries(biases).map(([sector, bias]) => (
+           <span key={sector} className="sector-bias-chip" style={{ 
+             background: bias === 'BULLISH' ? 'var(--green-dim)' : bias === 'BEARISH' ? 'var(--red-dim)' : 'hsla(0,0%,100%,0.05)',
+             color: bias === 'BULLISH' ? 'var(--green)' : bias === 'BEARISH' ? 'var(--red)' : 'var(--text-muted)',
+             border: `1px solid ${bias === 'BULLISH' ? 'hsla(var(--accent-emerald), 0.2)' : bias === 'BEARISH' ? 'hsla(var(--accent-rose), 0.2)' : 'var(--glass-border)'}`
+           }}>{sector}</span>
+         ))}
+       </div>
     </div>
   );
 }
 
 function SummaryPill({ label, count, color }) {
   return (
-    <div className={`summary-pill summary-pill-${color}`}>
-      <span className="sp-count">{count}</span>
-      <span className="sp-label">{label}</span>
+    <div style={{ flex: 1, padding: '16px', borderRadius: '14px', background: `var(--${color}-dim)`, border: `1px solid hsla(var(--accent-${color}), 0.2)` }}>
+       <div style={{ fontSize: '24px', fontWeight: '800', color: `var(--${color})` }}>{count}</div>
+       <div style={{ fontSize: '10px', fontWeight: '700', color: `var(--${color})`, letterSpacing: '1px' }}>{label}</div>
     </div>
   );
 }

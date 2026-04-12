@@ -17,58 +17,71 @@ function formatINR(num) {
 }
 
 function FnoTable({ title, data, type, onStockClick }) {
+  const accent = type === 'gainer' ? 'var(--green)' : 'var(--red)';
   return (
     <div className="fno-table-container">
-      <h3 className={`fno-table-title ${type === 'gainer' ? 'fno-title-gainer' : 'fno-title-loser'}`}>{title}</h3>
+      <style jsx>{`
+        .fno-table-container {
+          background: var(--bg-card);
+          border: 1px solid var(--glass-border);
+          border-radius: var(--radius-lg);
+          padding: 24px;
+          backdrop-filter: blur(20px);
+        }
+        .fno-table-title {
+          font-size: 14px;
+          font-weight: 800;
+          color: var(--text-muted);
+          margin-bottom: 20px;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+        }
+        .fno-table { width: 100%; border-collapse: collapse; }
+        .fno-table th {
+          text-align: left; font-size: 10px; font-weight: 700; color: var(--text-muted);
+          padding: 12px; border-bottom: 1px solid var(--glass-border);
+          text-transform: uppercase; letter-spacing: 1px;
+        }
+        .fno-table-row { cursor: pointer; transition: background 0.2s; }
+        .fno-table-row:hover { background: hsla(0,0%,100%,0.03); }
+        .fno-table td { padding: 14px 12px; font-size: 14px; border-bottom: 1px solid hsla(0,0%,100%,0.02); }
+        .fno-symbol-text { font-weight: 800; color: #fff; margin-right: 8px; }
+        .fno-pill { font-size: 9px; font-weight: 800; background: var(--blue-dim); color: var(--blue); padding: 2px 6px; border-radius: 4px; }
+        .fno-chg { font-weight: 800; }
+      `}</style>
+      <h3 className="fno-table-title" style={{ color: accent }}>{title}</h3>
       <table className="fno-table">
         <thead>
           <tr>
-            <th>#</th>
             <th>Symbol</th>
-            <th>Sector</th>
             <th>LTP</th>
             <th>Chg%</th>
-            <th>Vol Ratio</th>
-            <th>Signal</th>
+            <th>Vol</th>
           </tr>
         </thead>
         <tbody>
           {data && data.map((stock, i) => {
-            const sc = getSignalConfig(stock.signal);
             const isUp = stock.change_pct > 0;
-            const isDown = stock.change_pct < 0;
             return (
               <tr 
                 key={stock.symbol || i} 
                 onClick={() => onStockClick && onStockClick(stock.symbol)}
                 className="fno-table-row"
               >
-                <td>{i + 1}</td>
                 <td>
                   <span className="fno-symbol-text">{stock.symbol}</span>
                   <span className="fno-pill">F&O</span>
                 </td>
-                <td className="fno-sector">{stock.sector || 'Unknown'}</td>
-                <td className="fno-ltp">₹{formatINR(stock.ltp)}</td>
-                <td className={`fno-chg ${isUp ? 'fno-bg-green' : isDown ? 'fno-bg-red' : ''}`}>
+                <td style={{ fontWeight: '700' }}>₹{formatINR(stock.ltp)}</td>
+                <td className="fno-chg" style={{ color: isUp ? 'var(--green)' : 'var(--red)' }}>
                   {isUp ? '+' : ''}{(stock.change_pct || 0).toFixed(2)}%
                 </td>
-                <td className="fno-vol">
-                  {stock.vol_ratio && stock.vol_ratio >= 1.5 ? `🔥 ${stock.vol_ratio.toFixed(1)}x` : '-'}
-                </td>
-                <td>
-                  <span className="sc-card-signal-badge" style={{ background: sc.badge, color: sc.badgeText, whiteSpace: 'nowrap', padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 'bold' }}>
-                    {sc.icon} {stock.signal || 'NEUTRAL'}
-                  </span>
+                <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                  {stock.vol_ratio && stock.vol_ratio >= 1.2 ? `🔥 ${stock.vol_ratio.toFixed(1)}x` : '-'}
                 </td>
               </tr>
             );
           })}
-          {(!data || data.length === 0) && (
-            <tr>
-              <td colSpan="7" className="fno-empty">No data available</td>
-            </tr>
-          )}
         </tbody>
       </table>
     </div>
@@ -77,11 +90,15 @@ function FnoTable({ title, data, type, onStockClick }) {
 
 export default function FnoMoversTable({ gainers, losers, onStockClick }) {
   return (
-    <div className="fno-movers-section">
-      <h2 className="fno-main-title">🔶 F&O Top Movers</h2>
+    <div className="fno-movers-section" style={{ padding: '0 24px 40px', maxWidth: '1400px', margin: '0 auto' }}>
+      <style jsx>{`
+        .fno-main-title { font-size: 12px; font-weight: 800; color: var(--text-muted); margin-bottom: 24px; letter-spacing: 2px; }
+        .fno-movers-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; }
+      `}</style>
+      <h2 className="fno-main-title">F&O SECTOR ANALYSIS</h2>
       <div className="fno-movers-grid">
-        <FnoTable title="Top Gainers" data={gainers} type="gainer" onStockClick={onStockClick} />
-        <FnoTable title="Top Losers" data={losers} type="loser" onStockClick={onStockClick} />
+        <FnoTable title="Momentum Gainers" data={gainers} type="gainer" onStockClick={onStockClick} />
+        <FnoTable title="Pressure Losers" data={losers} type="loser" onStockClick={onStockClick} />
       </div>
     </div>
   );

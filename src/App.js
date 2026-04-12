@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./index.css";
 import InsightsPage from "./InsightsPage";
 import SignalScanner from "./SignalScanner";
+import MarketPulseHero from "./MarketPulseHero";
 import { useStockExplain, StockDeepDiveModal } from './StockDeepDive';
 import FnoMoversTable from "./FnoMoversTable";
 
@@ -110,7 +111,7 @@ const Sparkline = React.memo(({ data, accent }) => {
   }
 
   const areaD = `${pathD} L ${width},${height} L 0,${height} Z`;
-  const color = accent === 'green' ? '#10b981' : '#ef4444';
+  const color = accent === 'green' ? 'var(--green)' : 'var(--red)';
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -500,15 +501,14 @@ export default function App() {
 
             <div className="header-right">
               <button 
-                className="ai-insights-btn"
+                className="ai-insights-btn premium-btn"
                 onClick={() => setCurrentPage('insights')}
               >
-                ✨ AI Insights
+                ✨ Market Analyst
               </button>
               <button 
-                className="scanner-nav-btn"
+                className="scanner-nav-btn premium-btn-blue"
                 onClick={() => setCurrentPage('scanner')}
-                style={{ background: 'var(--blue)', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
               >
                 ◉ Signal Scanner
               </button>
@@ -517,9 +517,13 @@ export default function App() {
             </div>
           </header>
 
+          <MarketPulseHero niftyData={niftyData} midcapData={midcapData} />
+
           <div className="section-header">
-            <h2 className="section-title">Nifty 100</h2>
-            <div className="section-line" style={{ background: 'var(--blue)' }} />
+            <div className="section-title">
+              <div className="section-line" style={{ background: 'var(--blue)' }} />
+              NIFTY 100 SEGMENT
+            </div>
           </div>
           <main className="panels-wrapper">
             <Panel title="Top Gainers" accent="green" data={niftyData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
