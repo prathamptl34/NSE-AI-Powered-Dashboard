@@ -518,8 +518,6 @@ export default function App() {
             </div>
           </header>
 
-          <MarketPulseHero niftyData={niftyData} midcapData={midcapData} />
-
           <div className="section-header">
             <div className="section-title">
               <div className="section-line" style={{ background: 'var(--blue)' }} />
@@ -548,6 +546,8 @@ export default function App() {
             <Panel title="Top Gainers" accent="green" data={fnoMovers.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
             <Panel title="Top Losers" accent="red" data={fnoMovers.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
           </main>
+
+          <MarketPulseHero niftyData={niftyData} midcapData={midcapData} />
 
           <div className="historical-explorer">
             <div className="hist-card">
