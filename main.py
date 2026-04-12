@@ -47,9 +47,47 @@ _latest_ai_insight = None
 _latest_divergence_flags = []
 _is_generating_insight = False
 
+# Centralized AI Cache for high performance
+_AI_GLOBAL_STATE = {
+    "latest_insight": None, # For AI Analyst page
+    "sector_biases": {},    # For Scanner page adjustments
+    "scanner_narrative": "Initializing market intelligence...",
+    "movers_commentary": [],
+    "last_updated": None
+}
+
 # ── AI Setup ──────────────────────────────────────────────────────────────────
 # ── AI Setup (Groq SDK with LLaMA 3.3) ────────────────────────────────────────
 IST = pytz.timezone("Asia/Kolkata")
+
+def get_ai_sector_biases() -> dict:
+    """
+    Called by background loop to update sector sentiment.
+    Returns: {'IT': 'BULLISH', 'BANKS': 'BEARISH', ...}
+    """
+    try:
+        summary = get_market_summary()
+        n100 = summary.get("nifty100", {})
+        g = ", ".join([x['symbol'] for x in n100.get("gainers", [])[:5]])
+        l = ", ".join([x['symbol'] for x in n100.get("losers", [])[:5]])
+        
+        prompt = f"""Analyze top NSE movers and determine bias for these sectors: IT, BANKS, FMCG, METALS, AUTO, PHARMA, ENERGY.
+Gainers: {g}
+Losers: {l}
+
+Respond ONLY with a JSON object. Values MUST be 'BULLISH', 'BEARISH', or 'NEUTRAL'.
+Example: {{"IT": "BULLISH", "BANKS": "NEUTRAL"}}"""
+
+        result = call_ai(prompt, 200)
+        # Parse JSON
+        import json, re
+        match = re.search(r'\{.*\}', result, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        return {}
+    except Exception as e:
+        logger.error(f"Sector bias calculation error: {e}")
+        return {}
 
 def call_ai(prompt: str, max_tokens: int = 600) -> str:
     """
@@ -241,90 +279,27 @@ async def websocket_stream(websocket: WebSocket):
         connected_clients.discard(websocket)
 
 
-# ── AI Sector Bias ─────────────────────────────────────────────────────────────
-
-def get_ai_sector_biases() -> dict:
-    """
-    ONE Groq call to get sector biases based on current market knowledge.
-    Returns dict like: {'IT': 'BULLISH', 'BANKS': 'NEUTRAL', 'METALS': 'BEARISH', ...}
-    """
-    prompt = """You are an NSE market analyst. Based on current Indian market conditions,
-rate each sector as BULLISH, NEUTRAL, or BEARISH.
-
-Consider: global cues, FII activity, recent earnings trends, commodity prices, RBI policy.
-
-Respond ONLY as JSON. No explanation. Example format:
-{"IT": "BULLISH", "BANKS": "NEUTRAL", "METALS": "BEARISH", "FMCG": "BULLISH",
- "AUTO": "NEUTRAL", "PHARMA": "BULLISH", "INFRA": "NEUTRAL", "ENERGY": "NEUTRAL",
- "FINANCE": "NEUTRAL", "TELECOM": "BULLISH", "CONSUMER": "NEUTRAL", "REALTY": "NEUTRAL",
- "DIVERSIFIED": "NEUTRAL"}
-
-Sectors to rate: IT, BANKS, FMCG, METALS, AUTO, PHARMA, INFRA, ENERGY, FINANCE, TELECOM, CONSUMER, REALTY, DIVERSIFIED"""
-
-    try:
-        result = call_ai(prompt, max_tokens=200)
-        # Extract JSON from response
-        import json
-        match = re.search(r'\{[^}]+\}', result, re.DOTALL)
-        if match:
-            biases = json.loads(match.group())
-            # Validate all values are valid signals
-            valid = {'BULLISH', 'NEUTRAL', 'BEARISH'}
-            return {k: v for k, v in biases.items() if v in valid}
-    except Exception as e:
-        print(f'[AI sector bias] {e}')
-
-    # Fallback if AI fails
-    return {
-        'IT': 'NEUTRAL', 'BANKS': 'NEUTRAL', 'FMCG': 'NEUTRAL',
-        'METALS': 'NEUTRAL', 'AUTO': 'NEUTRAL', 'PHARMA': 'NEUTRAL',
-        'INFRA': 'NEUTRAL', 'ENERGY': 'NEUTRAL', 'FINANCE': 'NEUTRAL',
-        'TELECOM': 'NEUTRAL', 'CONSUMER': 'NEUTRAL', 'REALTY': 'NEUTRAL',
-        'DIVERSIFIED': 'NEUTRAL'
-    }
-
-
-# ── API Routes ────────────────────────────────────────────────────────────────
-
-@app.api_route("/api/health", methods=["GET", "HEAD"])
-async def health():
-    return {"status": "ok", "version": "1.0.0"}
-
-@app.post("/api/force-refresh-metadata")
-async def force_refresh():
-    """Trigger the scavenger loop to re-fetch all prev_close values."""
-    from backend.streamer import ALL_TOKENS
-    for tok in ALL_TOKENS.values():
-        tok["prev_close_confirmed"] = False
-    return {"message": "Metadata refresh triggered. Scavenger will update shortly."}
-
-
-@app.get("/api/market-summary")
-async def market_summary(request: Request):
-    """
-    Returns top 5 gainers and losers for Nifty 100 and Nifty Midcap 100.
-
-    Response shape:
-    {
-      "nifty100": {
-        "gainers": [ { symbol, ltp, prev_close, change_pct, volume } ],
-        "losers":  [ ... ]
-      },
-      "midcap100": { "gainers": [...], "losers": [...] },
-      "last_updated": "<ISO timestamp>"
-    }
-    """
-    if streamer is None:
-        raise HTTPException(status_code=503, detail="Streamer not initialised yet.")
-    return get_market_summary(top_n=5)
-
-
 @app.get("/api/market-summary/raw")
 async def market_summary_raw(request: Request):
     """Returns full tick data for all subscribed tokens (debug / advanced use)."""
     if streamer is None:
         raise HTTPException(status_code=503, detail="Streamer not initialised yet.")
     return get_market_summary(top_n=100)
+
+
+@app.get("/api/ai-insight")
+async def get_ai_insight():
+    """Returns the latest AI-generated market insight from background cache."""
+    # Use centralized state if available
+    state = _AI_GLOBAL_STATE.get("latest_insight")
+    if state:
+        return state
+        
+    # Fallback to legacy variable
+    if _latest_ai_insight:
+        return _latest_ai_insight
+        
+    return {"error": "AI Market Analyst is warming up. Please wait 60 seconds."}
 
 
 @app.get("/api/fno-movers")
@@ -527,6 +502,48 @@ No typos. No bullet points. Complete sentences only.""" if top_loser else None
             "gainers":        gainers,
             "losers":         losers,
         }
+        
+        # Update Central AI State
+        _AI_GLOBAL_STATE["latest_insight"] = _latest_ai_insight
+        _AI_GLOBAL_STATE["last_updated"]   = datetime.now(IST).strftime("%I:%M:%S %p IST")
+
+        # --- Performance Upgrade: Pre-calculate Scanner Data ---
+        try:
+            # 1. Sector Biases
+            biases = get_ai_sector_biases()
+            if biases:
+                _AI_GLOBAL_STATE["sector_biases"] = biases
+            
+            # 2. Scanner Narrative
+            ticks = get_all_ticks()
+            if ticks:
+                from backend.signal_engine import calculate_all_signals, get_summary_stats
+                
+                all_stocks_for_scanner = []
+                for t in ticks:
+                    all_stocks_for_scanner.append({
+                        "symbol": t["symbol"],
+                        "change_pct": t.get("change_pct", 0),
+                        "score": 50 # minimal dummy for narrative context
+                    })
+                
+                scanner_signals = calculate_all_signals(all_stocks_for_scanner)
+                scanner_stats = get_summary_stats(scanner_signals)
+                
+                # Run narrative and commentary in parallel
+                s_tasks = [
+                    asyncio.to_thread(generate_scanner_narrative, scanner_stats, scanner_signals[:5], scanner_signals[-5:]),
+                    asyncio.to_thread(generate_movers_commentary, scanner_signals[:3], scanner_signals[-3:])
+                ]
+                s_results = await asyncio.gather(*s_tasks, return_exceptions=True)
+                
+                if not isinstance(s_results[0], Exception):
+                    _AI_GLOBAL_STATE["scanner_narrative"] = s_results[0]
+                if not isinstance(s_results[1], Exception):
+                    _AI_GLOBAL_STATE["movers_commentary"] = s_results[1]
+                    
+        except Exception as e:
+            logger.error(f"Background scanner pre-calc error: {e}")
 
         # --- Priority 3: Divergence Lie Detector ---
         def _get_vr(t):
@@ -620,16 +637,10 @@ async def get_signal_scanner():
         changes = [abs(s.get('change_pct', 0)) for s in all_stocks]
         market_closed = len(changes) > 10 and max(changes) < 0.01
 
-        # Get AI sector biases if market is closed
-        sector_biases = {}
-        if market_closed:
-            logger.info('[Scanner] Market closed — using AI sector biases')
-            try:
-                sector_biases = await asyncio.to_thread(get_ai_sector_biases)
-                logger.info(f'[Scanner] AI biases: {sector_biases}')
-            except Exception as e:
-                logger.error(f"Sector bias error: {e}")
-                sector_biases = {}
+        # Get AI sector biases from cache (instant)
+        sector_biases = _AI_GLOBAL_STATE.get("sector_biases", {})
+        if market_closed and sector_biases:
+            logger.info('[Scanner] Market closed — using cached AI sector biases')
 
             # Override signals with AI sector biases
             # get_sector is now imported at top level
@@ -653,19 +664,10 @@ async def get_signal_scanner():
             signals.sort(key=lambda x: (order.get(x['signal'], 1), -x['score']))
 
         stats = get_summary_stats(signals)
-        top_bullish = [s for s in signals if s["signal"] == "BULLISH"][:5]
-        top_bearish = [s for s in signals if s["signal"] == "BEARISH"][:5]
-
-        # Parallelize AI calls for narrative and commentary
-        ai_tasks = [
-            asyncio.to_thread(generate_scanner_narrative, stats, top_bullish, top_bearish),
-            asyncio.to_thread(generate_movers_commentary, top_bullish[:3], top_bearish[:3])
-        ]
         
-        ai_results = await asyncio.gather(*ai_tasks, return_exceptions=True)
-        
-        narrative = ai_results[0] if not isinstance(ai_results[0], Exception) else "Scan complete. Analyzing market breadth."
-        movers_raw = ai_results[1] if isinstance(ai_results[1], list) else []
+        # Use cached AI narrative and commentary for instant response
+        narrative = _AI_GLOBAL_STATE.get("scanner_narrative", "Scan complete. Analyzing market breadth.")
+        movers_raw = _AI_GLOBAL_STATE.get("movers_commentary", [])
 
         if movers_raw:
             for item in movers_raw:
@@ -686,7 +688,7 @@ async def get_signal_scanner():
             "narrative":    narrative,
             "timestamp":    datetime.now(IST).strftime("%I:%M:%S %p IST"),
             "market_closed": market_closed,
-            "sector_biases": sector_biases,
+            "sector_biases": _AI_GLOBAL_STATE.get("sector_biases", {}),
             "disclaimer":   "AI signals for informational purposes only. Not SEBI advice.",
         }
 
