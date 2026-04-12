@@ -472,6 +472,7 @@ export default function InsightsPage({ onBack, wsStatus }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [breakouts, setBreakouts] = useState([]);
+  const [flags, setFlags] = useState([]);
   const [history, setHistory] = useState([]);
   const [moodScore, setMoodScore] = useState(50);
   const [error, setError] = useState(null);
@@ -480,9 +481,22 @@ export default function InsightsPage({ onBack, wsStatus }) {
   useEffect(() => {
     fetchInsight();
     fetchBreakouts();
+    fetchFlags();
     const interval = setInterval(fetchBreakouts, 300000); // 5 min
     return () => clearInterval(interval);
   }, []);
+
+  const fetchFlags = async () => {
+    try {
+      const res = await fetch('/api/divergence-flags');
+      if (res.ok) {
+        const d = await res.json();
+        setFlags(d.flags || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch flags:", err);
+    }
+  };
 
   const fetchBreakouts = async () => {
     try {
@@ -644,6 +658,34 @@ export default function InsightsPage({ onBack, wsStatus }) {
 
       <FearGreedGauge score={moodScore} />
       {data && <SectorHeatmap allStocks={[...(data.gainers || []), ...(data.losers || [])]} />}
+      
+      {flags && flags.length > 0 && (
+        <div className="lie-detector-section" style={{ margin: '0 32px 32px' }}>
+          <div className="section-label" style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-muted)', marginBottom: '16px', letterSpacing: '1px' }}>
+            ⚠️ AI LIE DETECTOR (NARRATIVE VS TAPE)
+          </div>
+          <div className="lie-detector-grid" style={{ display: 'grid', gap: '16px' }}>
+            {flags.map((f, i) => {
+              let accent = 'var(--text-primary)';
+              if (f.divergence_type === 'Bull Trap') accent = '#f59e0b';
+              else if (f.divergence_type === 'Bear Trap') accent = '#f43f5e';
+              else if (f.divergence_type === 'Confirmed Move') accent = 'var(--green)';
+
+              return (
+                <div key={i} style={{ padding: '20px', background: 'var(--bg-card)', border: `1px solid hsla(0,0%,100%,0.1)`, borderLeft: `4px solid ${accent}`, borderRadius: '12px', boxShadow: 'var(--shadow-premium)' }}>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: accent, marginBottom: '8px' }}>
+                    {f.symbol} — {f.divergence_type} ({f.confidence} Confidence)
+                  </div>
+                  <div style={{ fontSize: '14px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                    "{f.one_line_reason}"
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       
       <div className="ai-main-card">
          <div className="ai-card-label">NARRATIVE INTELLIGENCE</div>

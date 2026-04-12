@@ -42,6 +42,7 @@ load_dotenv()
 streamer = None
 START_TIME = time.time()
 _latest_ai_insight = None
+_latest_divergence_flags = []
 _is_generating_insight = False
 
 # ── AI Setup ──────────────────────────────────────────────────────────────────
@@ -524,6 +525,62 @@ No typos. No bullet points. Complete sentences only.""" if top_loser else None
             "losers":         losers,
         }
 
+        # --- Priority 3: Divergence Lie Detector ---
+        def _get_vr(t):
+            av = t.get("avg_volume", 0)
+            return round(t.get("volume", 0) / av, 2) if av > 10000 else 1.0
+
+        all_movers = gainers + losers
+        top_5_movers = sorted(all_movers, key=lambda x: abs(x.get('change_pct', 0)), reverse=True)[:5]
+        mover_data = [
+            {"symbol": m["symbol"], "price_change_pct": m.get("change_pct", 0), "volume_ratio": _get_vr(m)} 
+            for m in top_5_movers
+        ]
+
+        divergence_prompt = f"""
+You are a quantitative analyst. Analyze each stock below and compare news sentiment vs price action.
+
+Stocks data:
+{json.dumps(mover_data)}
+
+For each stock return ONLY valid JSON array, no extra text:
+[
+  {{
+    "symbol": "SYMBOL",
+    "narrative_sentiment": <integer -10 to 10>,
+    "tape_sentiment": <integer -10 to 10>,
+    "divergence_type": "Bull Trap" | "Bear Trap" | "Confirmed Move" | "Neutral",
+    "confidence": "Low" | "Medium" | "High",
+    "one_line_reason": "..."
+  }}
+]
+"""
+        div_result = await asyncio.to_thread(call_ai, divergence_prompt, 800)
+        
+        try:
+            json_str = div_result
+            if "[" in json_str:
+                json_str = json_str[json_str.find("["):json_str.rfind("]")+1]
+            parsed_response = json.loads(json_str)
+            filtered = [
+                s for s in parsed_response
+                if s.get('confidence') == 'High'
+                and abs(s.get('narrative_sentiment', 0) - s.get('tape_sentiment', 0)) > 5
+            ]
+            global _latest_divergence_flags
+            _latest_divergence_flags = filtered
+            
+            # Log to local file
+            os.makedirs(".data", exist_ok=True)
+            with open(".data/divergences.jsonl", "a") as f:
+                for match in filtered:
+                    m_copy = match.copy()
+                    m_copy['timestamp'] = datetime.now(IST).isoformat()
+                    f.write(json.dumps(m_copy) + "\n")
+        except Exception as e:
+            logger.error(f"Divergence parse error: {e}")
+    finally:
+        _is_generating_insight = False
 
 
 @app.get("/api/signal-scanner")
