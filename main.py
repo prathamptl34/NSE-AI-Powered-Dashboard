@@ -19,9 +19,11 @@ import logging
 import sys
 import traceback
 import re
+import json
+
 from groq import Groq
 from backend.signal_engine import calculate_all_signals, get_summary_stats, get_sector, FNO_STOCKS
-from backend.streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
+from backend.streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status, get_intraday_candles
 from backend.historical import get_historical_summary, get_intraday_sparklines
 from backend.nse_holidays import is_trading_day
 from backend.tv_mcp_client import (
@@ -172,6 +174,7 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 break
             except Exception as e:
+                print(e)
                 logger.error(f"AI insight polling error: {e}")
                 await asyncio.sleep(60)
                 
@@ -593,8 +596,6 @@ async def get_signal_scanner():
             return {"error": "No stock data available. WebSocket may be connecting."}
 
         # Map ticks to the format expected by signal_engine (ltp -> price)
-        from backend.streamer import get_intraday_candles
-        
         all_stocks = []
         for t in ticks:
             symbol = t["symbol"]

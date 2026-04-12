@@ -14,7 +14,13 @@ import threading
 import time
 import json
 from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional
+from collections import defaultdict
+
+_intraday_candles = defaultdict(list)
+_last_cumulative_vol = defaultdict(int)
+_current_trading_day = datetime.now().strftime("%Y-%m-%d")
 
 # Enable JSON logging if running in Cloud Run
 if os.environ.get("K_SERVICE"):
@@ -257,6 +263,11 @@ _store_lock = threading.Lock()
 connected_clients = set()
 _METADATA_CACHE = os.path.join(".data", "metadata_cache.json")
 
+# Time caching for high-frequency tick updates
+_cached_day = ""
+_cached_candle_time = ""
+_last_time_update = 0
+
 def load_metadata():
     """Loads previous close prices from persistent cache to enable instant startup."""
     if not os.path.exists(_METADATA_CACHE):
@@ -326,6 +337,48 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
             meta["prev_close_confirmed"] = True
             # Trigger immediate (but throttled) save
             save_metadata()
+            
+    # --- Priority 1: Intraday Candle Store (OHLCV 5-min) ---
+    global _current_trading_day, _cached_day, _cached_candle_time, _last_time_update
+    curr_t = time.time()
+    if curr_t - _last_time_update > 1.0:
+        now_dt = datetime.now()
+        _cached_day = now_dt.strftime("%Y-%m-%d")
+        minute_floor = (now_dt.minute // 5) * 5
+        _cached_candle_time = now_dt.replace(minute=minute_floor, second=0, microsecond=0).strftime("%H:%M")
+        _last_time_update = curr_t
+    
+    today_str = _cached_day
+    candle_time_str = _cached_candle_time
+
+    if today_str != _current_trading_day:
+        with _store_lock:
+            _intraday_candles.clear()
+            _last_cumulative_vol.clear()
+        _current_trading_day = today_str
+
+    with _store_lock:
+        tick_vol_diff = volume - _last_cumulative_vol[token]
+        if tick_vol_diff < 0:
+            tick_vol_diff = volume # Volume reset edge-case
+        _last_cumulative_vol[token] = volume
+
+        candles = _intraday_candles[token]
+        if not candles or candles[-1]["time"] != candle_time_str:
+            candles.append({
+                "time": candle_time_str,
+                "open": ltp,
+                "high": ltp,
+                "low": ltp,
+                "close": ltp,
+                "volume": tick_vol_diff
+            })
+        else:
+            c = candles[-1]
+            c["high"] = max(c["high"], ltp)
+            c["low"] = min(c["low"], ltp)
+            c["close"] = ltp
+            c["volume"] += tick_vol_diff
     
     # Fallback to current meta if not updated
     prev = meta["prev_close"]
@@ -353,6 +406,11 @@ def get_all_ticks() -> list:
     """Return all processed ticks for scanning."""
     with _store_lock:
         return list(_tick_store.values())
+
+def get_intraday_candles(token: str) -> list:
+    """Return the OHLCV intraday candles for a token."""
+    with _store_lock:
+        return list(_intraday_candles.get(token, []))
 
 def get_market_summary(top_n: int = 5) -> dict:
     """Compute top-N gainers and losers for each index."""
