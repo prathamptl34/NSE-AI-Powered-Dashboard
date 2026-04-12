@@ -142,7 +142,7 @@ export function StockDeepDiveModal({ stock, explanation, multiAgentData, loading
                        <span className="ai-label">MULTI-AGENT TECHNICAL DEBATE</span>
                        <span className="ma-consensus" style={{ background: dim, color: accent }}>{multiAgentData.consensus?.decision}</span>
                     </div>
-                    <p style={{ fontSize: '14px', color: var('--text-secondary'), lineHeight: '1.6' }}>{multiAgentData.consensus?.summary}</p>
+                    <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6' }}>{multiAgentData.consensus?.summary}</p>
                  </div>
                )}
              </>
