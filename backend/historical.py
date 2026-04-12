@@ -11,6 +11,7 @@ from cachetools import TTLCache
 # Import token dicts from existing streamer
 from .streamer import NIFTY100_TOKENS, MIDCAP100_TOKENS
 from .nse_holidays import is_trading_day, get_last_trading_day_str
+import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
@@ -322,6 +323,7 @@ def get_intraday_sparklines(tokens: list[str]) -> dict:
     """
     import concurrent.futures
     import time
+    from .streamer import ALL_TOKENS
     
     smart = _get_smart_connect()
     
@@ -346,23 +348,53 @@ def get_intraday_sparklines(tokens: list[str]) -> dict:
         if delay > 0:
             time.sleep(delay)
         
-        req = {
-            "exchange": "NSE",
-            "symboltoken": token,
-            "interval": "FIVE_MINUTE",
-            "fromdate": from_date,
-            "todate": to_date
-        }
-        res = smart.getCandleData(req)
-        # 3 req/sec limit means we must wait at least 0.35s before the next call
-        time.sleep(0.35) 
-        
-        if res and res.get("status") and res.get("data"):
-            # Return list of close prices (index 4)
-            return token, [row[4] for row in res["data"]]
+        # 1. Try Angel One
+        try:
+            req = {
+                "exchange": "NSE",
+                "symboltoken": token,
+                "interval": "FIVE_MINUTE",
+                "fromdate": from_date,
+                "todate": to_date
+            }
+            res = smart.getCandleData(req)
+            if res and res.get("status") and res.get("data") and len(res["data"]) > 5:
+                # 3 req/sec limit
+                time.sleep(0.35) 
+                return token, [row[4] for row in res["data"]]
+        except Exception as e:
+            logger.warning(f"Angel Sparkline Error for {token}: {e}")
+
+        # 2. Try yFinance Fallback
+        try:
+            symbol = ALL_TOKENS.get(token, {}).get("symbol")
+            if not symbol: return token, []
+            
+            # yF needs .NS suffix
+            yf_sym = f"{symbol}.NS"
+            # Get 5m data for the last 5 days (more than enough for today's sparkline)
+            df = yf.download(yf_sym, period="5d", interval="5m", progress=False)
+            if df is not None and not df.empty:
+                # Filter for target_day_str
+                # yF index is DatetimeIndex in UTC or local? Usually local for .NS
+                df.index = df.index.tz_localize(None) # Remove TZ for easier comparison
+                target_date = datetime.strptime(target_day_str, "%Y-%m-%d").date()
+                day_data = df[df.index.date == target_date]
+                
+                if not day_data.empty:
+                    prices = day_data['Close'].iloc[:, 0].tolist() if hasattr(day_data['Close'], 'iloc') and len(day_data['Close'].shape) > 1 else day_data['Close'].tolist()
+                    # Sanitize: yfinance sometimes returns multidimensional Close if multiple symbols were asked
+                    if isinstance(prices[0], (list, dict)): # Rare case
+                         prices = [float(p) for p in prices]
+                    
+                    logger.info(f"Sparkline: {symbol} using yFinance fallback ({len(prices)} points)")
+                    return token, prices
+        except Exception as e:
+            logger.error(f"yFinance Sparkline Error for {token}: {e}")
+
         return token, []
         
-    # Execute sequentially with 2 workers to avoid banning
+    # Execute with workers
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_token = {
             executor.submit(fetch_single, t, i * 0.4): t 

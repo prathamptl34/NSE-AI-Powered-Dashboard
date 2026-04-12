@@ -371,22 +371,43 @@ export default function App() {
   }, [fetchData]);
 
   // Intraday Sparkline Fetcher
+  const lastFetchTimeRef = useRef(0);
   useEffect(() => {
     if (viewMode !== 'chart') return;
     
-    const all = [...niftyData.gainers, ...niftyData.losers, ...midcapData.gainers, ...midcapData.losers];
-    const missingSymbols = all
-      .map(s => s.symbol)
-      .filter(sym => !fetchedIntradayRef.current.has(sym) && (!historyMap[sym] || historyMap[sym].length <= 2));
+    // Throttle: Don't check for missing symbols more than once every 30s
+    const now = Date.now();
+    if (now - lastFetchTimeRef.current < 30000) return;
+    
+    const all = [
+      ...niftyData.gainers, ...niftyData.losers, 
+      ...midcapData.gainers, ...midcapData.losers,
+      ...fnoMovers.gainers, ...fnoMovers.losers
+    ];
+    
+    // Deduplicate symbols
+    const uniqueSymbols = Array.from(new Set(all.map(s => s.symbol)));
+    
+    const missingSymbols = uniqueSymbols.filter(sym => 
+      !fetchedIntradayRef.current.has(sym) && 
+      (!historyMap[sym] || historyMap[sym].length <= 2)
+    );
       
     if (missingSymbols.length === 0) return;
     
+    // Mark as pending immediately
     missingSymbols.forEach(sym => fetchedIntradayRef.current.add(sym));
+    lastFetchTimeRef.current = now;
     
     const fetchIntraday = async () => {
       try {
+        console.log(`[Charts] Fetching sparklines for ${missingSymbols.length} stocks...`);
         const res = await fetch(`/api/intraday-sparklines?symbols=${missingSymbols.join(',')}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          // Allow retry after cooldown if failed
+          missingSymbols.forEach(sym => fetchedIntradayRef.current.delete(sym));
+          return;
+        }
         const data = await res.json();
         
         setHistoryMap(prev => {
@@ -398,11 +419,13 @@ export default function App() {
           });
           return next;
         });
-      } catch (e) {}
+      } catch (e) {
+        missingSymbols.forEach(sym => fetchedIntradayRef.current.delete(sym));
+      }
     };
     
     fetchIntraday();
-  }, [viewMode, niftyData, midcapData, historyMap]);
+  }, [viewMode, niftyData, midcapData, fnoMovers, historyMap]);
 
   const [selectedDate, setSelectedDate] = useState("");
   const [historicalData, setHistoricalData] = useState(null);
