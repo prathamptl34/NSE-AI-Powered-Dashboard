@@ -41,8 +41,8 @@ load_dotenv()
 # ── Global state ──────────────────────────────────────────────────────────────
 streamer = None
 START_TIME = time.time()
-
-
+_latest_ai_insight = None
+_is_generating_insight = False
 
 # ── AI Setup ──────────────────────────────────────────────────────────────────
 # ── AI Setup (Groq SDK with LLaMA 3.3) ────────────────────────────────────────
@@ -162,12 +162,28 @@ async def lifespan(app: FastAPI):
 
     breakout_task = asyncio.create_task(poll_breakouts())
     
+    # Start AI Insight Polling (Instant Fetch)
+    from main import generate_insight_payload_async
+    async def poll_ai_insights():
+        while True:
+            try:
+                await generate_insight_payload_async()
+                await asyncio.sleep(240)  # Every 4 minutes
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"AI insight polling error: {e}")
+                await asyncio.sleep(60)
+                
+    ai_insight_task = asyncio.create_task(poll_ai_insights())
+    
     yield
     
     logger.info("Shutting down background tasks...")
     from backend.streamer import save_metadata
     save_metadata()
     breakout_task.cancel()
+    ai_insight_task.cancel()
     await stop_tv_mcp_server()
     streamer.stop()
     task.cancel()
@@ -422,10 +438,16 @@ async def api_intraday_sparklines(symbols: str):
         logger.error(f"Sparkline fetch error: {e}")
         return {}
 
+_latest_ai_insight = None
+_is_generating_insight = False
 
-@app.get("/api/ai-insight")
-
-async def get_ai_insight(request: Request):
+async def generate_insight_payload_async():
+    """Generates the main AI insight. Run periodically in the background."""
+    global _latest_ai_insight, _is_generating_insight
+    if _is_generating_insight:
+        return
+    _is_generating_insight = True
+    
     try:
         # Get live market data from existing streamer
         summary = get_market_summary()
@@ -436,7 +458,10 @@ async def get_ai_insight(request: Request):
         top_loser  = losers[0]  if losers  else None
 
         if not gainers:
-            return {"error": "No market data available yet."}
+            # Keep existing insight if there's no data yet, wait for ticks
+            if _latest_ai_insight is None:
+                _latest_ai_insight = {"error": "No market data available yet."}
+            return
 
         # Build market overview prompts
         g_text = ", ".join([f"{g['symbol']} +{g['change_pct']:.2f}%" for g in gainers])
@@ -490,7 +515,7 @@ No typos. No bullet points. Complete sentences only.""" if top_loser else None
         signal = extract_signal(lines[-1]) if lines else "NEUTRAL"
         clean_insight = '\n'.join(lines[:-1]).strip() if extract_signal(lines[-1]) != "NEUTRAL" or lines[-1].strip().upper() in ["BULLISH","BEARISH","CAUTIOUS","NEUTRAL"] else main_insight
 
-        return {
+        _latest_ai_insight = {
             "insight":        clean_insight,
             "signal":         signal,
             "timestamp":      datetime.now(IST).strftime("%I:%M:%S %p IST"),
@@ -500,9 +525,6 @@ No typos. No bullet points. Complete sentences only.""" if top_loser else None
             "losers":         losers,
         }
 
-    except Exception as e:
-        logger.error("AI Insight error: %s", e)
-        return {"error": str(e), "insight": None}
 
 
 @app.get("/api/signal-scanner")
