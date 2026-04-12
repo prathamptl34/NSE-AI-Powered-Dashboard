@@ -1,2 +1,2 @@
-backend/OpenAPIScripMaster.json filter=lfs diff=lfs merge=lfs -text
-backend/*.json filter=lfs diff=lfs merge=lfs -text
+# Standard text processing
+* text=auto

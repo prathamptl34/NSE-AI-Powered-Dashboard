@@ -1,16 +1,7 @@
-# ── Web framework ─────────────────────────────────────────────────────────────
-fastapi==0.111.0
-uvicorn==0.29.0
-python-multipart==0.0.9
-
-# ── Angel One SmartAPI ────────────────────────────────────────────────────────
-smartapi-python==1.4.1
-websocket-client==1.8.0
-
-# ── Auth / TOTP ───────────────────────────────────────────────────────────────
+# ── Auth / TOTP ──
 pyotp==2.9.0
 
-# ── Utilities ─────────────────────────────────────────────────────────────────
+# ── Utilities ──
 python-dotenv==1.0.1
 httpx==0.27.0
 requests==2.32.3
@@ -20,8 +11,20 @@ pandas
 numpy
 websockets
 yfinance
-groq
 pytz
-# Database Drivers (added for deployment checklist compliance)
+tradingview-mcp
+
+# ── AI Providers ──
+groq
+huggingface_hub
+
+# ── Web / API ──
+fastapi
+uvicorn
+python-multipart
+smartapi-python
+websocket-client
+
+# ── Database ──
 sqlalchemy==2.0.30
 psycopg2-binary==2.9.9

@@ -24,6 +24,10 @@ from backend.signal_engine import calculate_all_signals, get_summary_stats, get_
 from backend.streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status
 from backend.historical import get_historical_summary, get_intraday_sparklines
 from backend.nse_holidays import is_trading_day
+from backend.tv_mcp_client import (
+    start_tv_mcp_server, stop_tv_mcp_server, 
+    get_multi_agent_analysis, get_multi_timeframe_alignment, get_volume_breakout_stocks
+)
 
 # ── Logging Configuration ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -119,6 +123,9 @@ async def lifespan(app: FastAPI):
     if not validate_environment():
         raise RuntimeError("Missing required environment variables. See logs for details.")
             
+    from backend.streamer import load_metadata
+    load_metadata()
+    
     logger.info("Starting MarketStreamer background task...")
     streamer = MarketStreamer(
         api_key=os.environ["ANGEL_API_KEY"].strip(),
@@ -128,8 +135,40 @@ async def lifespan(app: FastAPI):
     )
     task = asyncio.create_task(streamer.run())
     logger.info("MarketStreamer started.")
+    
+    # Start TradingView MCP Server
+    await start_tv_mcp_server()
+    
+    # Start Volume Breakout Polling
+    async def poll_breakouts():
+        while True:
+            try:
+                # Poll every 5 minutes
+                breakouts = await get_volume_breakout_stocks(limit=10)
+                if breakouts:
+                    from backend.streamer import connected_clients
+                    msg = {"type": "volume_breakouts", "data": breakouts, "timestamp": datetime.now().isoformat()}
+                    for ws in list(connected_clients):
+                        try:
+                            await ws.send_json(msg)
+                        except:
+                            pass
+                await asyncio.sleep(300) 
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Volume breakout polling error: {e}")
+                await asyncio.sleep(60)
+
+    breakout_task = asyncio.create_task(poll_breakouts())
+    
     yield
-    logger.info("Shutting down MarketStreamer...")
+    
+    logger.info("Shutting down background tasks...")
+    from backend.streamer import save_metadata
+    save_metadata()
+    breakout_task.cancel()
+    await stop_tv_mcp_server()
     streamer.stop()
     task.cancel()
     try:
@@ -645,6 +684,42 @@ IMPORTANT: Write carefully. No spelling errors. No typos. Proofread before respo
             "explanation": "Explanation unavailable. Please try again."
         }
 
+# ── TradingView MCP Routes ────────────────────────────────────────────────────
+
+@app.get("/api/tv/multi-agent/{symbol}")
+async def tv_multi_agent(symbol: str, timeframe: str = "1D"):
+    """Advanced AI debate about a stock using multiple technical agents."""
+    try:
+        analysis = await get_multi_agent_analysis(symbol.upper(), timeframe=timeframe)
+        if not analysis:
+            raise HTTPException(status_code=503, detail="Analysis service temporarily unavailable")
+        return analysis
+    except Exception as e:
+        logger.error(f"TV Multi-Agent error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/tv/mtf/{symbol}")
+async def tv_mtf_alignment(symbol: str):
+    """Checks trend alignment across multiple timeframes (15m to 1W)."""
+    try:
+        alignment = await get_multi_timeframe_alignment(symbol.upper())
+        if not alignment:
+            raise HTTPException(status_code=503, detail="Alignment service temporarily unavailable")
+        return alignment
+    except Exception as e:
+        logger.error(f"TV MTF error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/tv/volume-breakouts")
+async def tv_breakouts(timeframe: str = "15m"):
+    """Scans for real-time volume breakout opportunities."""
+    try:
+        breakouts = await get_volume_breakout_stocks(timeframe=timeframe)
+        return {"breakouts": breakouts, "timestamp": datetime.now().isoformat()}
+    except Exception as e:
+        logger.error(f"TV Breakout error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/trading-day-check")
 
@@ -680,7 +755,7 @@ if os.path.isdir(BUILD_DIR):
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("API_PORT", 8001))
+    port = int(os.environ.get("API_PORT", 8000))
     logger.info(f"Starting uvicorn on port {port}")
     
     try:

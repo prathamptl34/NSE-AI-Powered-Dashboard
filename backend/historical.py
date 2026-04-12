@@ -66,16 +66,14 @@ def _get_smart_connect() -> SmartConnect:
     global _cached_smart, _last_login_time
     
     with _login_lock:
-        # Check if session is alive (TTL 1 hour)
-        if _cached_smart and (time.time() - _last_login_time < 3600):
-            try:
-                # Check for feedToken as a proxy for a valid session object
-                if getattr(_cached_smart, 'feedToken', None):
-                    return _cached_smart
-            except Exception:
-                pass
+        # Check if session is alive (TTL 30 minutes for safety)
+        now = time.time()
+        if _cached_smart and (now - _last_login_time < 1800):
+            return _cached_smart
             
-            logger.info("Historical: Cached session invalid. Re-logging in...")
+        # Cooldown: Prevent hammer transitions if login just happened
+        if (now - _last_login_time < 10) and _cached_smart:
+            return _cached_smart
 
         try:
             totp = pyotp.TOTP(os.environ["ANGEL_TOTP_SECRET"].strip()).now()
@@ -86,7 +84,12 @@ def _get_smart_connect() -> SmartConnect:
                 totp,
             )
             if not resp or resp.get("status") is False:
-                raise RuntimeError(f"Angel One login failed: {resp.get('message', 'Unknown error')}")
+                # If we get rate limited on login, wait and return cached if possible
+                msg = resp.get('message', 'Unknown error')
+                if "access rate" in msg.lower() and _cached_smart:
+                    logger.warning(f"Historical: Login rate limit hit. Falling back to cached session.")
+                    return _cached_smart
+                raise RuntimeError(f"Angel One login failed: {msg}")
             
             logger.info("Historical: New Angel One login successful.")
             _cached_smart = smart
@@ -253,11 +256,11 @@ def get_historical_summary(date_str: str, index: str, top_n: int = 5) -> dict:
     results = []
     errors = 0
     
-    # Accelerated to 15 workers for lightning-fast cold fetches
-    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
-        # Reduced staggering to 0.03s for faster start
+    # Reduced to 2 workers to strictly stay under 10 req/sec limit (considering overhead)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+        # High stagger (0.5s) to ensure we NEVER hit the 10 req/sec total limit
         future_to_token = {
-            executor.submit(_process_single_token, smart, t, m, date_str, index, i * 0.03): t 
+            executor.submit(_process_single_token, smart, t, m, date_str, index, i * 0.5): t 
             for i, (t, m) in enumerate(tokens.items())
         }
         

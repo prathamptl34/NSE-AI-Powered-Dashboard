@@ -3,7 +3,9 @@ import { useState } from "react";
 export function useStockExplain() {
   const [activeStock,  setActiveStock]  = useState(null);
   const [explanation,  setExplanation]  = useState("");
+  const [multiAgentData, setMultiAgentData] = useState(null);
   const [loading,      setLoading]      = useState(false);
+  const [loadingMA,    setLoadingMA]    = useState(false);
 
   const openExplain = async (stock) => {
     document.body.style.overflow = 'hidden';
@@ -21,6 +23,20 @@ export function useStockExplain() {
       const res  = await fetch(`/api/stock-explain?${params}`);
       const data = await res.json();
       setExplanation(data.explanation || data.error || "No explanation available.");
+      
+      // Also fetch Multi-Agent Analysis
+      setLoadingMA(true);
+      try {
+        const maRes = await fetch(`/api/tv/multi-agent/${stock.symbol}`);
+        if (maRes.ok) {
+          const maData = await maRes.json();
+          setMultiAgentData(maData);
+        }
+      } catch (err) {
+        console.error("Multi-agent fetch failed:", err);
+      } finally {
+        setLoadingMA(false);
+      }
     } catch {
       closeExplain(); // Cleanup scroll and state on error
       setExplanation("Failed to connect to server. Please try again.");
@@ -33,13 +49,15 @@ export function useStockExplain() {
     document.body.style.overflow = '';
     setActiveStock(null);
     setExplanation("");
+    setMultiAgentData(null);
     setLoading(false);
+    setLoadingMA(false);
   };
 
   return { activeStock, explanation, loading, openExplain, closeExplain };
 }
 
-export function StockDeepDiveModal({ stock, explanation, loading, onClose }) {
+export function StockDeepDiveModal({ stock, explanation, multiAgentData, loading, loadingMA, onClose }) {
   if (!stock) return null;
 
   const isUp      = stock.change_pct >= 0;
@@ -78,7 +96,10 @@ export function StockDeepDiveModal({ stock, explanation, loading, onClose }) {
           <div className="deepdive-header-right">
             <span className="deepdive-price">₹{formatINR(stock.price)}</span>
             {stock.prev_close > 0 && (
-              <span className="deepdive-prev">prev ₹{formatINR(stock.prev_close)}</span>
+              <span className="deepdive-prev">
+                <span style={{ opacity: 0.6, marginRight: '4px' }}>prev</span>
+                ₹{formatINR(stock.prev_close)}
+              </span>
             )}
           </div>
           <button className="deepdive-close" onClick={onClose}>✕</button>
@@ -141,6 +162,40 @@ export function StockDeepDiveModal({ stock, explanation, loading, onClose }) {
                 <div className="deepdive-risk-box">
                   <span className="deepdive-risk-label">⚠ RISK</span>
                   <p className="deepdive-risk-text">{riskSection}</p>
+                </div>
+              )}
+
+              {/* TradingView Multi-Agent Analysis */}
+              {multiAgentData && (
+                <div className="deepdive-ma-card">
+                  <div className="deepdive-ma-header">
+                    <span className="deepdive-ma-label">TRADINGVIEW MULTI-AGENT DEBATE</span>
+                    <div className="deepdive-ma-consensus" data-stance={multiAgentData.consensus?.decision}>
+                      {multiAgentData.consensus?.decision}
+                    </div>
+                  </div>
+                  
+                  <div className="deepdive-ma-agents">
+                    {multiAgentData.agents?.map((agent, i) => (
+                      <div key={i} className="deepdive-ma-agent">
+                        <div className="ma-agent-top">
+                          <span className="ma-agent-name">{agent.agent_name}</span>
+                          <span className="ma-agent-stance" data-stance={agent.stance}>{agent.stance}</span>
+                        </div>
+                        <p className="ma-agent-reason">{agent.reasoning}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="deepdive-ma-summary">
+                    <strong>CONSENSUS:</strong> {multiAgentData.consensus?.summary}
+                  </div>
+                </div>
+              )}
+
+              {loadingMA && !multiAgentData && (
+                <div className="deepdive-ma-loading-shimmer">
+                  Running multi-agent technical debate...
                 </div>
               )}
             </>

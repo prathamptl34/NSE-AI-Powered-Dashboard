@@ -386,23 +386,115 @@ function SignalHistory({ history }) {
   );
 }
 
+// ── Multi-Timeframe Alignment Widget ──────────────────────────────────────────
+function MTFAlignmentWidget({ symbol }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!symbol) return;
+    const fetchMTF = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`/api/tv/mtf/${symbol}`);
+        if (res.ok) setData(await res.json());
+      } catch (err) {
+        console.error("MTF fetch failed:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMTF();
+  }, [symbol]);
+
+  if (loading) return <div className="mtf-loading">Checking multi-timeframe alignment...</div>;
+  if (!data) return null;
+
+  return (
+    <div className="mtf-alignment-section">
+      <div className="section-label">
+        <span className="label-dot" style={{ background: 'var(--purple)' }} />
+        MTF ALIGNMENT — {symbol}
+      </div>
+      <div className="mtf-grid">
+        {data.alignments?.map((item, i) => (
+          <div key={i} className="mtf-row">
+            <span className="mtf-timeframe">{item.timeframe}</span>
+            <div className="mtf-status" data-trend={item.trend}>
+              {item.trend}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Volume Breakouts Table ───────────────────────────────────────────────────
+function VolumeBreakoutTable({ breakouts }) {
+  if (!breakouts || breakouts.length === 0) return null;
+
+  return (
+    <div className="breakouts-section">
+      <div className="section-label">
+        <span className="label-dot" style={{ background: 'var(--orange)' }} />
+        LIVE VOLUME BREAKOUTS (15m)
+      </div>
+      <table className="breakouts-table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Price</th>
+            <th>Chg%</th>
+            <th>Vol Ratio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {breakouts.map((b, i) => (
+            <tr key={i}>
+              <td className="breakout-symbol">{b.symbol}</td>
+              <td>₹{b.price?.toFixed(2)}</td>
+              <td className={`breakout-chg ${b.change_pct >= 0 ? 'sc-up' : 'sc-down'}`}>
+                {b.change_pct >= 0 ? '+' : ''}{b.change_pct?.toFixed(2)}%
+              </td>
+              <td className="breakout-ratio">{b.volume_ratio?.toFixed(1)}x</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function InsightsPage({ onBack, wsStatus }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
-  const [history, setHistory] = useState([]); // In-memory history caps at 5 runs
-  const [error, setError] = useState(null);
+  const [breakouts, setBreakouts] = useState([]);
+  const [history, setHistory] = useState([]);
   const [moodScore, setMoodScore] = useState(50);
+  const [error, setError] = useState(null);
   const [hasGenerated, setHasGenerated] = useState(false);
 
   useEffect(() => {
-    // Auto-generate on first load
-    const timer = setTimeout(() => {
-      fetchInsight();
-    }, 500);
-    return () => clearTimeout(timer);
+    fetchInsight();
+    fetchBreakouts();
+    const interval = setInterval(fetchBreakouts, 300000); // 5 min
+    return () => clearInterval(interval);
   }, []);
+
+  const fetchBreakouts = async () => {
+    try {
+      const res = await fetch('/api/tv/volume-breakouts');
+      if (res.ok) {
+        const d = await res.json();
+        setBreakouts(d.breakouts || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch breakouts:", err);
+    }
+  };
 
   const fetchInsight = async () => {
     setLoading(true);
@@ -472,9 +564,13 @@ export default function InsightsPage({ onBack, wsStatus }) {
         </div>
       </div>
 
-      {/* MARKET VISUALS */}
       <FearGreedGauge score={moodScore} />
       {data && <SectorHeatmap allStocks={[...(data.gainers || []), ...(data.losers || [])]} />}
+      
+      <div className="insights-secondary-grid">
+        {data?.gainers?.[0] && <MTFAlignmentWidget symbol={data.gainers[0].symbol} />}
+        <VolumeBreakoutTable breakouts={breakouts} />
+      </div>
 
       {/* MAIN CONTENT */}
       {/* MAIN CONTENT */}

@@ -265,7 +265,7 @@ function Panel({ title, accent, data, type, lastUpdated, onStockClick, viewMode,
 // ── App Component ─────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { activeStock, explanation, loading, openExplain, closeExplain } = useStockExplain();
+  const { activeStock, explanation, multiAgentData, loading, loadingMA, openExplain, closeExplain } = useStockExplain();
   const [currentPage, setCurrentPage] = useState('home');
   const [niftyData, setNiftyData] = useState({ gainers: [], losers: [] });
   const [midcapData, setMidcapData] = useState({ gainers: [], losers: [] });

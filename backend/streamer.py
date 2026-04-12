@@ -11,6 +11,8 @@ import logzero
 from logzero import logger
 import pyotp
 import threading
+import time
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -253,6 +255,50 @@ _tv_lock = threading.Lock()
 live_prices = {}
 _store_lock = threading.Lock()
 connected_clients = set()
+_METADATA_CACHE = os.path.join(".data", "metadata_cache.json")
+
+def load_metadata():
+    """Loads previous close prices from persistent cache to enable instant startup."""
+    if not os.path.exists(_METADATA_CACHE):
+        return
+    try:
+        with open(_METADATA_CACHE, "r") as f:
+            cache = json.load(f)
+            count = 0
+            for token, meta in cache.items():
+                if token in ALL_TOKENS:
+                    ALL_TOKENS[token]["prev_close"] = meta.get("prev_close", 0.0)
+                    ALL_TOKENS[token]["prev_close_confirmed"] = meta.get("prev_close_confirmed", False)
+                    count += 1
+            logger.info(f"Loaded metadata for {count} tokens from persistence.")
+    except Exception as e:
+        logger.warning(f"Failed to load metadata cache: {e}")
+
+_last_save_time = 0
+
+def save_metadata(force=False):
+    """Saves current confirmed previous close prices to persistent cache."""
+    global _last_save_time
+    now = time.time()
+    if not force and (now - _last_save_time < 10):
+        return  # Throttle to once every 10s
+        
+    try:
+        os.makedirs(".data", exist_ok=True)
+        cache = {
+            tok: {
+                "prev_close": m.get("prev_close", 0.0),
+                "prev_close_confirmed": m.get("prev_close_confirmed", False)
+            }
+            for tok, m in ALL_TOKENS.items()
+            if m.get("prev_close_confirmed")
+        }
+        with open(_METADATA_CACHE, "w") as f:
+            json.dump(cache, f, indent=2)
+        _last_save_time = now
+        logger.info(f"Saved metadata for {len(cache)} tokens to persistence.")
+    except Exception as e:
+        logger.warning(f"Failed to save metadata cache: {e}")
 
 
 def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0):
@@ -274,10 +320,12 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
             if was_confirmed and percent_diff > 0.1:
                 logger.info(f"[Metadata] Corrected {meta['symbol']} prev_close: {old_prev} -> {close_price} ({percent_diff:.2f}% diff)")
             else:
-                logger.info(f"[Metadata] Set {meta['symbol']} prev_close to {close_price} from WebSocket (authoritative)")
+                logger.info(f"[Metadata] Confirming {meta['symbol']} via WebSocket: {close_price}")
             
             meta["prev_close"] = close_price
             meta["prev_close_confirmed"] = True
+            # Trigger immediate (but throttled) save
+            save_metadata()
     
     # Fallback to current meta if not updated
     prev = meta["prev_close"]
@@ -315,9 +363,30 @@ def get_market_summary(top_n: int = 5) -> dict:
     midcap  = [t for t in ticks if t["index"] == "midcap100"]
 
     def rank(items, reverse):
-        # Filter items with non-None change_pct and basic price data
-        valid_items = [t for t in items if t.get("ltp", 0) > 0]
-        return sorted(valid_items, key=lambda x: x.get("change_pct", 0.0), reverse=reverse)[:top_n]
+        # 1. Filter: Must have valid price AND confirmed previous close
+        # Exclude stocks with 0 price or 0 prev_close to prevent 100% drop visual glitches
+        valid_items = [
+            t for t in items 
+            if t.get("ltp", 0) > 0.01 
+            and t.get("prev_close", 0) > 0.01
+            and abs(t.get("change_pct", 0.0)) > 0.001
+        ]
+        
+        # 2. Deduplicate by symbol (safety first)
+        seen_symbols = set()
+        unique_items = []
+        for it in sorted(valid_items, key=lambda x: (abs(x.get("change_pct", 0.0)), x.get("volume", 0)), reverse=True):
+            sym = it["symbol"]
+            if sym not in seen_symbols:
+                unique_items.append(it)
+                seen_symbols.add(sym)
+
+        # 3. Final Sort for direction (Gainer vs Loser)
+        return sorted(
+            unique_items, 
+            key=lambda x: (x.get("change_pct", 0.0), x.get("volume", 0)), 
+            reverse=reverse
+        )[:top_n]
 
     return {
         "nifty100": {
@@ -605,11 +674,18 @@ async def market_pusher():
             
             # Prepare F&O Movers
             fno_list = list(_fno_tick_store.values())
-            valid_fno = [v for v in fno_list if v and v.get("change_pct") is not None and v.get("ltp", 0) > 0]
-            fno_sorted = sorted(valid_fno, key=lambda x: x["change_pct"], reverse=True)
+            valid_fno = [
+                v for v in fno_list 
+                if v and v.get("change_pct") is not None and v.get("ltp", 0) > 0 and abs(v.get("change_pct", 0.0)) > 0.001
+            ]
+            
+            # Sort F&O: Primary by change_pct, Secondary by volume
+            fno_sorted_asc = sorted(valid_fno, key=lambda x: (x.get("change_pct", 0.0), x.get("volume", 0)), reverse=False)
+            fno_sorted_desc = sorted(valid_fno, key=lambda x: (x.get("change_pct", 0.0), x.get("volume", 0)), reverse=True)
+            
             fno_movers = {
-                'gainers': fno_sorted[:5],
-                'losers': fno_sorted[-5:][::-1]
+                'gainers': fno_sorted_desc[:5],
+                'losers':  fno_sorted_asc[:5]
             }
 
             # The frontend (App.js) handles updates per index. 
@@ -631,7 +707,6 @@ async def market_pusher():
 
 async def scan_loop():
     """Metadata scavenger loop. Focuses on filling missing prev_close/OHLC."""
-    import time
     while True:
         cycle_start = time.time()
         to_fetch = []
@@ -640,18 +715,37 @@ async def scan_loop():
         for tok, meta in ALL_TOKENS.items():
             with _store_lock:
                 tick = _tick_store.get(tok)
-                if not tick or not tick.get('prev_close_confirmed'):
-                    to_fetch.append((meta['symbol'], tok))
+                # If already confirmed (via WebSocket or past fetch), skip
+                if meta.get('prev_close_confirmed'):
+                    continue
+                to_fetch.append((meta['symbol'], tok))
         
-        # Fetch in small batches to respect rate limits
-        batch_size = 3
-        for i in range(0, len(to_fetch), batch_size):
-            batch = to_fetch[i : i + batch_size]
-            tasks = [fetch_symbol_safe(sym, tok) for sym, tok in batch]
-            if tasks:
-                await asyncio.gather(*tasks, return_exceptions=True)
-            await asyncio.sleep(1.1) 
+        # PRIORITIZE: Sort such that symbols in FNO_SYMBOL_TOKEN_MAP come first
+        to_fetch.sort(key=lambda x: x[0] in FNO_SYMBOL_TOKEN_MAP, reverse=True)
+
+        if to_fetch:
+            logger.info(f'[Scan] Backfilling {len(to_fetch)} symbols...')
+            # Fetch in batches of 20 (Safe because historical.py has internal 0.5s staggering)
+            batch_size = 20
+            for i in range(0, len(to_fetch), batch_size):
+                batch = to_fetch[i : i + batch_size]
+                tasks = [fetch_symbol_safe(sym, tok) for sym, tok in batch]
+                if tasks:
+                    results = await asyncio.gather(*tasks, return_exceptions=True)
+                    # Check for rate limiting in batch results
+                    if any("access rate" in str(r).lower() for r in results if isinstance(r, Exception) or isinstance(r, str)):
+                        logger.warning("[Scan] 429 Detected in batch. Backing off for 60s...")
+                        await asyncio.sleep(60)
+                        break
+                
+                # Intra-batch sleep for extra safety
+                await asyncio.sleep(0.5) 
+                # Save progress after every batch
+                save_metadata()
 
         cycle_time = time.time() - cycle_start
-        logger.info(f'[Scan] Scavenger cycle complete | {cycle_time:.1f}s')
-        await asyncio.sleep(60) # Wait before next pass
+        # Once all are confirmed, wait 60s for next pass. Otherwise retry missing after 10s.
+        sleep_time = 10 if to_fetch else 60
+        if to_fetch:
+             logger.info(f'[Scan] Scavenger cycle complete in {cycle_time:.1f}s.')
+        await asyncio.sleep(sleep_time) 

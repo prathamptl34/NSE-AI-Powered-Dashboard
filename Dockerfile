@@ -1,53 +1,33 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# Stage 1 — Build React frontend
-# ─────────────────────────────────────────────────────────────────────────────
-FROM node:20-alpine AS frontend-builder
-
+# Stage 1: Build React Frontend
+FROM node:20-slim AS build-stage
 WORKDIR /app
-
-# Cache node_modules layer
-COPY package.json package-lock.json* ./
+COPY package*.json ./
 RUN npm install
-
-# Copy source and build (resilient to flat structure)
 COPY . .
-RUN mkdir -p public src && \
-    [ -f index.html ] && mv index.html public/ || true && \
-    [ -f App.js ]     && mv App.js src/     || true && \
-    [ -f index.js ]   && mv index.js src/    || true && \
-    [ -f index.css ]  && mv index.css src/   || true && \
-    npm run build
+RUN npm run build
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Stage 2 — Python backend + compiled frontend
-# ─────────────────────────────────────────────────────────────────────────────
-FROM python:3.12-slim AS final
-
-# Security: run as non-root
-RUN addgroup --system appgroup && adduser --system --ingroup appgroup --home /app appuser
-
+# Stage 2: Serve with Python/FastAPI
+FROM python:3.11-slim
 WORKDIR /app
 
-# Install Python dependencies
+# Install system dependencies for psycopg2-binary and others
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend source
-COPY main.py ./
-COPY backend/ ./backend/
-COPY tokens.json* .env.example* ./
+# Copy backend code
+COPY . .
 
-# Copy compiled React build from stage 1
-COPY --from=frontend-builder /app/build ./build
+# Copy built frontend from Stage 1 into the 'build' directory in backend
+COPY --from=build-stage /app/build ./build
 
-# Switch to non-root user
-USER appuser
-
-# Hugging Face Spaces listens on port 7860
-ENV PORT=7860
-
+# Hugging Face Spaces use port 7860 by default
 EXPOSE 7860
 
-# Uvicorn with single worker to avoid session competition and shared state issues
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1"]
+# Command to run the app
+# We use uvicorn directly to ensure it binds to the correct port
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
