@@ -783,21 +783,21 @@ async def scan_loop():
 
         if to_fetch:
             logger.info(f'[Scan] Backfilling {len(to_fetch)} symbols...')
-            # Fetch in batches of 20 (Safe because historical.py has internal 0.5s staggering)
-            batch_size = 20
+            # Fetch in batches of 10 for safety against Angel One rate limits
+            batch_size = 10
             for i in range(0, len(to_fetch), batch_size):
                 batch = to_fetch[i : i + batch_size]
                 tasks = [fetch_symbol_safe(sym, tok) for sym, tok in batch]
                 if tasks:
                     results = await asyncio.gather(*tasks, return_exceptions=True)
-                    # Check for rate limiting in batch results
-                    if any("access rate" in str(r).lower() for r in results if isinstance(r, Exception) or isinstance(r, str)):
-                        logger.warning("[Scan] 429 Detected in batch. Backing off for 60s...")
-                        await asyncio.sleep(60)
+                    # Check for rate limiting in batch results (AB1012 or 429)
+                    if any(x in str(r).lower() for r in results if isinstance(r, (Exception, str)) for x in ["access rate", "ab1012", "too many requests"]):
+                        logger.warning("[Scan] Rate limit detected. Backing off for 120s...")
+                        await asyncio.sleep(120)
                         break
                 
                 # Intra-batch sleep for extra safety
-                await asyncio.sleep(0.5) 
+                await asyncio.sleep(2.0) 
                 # Save progress after every batch
                 save_metadata()
 

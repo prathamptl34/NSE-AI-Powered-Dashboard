@@ -329,23 +329,34 @@ export default function App() {
   // Polling & WebSocket Manager
   useEffect(() => {
     fetchData();
-    const id = setInterval(fetchData, wsStatus === 'live' ? 10000 : 5000);
+    const pollId = setInterval(fetchData, wsStatus === 'live' ? 10000 : 5000);
 
+    let reconnectTimer;
     const connectWS = () => {
+      // If already connecting or connected, do nothing
       if (wsRef.current && (wsRef.current.readyState === 0 || wsRef.current.readyState === 1)) return;
       
       try {
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // Fallback: If on dev port 3000, point to backend 8000
         const isDev = window.location.port === '3000';
         const backendHost = isDev ? '127.0.0.1:8000' : window.location.host;
         const ws = new WebSocket(`${proto}//${backendHost}/ws/stream`);
         wsRef.current = ws;
 
-        ws.onopen = () => setWsStatus('live');
+        ws.onopen = () => {
+          console.log("[WS] Connected");
+          setWsStatus('live');
+        };
+
         ws.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data);
+            
+            if (msg.type === 'ping') {
+               // Optional: respond to ping if backend requires
+               return;
+            }
+
             if (msg.type === 'full_update' || msg.type === 'partial_update') {
               if (msg.index === 'nifty100') {
                 setNiftyData({ gainers: msg.gainers || [], losers: msg.losers || [] });
@@ -360,14 +371,35 @@ export default function App() {
             }
           } catch (err) {}
         };
-        ws.onerror = () => setWsStatus('offline');
-      } catch (e) {}
+
+        ws.onclose = () => {
+          console.log("[WS] Disconnected. Retrying in 3s...");
+          setWsStatus('offline');
+          // Important: Clear the ref ready for next attempt
+          wsRef.current = null;
+          reconnectTimer = setTimeout(connectWS, 3000);
+        };
+
+        ws.onerror = (e) => {
+          console.error("[WS] Error:", e);
+          setWsStatus('offline');
+          ws.close();
+        };
+      } catch (e) {
+        console.error("[WS] Setup error:", e);
+        reconnectTimer = setTimeout(connectWS, 5000);
+      }
     };
 
     connectWS();
+
     return () => {
-      clearInterval(id);
-      if (wsRef.current) wsRef.current.close();
+      clearInterval(pollId);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (wsRef.current) {
+        wsRef.current.onclose = null; // Prevent reconnect loop during unmount
+        wsRef.current.close();
+      }
     };
   }, [fetchData]);
 

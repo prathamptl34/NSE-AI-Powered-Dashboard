@@ -56,7 +56,21 @@ _AI_GLOBAL_STATE = {
     "last_updated": None
 }
 
-# ── AI Setup ──────────────────────────────────────────────────────────────────
+@app.get("/api/cache-status")
+async def get_cache_status():
+    """Returns the status of the background metadata scavenger."""
+    from backend.streamer import ALL_TOKENS
+    total = len(ALL_TOKENS)
+    confirmed = sum(1 for v in ALL_TOKENS.values() if v.get('prev_close_confirmed'))
+    return {
+        "ready": confirmed > (total * 0.8), # Considered ready if 80% confirmed
+        "progress_pct": round((confirmed / total) * 100, 1) if total > 0 else 100,
+        "confirmed": confirmed,
+        "total": total
+    }
+
+
+# ── AI Sector Bias ─────────────────────────────────────────────────────────────
 # ── AI Setup (Groq SDK with LLaMA 3.3) ────────────────────────────────────────
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -477,16 +491,19 @@ No typos. No bullet points. Complete sentences only.""" if top_gainer else None
 Explain: (1) the most likely specific reason for the decline, (2) key risk level to watch.
 No typos. No bullet points. Complete sentences only.""" if top_loser else None
 
-        # Run all 3 AI calls in parallel via Groq
-        tasks = [asyncio.to_thread(call_ai, main_prompt, 600)]
-        if g_prompt: tasks.append(asyncio.to_thread(call_ai, g_prompt, 250))
-        if l_prompt: tasks.append(asyncio.to_thread(call_ai, l_prompt, 250))
-
-        results = await asyncio.gather(*tasks)
-
-        main_insight   = results[0]
-        gainer_insight = results[1] if len(results) > 1 else None
-        loser_insight  = results[2] if len(results) > 2 else None
+        # Run AI calls sequentially with safety sleeps to avoid Groq 429 limits
+        main_insight = await asyncio.to_thread(call_ai, main_prompt, 600)
+        await asyncio.sleep(2)
+        
+        gainer_insight = None
+        if g_prompt:
+            gainer_insight = await asyncio.to_thread(call_ai, g_prompt, 250)
+            await asyncio.sleep(2)
+            
+        loser_insight = None
+        if l_prompt:
+            loser_insight = await asyncio.to_thread(call_ai, l_prompt, 250)
+            await asyncio.sleep(2)
 
         # Strip the signal word from the main insight text
         lines  = main_insight.strip().split('\n')
@@ -530,17 +547,12 @@ No typos. No bullet points. Complete sentences only.""" if top_loser else None
                 scanner_signals = calculate_all_signals(all_stocks_for_scanner)
                 scanner_stats = get_summary_stats(scanner_signals)
                 
-                # Run narrative and commentary in parallel
-                s_tasks = [
-                    asyncio.to_thread(generate_scanner_narrative, scanner_stats, scanner_signals[:5], scanner_signals[-5:]),
-                    asyncio.to_thread(generate_movers_commentary, scanner_signals[:3], scanner_signals[-3:])
-                ]
-                s_results = await asyncio.gather(*s_tasks, return_exceptions=True)
+                # 2. Scanner Narrative & Commentary (Sequential)
+                _AI_GLOBAL_STATE["scanner_narrative"] = await asyncio.to_thread(generate_scanner_narrative, scanner_stats, scanner_signals[:5], scanner_signals[-5:])
+                await asyncio.sleep(2)
                 
-                if not isinstance(s_results[0], Exception):
-                    _AI_GLOBAL_STATE["scanner_narrative"] = s_results[0]
-                if not isinstance(s_results[1], Exception):
-                    _AI_GLOBAL_STATE["movers_commentary"] = s_results[1]
+                _AI_GLOBAL_STATE["movers_commentary"] = await asyncio.to_thread(generate_movers_commentary, scanner_signals[:3], scanner_signals[-3:])
+                await asyncio.sleep(2)
                     
         except Exception as e:
             logger.error(f"Background scanner pre-calc error: {e}")
