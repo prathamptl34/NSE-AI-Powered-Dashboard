@@ -56,19 +56,6 @@ _AI_GLOBAL_STATE = {
     "last_updated": None
 }
 
-@app.get("/api/cache-status")
-async def get_cache_status():
-    """Returns the status of the background metadata scavenger."""
-    from backend.streamer import ALL_TOKENS
-    total = len(ALL_TOKENS)
-    confirmed = sum(1 for v in ALL_TOKENS.values() if v.get('prev_close_confirmed'))
-    return {
-        "ready": confirmed > (total * 0.8), # Considered ready if 80% confirmed
-        "progress_pct": round((confirmed / total) * 100, 1) if total > 0 else 100,
-        "confirmed": confirmed,
-        "total": total
-    }
-
 
 # ── AI Sector Bias ─────────────────────────────────────────────────────────────
 # ── AI Setup (Groq SDK with LLaMA 3.3) ────────────────────────────────────────
@@ -291,6 +278,20 @@ async def websocket_stream(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket error: {e}")
         connected_clients.discard(websocket)
+
+
+@app.get("/api/cache-status")
+async def get_cache_status():
+    """Returns the status of the background metadata scavenger."""
+    from backend.streamer import ALL_TOKENS
+    total = len(ALL_TOKENS)
+    confirmed = sum(1 for v in ALL_TOKENS.values() if v.get('prev_close_confirmed'))
+    return {
+        "ready": confirmed > (total * 0.8), # Considered ready if 80% confirmed
+        "progress_pct": round((confirmed / total) * 100, 1) if total > 0 else 100,
+        "confirmed": confirmed,
+        "total": total
+    }
 
 
 @app.get("/api/market-summary/raw")
