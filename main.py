@@ -270,7 +270,7 @@ async def websocket_stream(websocket: WebSocket):
     logger.info(f"WebSocket accepted. Total clients: {len(connected_clients)}")
     try:
         while True:
-            await asyncio.sleep(30)  # keep alive ping
+            await asyncio.sleep(15)  # keep alive ping
             await websocket.send_json({"type": "ping"})
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")

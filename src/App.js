@@ -326,12 +326,15 @@ export default function App() {
     }
   }, []);
 
+  const [showBanner, setShowBanner] = useState(false);
+  const bannerTimerRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
+
   // Polling & WebSocket Manager
   useEffect(() => {
     fetchData();
     const pollId = setInterval(fetchData, wsStatus === 'live' ? 10000 : 5000);
 
-    let reconnectTimer;
     const connectWS = () => {
       // If already connecting or connected, do nothing
       if (wsRef.current && (wsRef.current.readyState === 0 || wsRef.current.readyState === 1)) return;
@@ -346,16 +349,14 @@ export default function App() {
         ws.onopen = () => {
           console.log("[WS] Connected");
           setWsStatus('live');
+          setShowBanner(false);
+          if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
         };
 
         ws.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data);
-            
-            if (msg.type === 'ping') {
-               // Optional: respond to ping if backend requires
-               return;
-            }
+            if (msg.type === 'ping') return;
 
             if (msg.type === 'full_update' || msg.type === 'partial_update') {
               if (msg.index === 'nifty100') {
@@ -368,26 +369,33 @@ export default function App() {
               }
               setLastUpdated(formatIST());
               setWsStatus('live');
+              setShowBanner(false);
+              if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
             }
           } catch (err) {}
         };
 
         ws.onclose = () => {
-          console.log("[WS] Disconnected. Retrying in 3s...");
+          console.log("[WS] Disconnected. Silent retry...");
           setWsStatus('offline');
-          // Important: Clear the ref ready for next attempt
           wsRef.current = null;
-          reconnectTimer = setTimeout(connectWS, 3000);
+          
+          // Only show banner after 7s of continuous disconnection
+          if (!bannerTimerRef.current) {
+            bannerTimerRef.current = setTimeout(() => {
+              setShowBanner(true);
+            }, 7000);
+          }
+          
+          reconnectTimerRef.current = setTimeout(connectWS, 3000);
         };
 
         ws.onerror = (e) => {
-          console.error("[WS] Error:", e);
           setWsStatus('offline');
           ws.close();
         };
       } catch (e) {
-        console.error("[WS] Setup error:", e);
-        reconnectTimer = setTimeout(connectWS, 5000);
+        reconnectTimerRef.current = setTimeout(connectWS, 5000);
       }
     };
 
@@ -395,13 +403,33 @@ export default function App() {
 
     return () => {
       clearInterval(pollId);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
       if (wsRef.current) {
-        wsRef.current.onclose = null; // Prevent reconnect loop during unmount
+        wsRef.current.onclose = null;
         wsRef.current.close();
       }
     };
   }, [fetchData]);
+
+  const handleManualRetry = () => {
+    fetchData();
+    if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+    // Force immediate reconnection attempt
+    const connectWS = () => {
+      if (wsRef.current && (wsRef.current.readyState === 0 || wsRef.current.readyState === 1)) return;
+      try {
+        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const isDev = window.location.port === '3000';
+        const backendHost = isDev ? '127.0.0.1:8000' : window.location.host;
+        const ws = new WebSocket(`${proto}//${backendHost}/ws/stream`);
+        wsRef.current = ws;
+        ws.onopen = () => { setWsStatus('live'); setShowBanner(false); };
+        ws.onclose = () => { setWsStatus('offline'); reconnectTimerRef.current = setTimeout(connectWS, 3000); };
+      } catch(e){}
+    };
+    connectWS();
+  };
 
   // Intraday Sparkline Fetcher
   const lastFetchTimeRef = useRef(0);
@@ -500,10 +528,10 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {wsStatus === 'offline' && (
+      {showBanner && (
         <div className="offline-notice">
           <span>⚠️ Connection Lost. Reconnecting to Market Stream...</span>
-          <button className="retry-btn" onClick={() => fetchData()}>Retry Now</button>
+          <button className="retry-btn" onClick={handleManualRetry}>Retry Now</button>
         </div>
       )}
 
