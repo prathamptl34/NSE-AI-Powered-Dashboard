@@ -648,11 +648,11 @@ async def get_signal_scanner():
             all_stocks.append({
                 "token":      t["token"],
                 "symbol":     symbol,
-                "price":      t["ltp"],
-                "prev_close": t["prev_close"],
-                "change_pct": t.get("change_pct", 0),
-                "volume":     t.get("volume", 0),
-                "avg_volume": t.get("avg_volume", 0),
+                "price":      t.get("ltp") or 0,
+                "prev_close": t.get("prev_close") or 0,
+                "change_pct": t.get("change_pct") or 0,
+                "volume":     t.get("volume") or 0,
+                "avg_volume": t.get("avg_volume") or 0,
                 "is_fno":     symbol in FNO_STOCKS,
                 "candles_today": candles,
                 "historical_candles": [] # Will be populated dynamically later

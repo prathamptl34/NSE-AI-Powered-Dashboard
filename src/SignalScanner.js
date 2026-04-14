@@ -205,8 +205,27 @@ export default function SignalScanner({ onBack }) {
           font-size: 11px;
           font-weight: 800;
           padding: 4px 10px;
-          border-radius: 6px;
           text-transform: uppercase;
+        }
+        .smart-money-badge {
+          display: inline-block;
+          margin-top: 12px;
+          margin-bottom: 4px;
+          padding: 6px 10px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 800;
+          text-transform: uppercase;
+        }
+        .smart-money-badge.accumulation {
+          background: hsla(160, 84%, 39%, 0.15);
+          color: var(--green);
+          border: 1px solid hsla(160, 84%, 39%, 0.3);
+        }
+        .smart-money-badge.distribution {
+          background: hsla(349, 89%, 60%, 0.15);
+          color: var(--red);
+          border: 1px solid hsla(349, 89%, 60%, 0.3);
         }
         .sc-card-score-row { margin: 16px 0; display: flex; align-items: center; gap: 10px; }
         .sc-card-score-track { flex: 1; height: 6px; background: hsla(0,0%,100%,0.05); border-radius: 3px; }
@@ -350,6 +369,12 @@ const SignalCard = memo(function SignalCard({ stock, onClick }) {
         <span className="sc-card-symbol">{stock.symbol}</span>
         <span className="sc-card-signal-badge" style={{ background: sa.bg, color: sa.color }}>{stock.signal}</span>
       </div>
+
+      {stock.smart_money && (
+        <div className={`smart-money-badge ${stock.smart_money.type.toLowerCase()}`}>
+          🐋 Smart Money — {stock.smart_money.type} at ₹{stock.smart_money.price_level}
+        </div>
+      )}
       
       <div className="sc-card-score-row">
         <div className="sc-card-score-track">
@@ -362,9 +387,9 @@ const SignalCard = memo(function SignalCard({ stock, onClick }) {
       <p className="sc-card-reason">{stock.reason}</p>
       
       <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>₹{stock.price.toLocaleString('en-IN')}</span>
-        <span style={{ fontSize: '12px', fontWeight: '800', color: stock.change_pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
-          {stock.change_pct >= 0 ? '+' : ''}{stock.change_pct.toFixed(2)}%
+        <span style={{ fontSize: '15px', fontWeight: '800', color: '#fff' }}>₹{formatINR(stock.price)}</span>
+        <span style={{ fontSize: '12px', fontWeight: '800', color: (stock.change_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+          {(stock.change_pct || 0) >= 0 ? '+' : ''}{(stock.change_pct || 0).toFixed(2)}%
         </span>
       </div>
     </div>
@@ -383,9 +408,9 @@ function SignalDetailModal({ stock, onClose }) {
              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700' }}>{stock.sector}</span>
            </div>
            <div>
-             <span className="sdm-price">₹{stock.price.toLocaleString('en-IN')}</span>
-             <span style={{ display: 'block', textAlign: 'right', fontSize: '14px', fontWeight: '800', color: stock.change_pct >= 0 ? 'var(--green)' : 'var(--red)' }}>
-               {stock.change_pct >= 0 ? '+' : ''}{stock.change_pct.toFixed(2)}%
+             <span className="sdm-price">₹{formatINR(stock.price)}</span>
+             <span style={{ display: 'block', textAlign: 'right', fontSize: '14px', fontWeight: '800', color: (stock.change_pct || 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+               {(stock.change_pct || 0) >= 0 ? '+' : ''}{(stock.change_pct || 0).toFixed(2)}%
              </span>
            </div>
         </div>
@@ -401,15 +426,15 @@ function SignalDetailModal({ stock, onClose }) {
         <div className="price-levels-grid">
            <div className="price-level-card">
               <span className="level-label">SUPPORT</span>
-              <span className="level-price">₹{stock.support?.toLocaleString('en-IN') || '—'}</span>
+              <span className="level-price">₹{formatINR(stock.support)}</span>
            </div>
            <div className="price-level-card" style={{ background: 'hsla(var(--accent-emerald), 0.1)' }}>
               <span className="level-label" style={{ color: 'var(--green)' }}>TARGET</span>
-              <span className="level-price" style={{ color: 'var(--green)' }}>₹{stock.target?.toLocaleString('en-IN') || '—'}</span>
+              <span className="level-price" style={{ color: 'var(--green)' }}>₹{formatINR(stock.target)}</span>
            </div>
            <div className="price-level-card" style={{ background: 'hsla(var(--accent-rose), 0.1)' }}>
               <span className="level-label" style={{ color: 'var(--red)' }}>STOP LOSS</span>
-              <span className="level-price" style={{ color: 'var(--red)' }}>₹{stock.stop_loss?.toLocaleString('en-IN') || '—'}</span>
+              <span className="level-price" style={{ color: 'var(--red)' }}>₹{formatINR(stock.stop_loss)}</span>
            </div>
         </div>
 
