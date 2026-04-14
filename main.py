@@ -307,6 +307,10 @@ async def get_summary():
 
 @app.get("/api/market-summary/raw")
 async def market_summary_raw(request: Request):
+    """Returns full tick data for all subscribed tokens (debug / advanced use)."""
+    if streamer is None:
+        raise HTTPException(status_code=503, detail="Streamer not initialised yet.")
+    return get_market_summary(top_n=100)
 
 
 @app.get("/api/ai-insight")
