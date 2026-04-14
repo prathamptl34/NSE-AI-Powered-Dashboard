@@ -281,48 +281,48 @@ export default function App() {
   const wsRef = useRef(null);
 
   const fetchData = useCallback(async () => {
-    try {
-      // 1. Market Summary
-      let res;
+    const fetchWithFallback = async (path) => {
       try {
-        res = await fetch("/api/market-summary");
+        let res;
+        try {
+          res = await fetch(path);
+        } catch (e) {
+          // Dev fallback
+          res = await fetch(`http://127.0.0.1:8000${path}`);
+        }
+        
+        if (!res.ok) return null;
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+           console.warn(`[API] ${path} returned non-JSON:`, contentType);
+           return null;
+        }
+        return await res.json();
       } catch (e) {
-        res = await fetch("http://127.0.0.1:8000/api/market-summary");
+        console.warn(`[API] ${path} error:`, e);
+        return null;
       }
-      if (res.ok) {
-        const json = await res.json();
-        setNiftyData(json.nifty100 || { gainers: [], losers: [] });
-        setMidcapData(json.midcap100 || { gainers: [], losers: [] });
-        setLastUpdated(formatIST());
-      }
+    };
 
-      // 2. F&O Movers
-      try {
-        let fnoRes;
-        try { fnoRes = await fetch("/api/fno-movers"); }
-        catch (e) { fnoRes = await fetch("http://127.0.0.1:8000/api/fno-movers"); }
-        if (fnoRes.ok) {
-          const fnoJson = await fnoRes.json();
-          setFnoMovers({ gainers: fnoJson.gainers || [], losers: fnoJson.losers || [] });
-        }
-      } catch (e) {}
+    // 1. Market Summary
+    const summary = await fetchWithFallback("/api/market-summary");
+    if (summary) {
+      setNiftyData(summary.nifty100 || { gainers: [], losers: [] });
+      setMidcapData(summary.midcap100 || { gainers: [], losers: [] });
+      setLastUpdated(formatIST());
+    }
 
-      // 3. AI Insight Narrative
-      try {
-        let aiRes;
-        try { aiRes = await fetch("/api/ai-insight"); }
-        catch (e) { aiRes = await fetch("http://127.0.0.1:8000/api/ai-insight"); }
-        if (aiRes.ok) {
-          const aiJson = await aiRes.json();
-          if (aiJson.insight) setAiInsight(aiJson.insight);
-          if (aiJson.signal) setAiSignal(aiJson.signal);
-        }
-      } catch (e) {}
+    // 2. F&O Movers
+    const fno = await fetchWithFallback("/api/fno-movers");
+    if (fno) {
+      setFnoMovers({ gainers: fno.gainers || [], losers: fno.losers || [] });
+    }
 
-      setWsStatus('live');
-    } catch (err) {
-      console.warn("Connection attempt failed.", err);
-      setWsStatus('offline');
+    // 3. AI Insight Narrative
+    const ai = await fetchWithFallback("/api/ai-insight");
+    if (ai) {
+      if (ai.insight) setAiInsight(ai.insight);
+      if (ai.signal) setAiSignal(ai.signal);
     }
   }, []);
 

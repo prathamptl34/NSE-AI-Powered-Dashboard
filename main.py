@@ -294,12 +294,19 @@ async def get_cache_status():
     }
 
 
+@app.get("/api/market-summary")
+async def get_summary():
+    try:
+        if streamer is None:
+             raise HTTPException(status_code=503, detail={"error": "Not Ready", "message": "Streamer not initialised yet."})
+        return get_market_summary(top_n=100)
+    except Exception as e:
+        logger.error(f"Market stats error: {e}")
+        return JSONResponse(status_code=500, content={"error": "SERVER_ERROR", "message": str(e)})
+
+
 @app.get("/api/market-summary/raw")
 async def market_summary_raw(request: Request):
-    """Returns full tick data for all subscribed tokens (debug / advanced use)."""
-    if streamer is None:
-        raise HTTPException(status_code=503, detail="Streamer not initialised yet.")
-    return get_market_summary(top_n=100)
 
 
 @app.get("/api/ai-insight")
@@ -319,16 +326,20 @@ async def get_ai_insight():
 
 @app.get("/api/fno-movers")
 async def get_fno_movers():
-    from backend.streamer import _fno_tick_store
-    sorted_stocks = sorted(
-        [v for v in _fno_tick_store.values() if v and v.get("change_pct") is not None],
-        key=lambda x: x["change_pct"], reverse=True
-    )
-    return {
-        "gainers": sorted_stocks[:5],
-        "losers": sorted_stocks[-5:][::-1],
-        "timestamp": datetime.now().isoformat()
-    }
+    try:
+        from backend.streamer import _fno_tick_store
+        sorted_stocks = sorted(
+            [v for v in _fno_tick_store.values() if v and v.get("change_pct") is not None],
+            key=lambda x: x["change_pct"], reverse=True
+        )
+        return {
+            "gainers": sorted_stocks[:5],
+            "losers": sorted_stocks[-5:][::-1],
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"F&O movers error: {e}")
+        return JSONResponse(status_code=500, content={"error": "F&O_DATA_ERROR", "message": str(e)})
 
 
 @app.get("/api/historical-summary")
