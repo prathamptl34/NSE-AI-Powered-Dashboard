@@ -219,12 +219,10 @@ def calculate_signal(stock: dict, candles_today: list = None, historical_candles
         "potential_pct": potential_pct,
         "risk_pct":      risk_pct,
         "smart_money":   smart_money,
-        "key_levels": {
-            "support":    round(prev_close * 0.99, 2) if prev_close else None,
-            "resistance": round(prev_close * 1.01, 2) if prev_close else None,
-            "stop_loss":  round(price * (0.97 if change_pct >= 0 else 1.03), 2) if price else None,
-            "target":     round(price * (1.03 if change_pct >= 0 else 0.97), 2) if price else None,
-        } if price else None,
+        "support":    round(prev_close * 0.99, 2) if prev_close else None,
+        "resistance": round(prev_close * 1.01, 2) if prev_close else None,
+        "stop_loss":  round(price * (0.97 if change_pct >= 0 else 1.03), 2) if price else None,
+        "target":     round(price * (1.03 if change_pct >= 0 else 0.97), 2) if price else None,
     }
 
 
