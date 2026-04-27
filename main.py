@@ -299,7 +299,7 @@ async def get_summary():
     try:
         if streamer is None:
              raise HTTPException(status_code=503, detail={"error": "Not Ready", "message": "Streamer not initialised yet."})
-        return get_market_summary(top_n=100)
+        return get_market_summary(top_n=5)
     except Exception as e:
         logger.error(f"Market stats error: {e}")
         return JSONResponse(status_code=500, content={"error": "SERVER_ERROR", "message": str(e)})

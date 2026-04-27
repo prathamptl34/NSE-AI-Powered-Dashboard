@@ -181,23 +181,12 @@ const Sparkline = React.memo(({ data, accent }) => {
   );
 });
 
-const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, viewMode, history }) {
-  const [flash, setFlash] = useState(null);
-  const prevPrice = useRef(stock.ltp);
-
-  useEffect(() => {
-    if (stock.ltp === prevPrice.current) return;
-    const dir = stock.ltp > prevPrice.current ? 'up' : 'down';
-    setFlash(dir);
-    prevPrice.current = stock.ltp;
-    const t = setTimeout(() => setFlash(null), 600);
-    return () => clearTimeout(t);
-  }, [stock.ltp]);
-
+// Pure display — receives flashDir as prop, re-keyed by parent to restart CSS animation
+function StockCardInner({ stock, rank, accent, onClick, viewMode, history, flashDir }) {
   return (
     <div
-      className={`stock-card ${viewMode === 'chart' ? 'card-chart-mode' : ''} flash-${flash || 'none'}`}
-      style={{ animationDelay: `${rank * 0.04}s`, cursor: 'pointer' }}
+      className={`stock-card ${viewMode === 'chart' ? 'card-chart-mode' : ''} ${flashDir ? `flash-${flashDir}` : ''}`}
+      style={{ cursor: 'pointer' }}
       onClick={() => onClick({
         symbol: stock.symbol,
         price: stock.ltp,
@@ -208,12 +197,10 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
       <div className={`rank rank-${accent}`}>
         {String(rank).padStart(2, '0')}
       </div>
-
       <div className="stock-meta" style={{ minWidth: '90px' }}>
         <span className="stock-symbol">{stock.symbol}</span>
         <span className="stock-exchange">NSE</span>
       </div>
-
       {viewMode === 'chart' ? (
         <Sparkline data={history} accent={accent} />
       ) : (
@@ -222,7 +209,6 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
           <span className="stock-prev">prev ₹{formatINR(stock.prev_close)}</span>
         </div>
       )}
-
       <div className={`change-badge change-${accent}`}>
         {viewMode === 'chart' && <span className="chart-price">₹{formatINR(stock.ltp)}</span>}
         <span className="change-arrow">{accent === 'green' ? '▲' : '▼'}</span>
@@ -230,20 +216,52 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
       </div>
     </div>
   );
+}
+
+// Wrapper — tracks price changes, bumps animKey to force StockCardInner to remount
+const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, viewMode, history }) {
+  const [animKey, setAnimKey] = useState(0);
+  const [flashDir, setFlashDir] = useState(null);
+  const prevPrice = useRef(stock.ltp);
+
+  useEffect(() => {
+    if (stock.ltp === prevPrice.current) return;
+    const dir = stock.ltp > prevPrice.current ? 'up' : 'down';
+    prevPrice.current = stock.ltp;
+    setFlashDir(dir);
+    setAnimKey(k => k + 1); // key on StockCardInner below drives remount → CSS animation restarts
+    const t = setTimeout(() => setFlashDir(null), 800);
+    return () => clearTimeout(t);
+  }, [stock.ltp]);
+
+  return (
+    <StockCardInner
+      key={animKey}
+      stock={stock}
+      rank={rank}
+      accent={accent}
+      onClick={onClick}
+      viewMode={viewMode}
+      history={history}
+      flashDir={flashDir}
+    />
+  );
 });
 
 function Panel({ title, accent, data, type, lastUpdated, onStockClick, viewMode, historyMap }) {
+  // Clamp to 5 to prevent glitches when WS sends extra items mid-update
+  const items = data ? data.slice(0, 5) : [];
   return (
     <section className={`panel panel-${accent}`}>
       <div className="panel-header">
         <span className="panel-icon">{type === 'gainer' ? '▲' : '▼'}</span>
         <h2 className="panel-title">{title}</h2>
-        <span className="panel-count">{data ? data.length : 0} stocks</span>
+        <span className="panel-count">{items.length} stocks</span>
       </div>
       <div className="panel-body">
-        {!data || data.length === 0
+        {items.length === 0
           ? <SkeletonList count={5} />
-          : data.map((s, i) => (
+          : items.map((s, i) => (
               <StockCard 
                 key={s.symbol} 
                 stock={s} 

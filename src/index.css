@@ -421,6 +421,24 @@ body {
   to   { opacity: 1; transform: translateX(0); }
 }
 
+/* ─── Price Flash Animations ─────────────────────────────────────────────── */
+@keyframes flash-up-anim {
+  0%   { background: transparent; }
+  20%  { background: hsla(160, 84%, 39%, 0.25); box-shadow: inset 0 0 0 1px hsla(160, 84%, 39%, 0.4); }
+  60%  { background: hsla(160, 84%, 39%, 0.12); box-shadow: inset 0 0 0 1px hsla(160, 84%, 39%, 0.2); }
+  100% { background: transparent; box-shadow: none; }
+}
+
+@keyframes flash-down-anim {
+  0%   { background: transparent; }
+  20%  { background: hsla(343, 90%, 60%, 0.25); box-shadow: inset 0 0 0 1px hsla(343, 90%, 60%, 0.4); }
+  60%  { background: hsla(343, 90%, 60%, 0.12); box-shadow: inset 0 0 0 1px hsla(343, 90%, 60%, 0.2); }
+  100% { background: transparent; box-shadow: none; }
+}
+
+.flash-up   { animation: flash-up-anim 0.7s ease-out forwards; }
+.flash-down { animation: flash-down-anim 0.7s ease-out forwards; }
+
 /* ─── Rank Badge ─────────────────────────────────────────────────────────── */
 .rank {
   font-size: 11px;
