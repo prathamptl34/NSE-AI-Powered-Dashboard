@@ -60,28 +60,44 @@ function FnoTable({ title, data, type, onStockClick }) {
           </tr>
         </thead>
         <tbody>
-          {data && data.map((stock, i) => {
-            const isUp = stock.change_pct > 0;
-            return (
-              <tr 
-                key={stock.symbol || i} 
-                onClick={() => onStockClick && onStockClick(stock.symbol)}
-                className="fno-table-row"
-              >
-                <td>
-                  <span className="fno-symbol-text">{stock.symbol}</span>
-                  <span className="fno-pill">F&O</span>
-                </td>
-                <td style={{ fontWeight: '700' }}>₹{formatINR(stock.ltp)}</td>
-                <td className="fno-chg" style={{ color: isUp ? 'var(--green)' : 'var(--red)' }}>
-                  {isUp ? '+' : ''}{(stock.change_pct || 0).toFixed(2)}%
-                </td>
-                <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
-                  {stock.vol_ratio && stock.vol_ratio >= 1.2 ? `🔥 ${stock.vol_ratio.toFixed(1)}x` : '-'}
+          {!data || data.length === 0 ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <tr key={i} className="fno-table-row" style={{ height: '49px' }}>
+                <td colSpan="4" style={{ padding: '8px 12px' }}>
+                  <div style={{
+                    height: '20px', 
+                    background: 'linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.02) 100%)',
+                    backgroundSize: '200% 100%',
+                    animation: 'shimmer 1.5s ease-in-out infinite',
+                    borderRadius: '4px'
+                  }}></div>
                 </td>
               </tr>
-            );
-          })}
+            ))
+          ) : (
+            data.slice(0, 5).map((stock, i) => {
+              const isUp = stock.change_pct > 0;
+              return (
+                <tr 
+                  key={stock.symbol || i} 
+                  onClick={() => onStockClick && onStockClick(stock.symbol)}
+                  className="fno-table-row"
+                >
+                  <td>
+                    <span className="fno-symbol-text">{stock.symbol}</span>
+                    <span className="fno-pill">F&O</span>
+                  </td>
+                  <td style={{ fontWeight: '700' }}>₹{formatINR(stock.ltp)}</td>
+                  <td className="fno-chg" style={{ color: isUp ? 'var(--green)' : 'var(--red)' }}>
+                    {isUp ? '+' : ''}{(stock.change_pct || 0).toFixed(2)}%
+                  </td>
+                  <td style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                    {stock.vol_ratio && stock.vol_ratio >= 1.2 ? `🔥 ${stock.vol_ratio.toFixed(1)}x` : '-'}
+                  </td>
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
     </div>

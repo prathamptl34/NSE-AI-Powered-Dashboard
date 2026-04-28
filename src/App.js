@@ -620,9 +620,12 @@ export default function App() {
             <h2 className="section-title">Equity F&O Segment</h2>
             <div className="section-line" style={{ background: '#f97316' }} />
           </div>
-          <main className="panels-wrapper" style={{ marginBottom: '40px' }}>
-            <Panel title="Top Gainers" accent="green" data={fnoMovers.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
-            <Panel title="Top Losers" accent="red" data={fnoMovers.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
+          <main className="panels-wrapper" style={{ marginBottom: '40px', display: 'block' }}>
+            <FnoMoversTable 
+              gainers={fnoMovers.gainers} 
+              losers={fnoMovers.losers} 
+              onStockClick={openExplain} 
+            />
           </main>
 
           <MarketPulseHero niftyData={niftyData} midcapData={midcapData} />

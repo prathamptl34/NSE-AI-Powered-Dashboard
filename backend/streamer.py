@@ -440,11 +440,10 @@ def get_market_summary(top_n: int = 5) -> dict:
                 seen_symbols.add(sym)
 
         # 3. Final Sort for direction (Gainer vs Loser)
-        return sorted(
-            unique_items, 
-            key=lambda x: (x.get("change_pct", 0.0), x.get("volume", 0)), 
-            reverse=reverse
-        )[:top_n]
+        if reverse: # Gainers
+            return sorted(unique_items, key=lambda x: (x.get("change_pct", 0.0), x.get("volume", 0)), reverse=True)[:top_n]
+        else: # Losers
+            return sorted(unique_items, key=lambda x: (x.get("change_pct", 0.0), -x.get("volume", 0)), reverse=False)[:top_n]
 
     return {
         "nifty100": {
@@ -738,7 +737,7 @@ async def market_pusher():
             ]
             
             # Sort F&O: Primary by change_pct, Secondary by volume
-            fno_sorted_asc = sorted(valid_fno, key=lambda x: (x.get("change_pct", 0.0), x.get("volume", 0)), reverse=False)
+            fno_sorted_asc = sorted(valid_fno, key=lambda x: (x.get("change_pct", 0.0), -x.get("volume", 0)), reverse=False)
             fno_sorted_desc = sorted(valid_fno, key=lambda x: (x.get("change_pct", 0.0), x.get("volume", 0)), reverse=True)
             
             fno_movers = {

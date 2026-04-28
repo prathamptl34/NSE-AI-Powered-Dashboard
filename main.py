@@ -872,6 +872,11 @@ if os.path.isdir(BUILD_DIR):
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
+        # Serve exact file if it exists (e.g., /favicon.ico, /manifest.json)
+        file_path = os.path.join(BUILD_DIR, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # Fallback to index.html for React Router
         index = os.path.join(BUILD_DIR, "index.html")
         return FileResponse(index)
 

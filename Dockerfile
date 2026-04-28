@@ -25,6 +25,13 @@ COPY . .
 # Copy built frontend from Stage 1 into the 'build' directory in backend
 COPY --from=build-stage /app/build ./build
 
+# Create a non-root user for Hugging Face Spaces (UID 1000)
+RUN useradd -m -u 1000 user && \
+    chown -R user:user /app
+
+# Switch to the non-root user
+USER user
+
 # Hugging Face Spaces use port 7860 by default
 EXPOSE 7860
 
