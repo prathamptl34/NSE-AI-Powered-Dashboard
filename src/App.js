@@ -218,9 +218,8 @@ function StockCardInner({ stock, rank, accent, onClick, viewMode, history, flash
   );
 }
 
-// Wrapper — tracks price changes, bumps animKey to force StockCardInner to remount
+// Wrapper — tracks price changes, manages flash animations without remounting
 const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, viewMode, history }) {
-  const [animKey, setAnimKey] = useState(0);
   const [flashDir, setFlashDir] = useState(null);
   const prevPrice = useRef(stock.ltp);
 
@@ -228,15 +227,24 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
     if (stock.ltp === prevPrice.current) return;
     const dir = stock.ltp > prevPrice.current ? 'up' : 'down';
     prevPrice.current = stock.ltp;
-    setFlashDir(dir);
-    setAnimKey(k => k + 1); // key on StockCardInner below drives remount → CSS animation restarts
+    
+    // Briefly clear the flash direction to restart the animation if needed
+    setFlashDir(null);
+    
+    // Use requestAnimationFrame to ensure the DOM updates before reapplying the class
+    const req = requestAnimationFrame(() => {
+      setFlashDir(dir);
+    });
+
     const t = setTimeout(() => setFlashDir(null), 800);
-    return () => clearTimeout(t);
+    return () => {
+      cancelAnimationFrame(req);
+      clearTimeout(t);
+    };
   }, [stock.ltp]);
 
   return (
     <StockCardInner
-      key={animKey}
       stock={stock}
       rank={rank}
       accent={accent}
