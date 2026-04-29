@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./index.css";
 import InsightsPage from "./InsightsPage";
 import SignalScanner from "./SignalScanner";
-import MarketPulseHero from "./MarketPulseHero";
 import { useStockExplain, StockDeepDiveModal } from './StockDeepDive';
 import FnoMoversTable from "./FnoMoversTable";
 
@@ -635,10 +634,7 @@ export default function App() {
               losers={fnoMovers.losers} 
               onStockClick={openExplain} 
             />
-          </main>
-
-          <MarketPulseHero niftyData={niftyData} midcapData={midcapData} />
-
+        </main>
           <div className="historical-explorer">
             <div className="hist-card">
               <div className="hist-controls-box">
