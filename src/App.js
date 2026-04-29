@@ -4,6 +4,7 @@ import InsightsPage from "./InsightsPage";
 import SignalScanner from "./SignalScanner";
 import { useStockExplain, StockDeepDiveModal } from './StockDeepDive';
 import FnoMoversTable from "./FnoMoversTable";
+import HeatmapPage from "./Heatmap";
 
 // ── Utility functions ─────────────────────────────────────────────────────────
 
@@ -599,6 +600,12 @@ export default function App() {
               >
                 ◉ Signal Scanner
               </button>
+              <button
+                className="heatmap-nav-btn premium-btn-orange"
+                onClick={() => setCurrentPage('heatmap')}
+              >
+                🔥 Heatmap
+              </button>
               <ConnectionDot status={wsStatus} />
               <MarketClock />
             </div>
@@ -699,8 +706,10 @@ export default function App() {
         </div>
       ) : currentPage === 'insights' ? (
         <InsightsPage onBack={() => setCurrentPage('home')} wsStatus={wsStatus} />
-      ) : (
+      ) : currentPage === 'scanner' ? (
         <SignalScanner onBack={() => setCurrentPage('home')} />
+      ) : (
+        <HeatmapPage onBack={() => setCurrentPage('home')} wsStatus={wsStatus} />
       )}
 
       <StockDeepDiveModal

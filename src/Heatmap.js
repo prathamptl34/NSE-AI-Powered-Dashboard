@@ -1,0 +1,317 @@
+import React, { useState, useEffect, useRef, useCallback } from "react";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatINR(num) {
+  if (num === null || num === undefined) return "—";
+  return Number(num).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatVol(v) {
+  if (!v || v === 0) return "—";
+  if (v >= 1e7) return (v / 1e7).toFixed(2) + " Cr";
+  if (v >= 1e5) return (v / 1e5).toFixed(1) + " L";
+  return v.toLocaleString("en-IN");
+}
+
+function getTileClass(changePct, hasData) {
+  if (!hasData) return "flat";
+  if (changePct > 0.05) return "positive";
+  if (changePct < -0.05) return "negative";
+  return "flat";
+}
+
+function getTimestamp() {
+  return new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  }) + " IST";
+}
+
+// ─── Pill Badge Strip ─────────────────────────────────────────────────────────
+
+const PILL_BUCKETS = [
+  { label: ">5%",   min:  5,    max: Infinity, cls: "pill-strong-green" },
+  { label: ">3%",   min:  3,    max: 5,        cls: "pill-green"        },
+  { label: ">1%",   min:  1,    max: 3,        cls: "pill-mild-green"   },
+  { label: "Flat",  min: -1,    max: 1,        cls: "pill-flat"         },
+  { label: "<-1%",  min: -3,    max: -1,       cls: "pill-mild-red"     },
+  { label: "<-3%",  min: -5,    max: -3,       cls: "pill-red"          },
+  { label: "<-5%",  min: -Infinity, max: -5,   cls: "pill-strong-red"   },
+];
+
+function PillStrip({ indices }) {
+  const counts = PILL_BUCKETS.map((b) => ({
+    ...b,
+    count: indices.filter(
+      (idx) => idx.constituent_count > 0 &&
+               idx.change_pct >= b.min && idx.change_pct < b.max
+    ).length,
+  }));
+
+  return (
+    <div className="heatmap-pill-strip">
+      {counts.map((b) =>
+        b.count > 0 ? (
+          <span key={b.label} className={`heatmap-pill ${b.cls}`}>
+            {b.label} <strong>{b.count}</strong>
+          </span>
+        ) : null
+      )}
+    </div>
+  );
+}
+
+// ─── Index Tile ───────────────────────────────────────────────────────────────
+
+const IndexTile = React.memo(function IndexTile({ data, expanded, onToggle }) {
+  const tileRef    = useRef(null);
+  const prevPct    = useRef(data.change_pct);
+  const rafRef     = useRef(null);
+  const timeoutRef = useRef(null);
+
+  const hasData   = data.constituent_count > 0;
+  const tileClass = getTileClass(data.change_pct, hasData);
+  const sign      = data.change_pct >= 0 ? "+" : "";
+
+  // RAF-based flash on change_pct update (no remount)
+  useEffect(() => {
+    if (data.change_pct === prevPct.current) return;
+    const dir = data.change_pct > prevPct.current ? "green" : "red";
+    prevPct.current = data.change_pct;
+
+    if (tileRef.current) {
+      tileRef.current.classList.remove("tile-flash-green", "tile-flash-red");
+      rafRef.current = requestAnimationFrame(() => {
+        if (tileRef.current) {
+          tileRef.current.classList.add(`tile-flash-${dir}`);
+        }
+      });
+      timeoutRef.current = setTimeout(() => {
+        if (tileRef.current) {
+          tileRef.current.classList.remove("tile-flash-green", "tile-flash-red");
+        }
+      }, 700);
+    }
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [data.change_pct]);
+
+  return (
+    <div
+      ref={tileRef}
+      className={`index-tile ${tileClass}`}
+      onClick={onToggle}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onToggle()}
+      aria-expanded={expanded}
+    >
+      {/* ── Collapsed Header ── */}
+      <div className="tile-header">
+        <span className="tile-name">{data.sector}</span>
+        <span className="tile-arrow">{data.change_pct >= 0 ? "▲" : "▼"}</span>
+      </div>
+      <div className="tile-change">
+        {hasData ? `${sign}${data.change_pct.toFixed(2)}%` : "—"}
+      </div>
+
+      {/* ── Expanded Panel ── */}
+      <div className={`tile-expanded-panel${expanded ? " open" : ""}`}>
+        <div className="tile-divider" />
+
+        {!hasData ? (
+          <div className="tile-awaiting">⏳ Awaiting market data…</div>
+        ) : (
+          <>
+            {data.top_gainer && (
+              <div className="tile-stock-row">
+                <span className="tile-stock-label gainer-label">📈 TOP GAINER</span>
+                <div className="tile-stock-body">
+                  <span className="tile-stock-symbol">{data.top_gainer.symbol}</span>
+                  <span className="tile-stock-price">₹{formatINR(data.top_gainer.ltp)}</span>
+                  <span className="tile-change-pill pill-green-pill">
+                    +{data.top_gainer.change_pct.toFixed(2)}%
+                  </span>
+                </div>
+                <span className="tile-volume">Vol: {formatVol(data.top_gainer.volume)}</span>
+              </div>
+            )}
+
+            <div className="tile-mini-divider" />
+
+            {data.top_loser && (
+              <div className="tile-stock-row">
+                <span className="tile-stock-label loser-label">📉 TOP LOSER</span>
+                <div className="tile-stock-body">
+                  <span className="tile-stock-symbol">{data.top_loser.symbol}</span>
+                  <span className="tile-stock-price">₹{formatINR(data.top_loser.ltp)}</span>
+                  <span className="tile-change-pill pill-red-pill">
+                    {data.top_loser.change_pct.toFixed(2)}%
+                  </span>
+                </div>
+                <span className="tile-volume">Vol: {formatVol(data.top_loser.volume)}</span>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+});
+
+// ─── Main Heatmap Page ────────────────────────────────────────────────────────
+
+export default function HeatmapPage({ onBack, wsStatus }) {
+  const [indices, setIndices]       = useState([]);
+  const [expandedTile, setExpanded] = useState(null);
+  const [streaming, setStreaming]   = useState(false);
+  const [timestamp, setTimestamp]   = useState(getTimestamp());
+  const [loading, setLoading]       = useState(true);
+
+  const sseRef = useRef(null);
+
+  // Helper to merge live SSE diff into existing state by sector name
+  const mergeIndices = useCallback((incoming) => {
+    setIndices((prev) => {
+      if (!prev.length) return incoming;
+      const byName = {};
+      incoming.forEach((idx) => { byName[idx.sector] = idx; });
+      return prev.map((idx) => byName[idx.sector] || idx);
+    });
+    setTimestamp(getTimestamp());
+  }, []);
+
+  // Initial fetch
+  useEffect(() => {
+    const fetchInitial = async () => {
+      try {
+        const base = window.location.port === "3000" ? "http://127.0.0.1:8000" : "";
+        const res  = await fetch(`${base}/api/heatmap/sectoral`);
+        if (!res.ok) throw new Error("fetch failed");
+        const json = await res.json();
+        setIndices(json.indices || []);
+      } catch (e) {
+        console.warn("[Heatmap] initial fetch error:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInitial();
+  }, []);
+
+  // SSE connection — with mandatory cleanup (Amendment #3)
+  useEffect(() => {
+    if (!streaming) {
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+      return;
+    }
+
+    const isDev   = window.location.port === "3000";
+    const baseUrl = isDev ? "http://127.0.0.1:8000" : "";
+    const es      = new EventSource(`${baseUrl}/api/heatmap/stream`);
+    sseRef.current = es;
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.indices) mergeIndices(data.indices);
+      } catch {}
+    };
+
+    es.onerror = (e) => {
+      console.warn("[Heatmap SSE] connection error", e);
+    };
+
+    // Mandatory cleanup — close SSE on unmount or streaming toggle
+    return () => {
+      es.close();
+      sseRef.current = null;
+    };
+  }, [streaming, mergeIndices]);
+
+  const toggleTile = useCallback((sector) => {
+    setExpanded((prev) => (prev === sector ? null : sector));
+  }, []);
+
+  return (
+    <div className="heatmap-page">
+      {/* ── Sticky Header ── */}
+      <div className="heatmap-header">
+        <div className="heatmap-header-left">
+          <button className="ai-back-btn" onClick={onBack}>← Back</button>
+          <div className="heatmap-title-block">
+            <span className="heatmap-title">🔥 Sector Heatmap</span>
+            <span className="heatmap-badge">NSE Live</span>
+          </div>
+        </div>
+
+        <div className="heatmap-header-right">
+          <span className="heatmap-timestamp">{timestamp}</span>
+
+          {/* Streaming toggle */}
+          <div
+            className="heatmap-stream-toggle"
+            onClick={() => setStreaming((s) => !s)}
+            title={streaming ? "Streaming ON — click to pause" : "Click to start live streaming"}
+          >
+            <div className={`stream-dot ${streaming ? "dot-live" : "dot-off"}`} />
+            <span>{streaming ? "Streaming ON" : "Streaming OFF"}</span>
+          </div>
+
+          <div className={`conn-dot conn-${wsStatus}`}>
+            <span className="dot-inner" />
+            <span className="dot-label">{wsStatus === "live" ? "Live" : "Offline"}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Pill Badges ── */}
+      {!loading && indices.length > 0 && (
+        <div className="heatmap-pills-row">
+          <PillStrip indices={indices} />
+        </div>
+      )}
+
+      {/* ── Grid ── */}
+      <div className="heatmap-body">
+        {loading ? (
+          <div className="heatmap-loading">
+            <div className="heatmap-spinner" />
+            <span>Loading sector data…</span>
+          </div>
+        ) : indices.length === 0 ? (
+          <div className="heatmap-empty">
+            <span>⏳ Market data warming up. Check back in a moment.</span>
+          </div>
+        ) : (
+          <div className="heatmap-grid">
+            {indices.map((idx) => (
+              <IndexTile
+                key={idx.sector}
+                data={idx}
+                expanded={expandedTile === idx.sector}
+                onToggle={() => toggleTile(idx.sector)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

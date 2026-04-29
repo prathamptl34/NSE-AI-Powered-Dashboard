@@ -263,6 +263,36 @@ _store_lock = threading.Lock()
 connected_clients = set()
 _METADATA_CACHE = os.path.join(".data", "metadata_cache.json")
 
+# ── Sectoral Heatmap State ────────────────────────────────────────────────────
+# Constituent symbols per NSE sector index (subset drawn from ALL_TOKENS universe)
+SECTOR_CONSTITUENTS: dict[str, list] = {
+    "NIFTY AUTO":              ["MARUTI", "M&M", "TVSMOTOR", "EICHERMOT", "BAJAJ-AUTO", "HEROMOTOCO", "MOTHERSON", "BOSCHLTD", "BHARATFORG"],
+    "NIFTY BANK":              ["HDFCBANK", "ICICIBANK", "KOTAKBANK", "SBIN", "AXISBANK", "INDUSINDBK", "PNB", "BANKBARODA", "FEDERALBNK", "IDFCFIRSTB", "AUBANK"],
+    "NIFTY ENERGY":            ["RELIANCE", "ONGC", "BPCL", "IOC", "GAIL", "NTPC", "TATAPOWER", "ADANIGREEN", "ADANIPOWER", "JSWENERGY"],
+    "NIFTY FINANCIAL SVCS":    ["HDFCBANK", "ICICIBANK", "KOTAKBANK", "BAJFINANCE", "BAJAJFINSV", "SBILIFE", "HDFCLIFE", "SHRIRAMFIN", "CHOLAFIN", "JIOFIN"],
+    "NIFTY FMCG":              ["HINDUNILVR", "ITC", "NESTLEIND", "BRITANNIA", "DABUR", "MARICO", "GODREJCP", "COLPAL", "TATACONSUM", "VBL"],
+    "NIFTY IT":                ["TCS", "INFY", "HCLTECH", "WIPRO", "TECHM", "LTM", "MPHASIS", "COFORGE", "PERSISTENT", "OFSS"],
+    "NIFTY METAL":             ["TATASTEEL", "HINDALCO", "VEDL", "JSWSTEEL", "SAIL", "NMDC", "NATIONALUM", "HINDZINC", "COALINDIA", "JINDALSTEL"],
+    "NIFTY PHARMA":            ["SUNPHARMA", "DRREDDY", "CIPLA", "DIVISLAB", "APOLLOHOSP", "LUPIN", "AUROPHARMA", "TORNTPHARM", "ALKEM", "ZYDUSLIFE"],
+    "NIFTY PSU BANK":          ["SBIN", "PNB", "BANKBARODA", "CANBK", "UNIONBANK", "INDIANB", "BANKINDIA"],
+    "NIFTY REALTY":            ["DLF", "LODHA", "GODREJPROP", "OBEROIRLTY", "PHOENIXLTD", "PRESTIGE"],
+    "NIFTY HEALTHCARE":        ["APOLLOHOSP", "MAXHEALTH", "FORTIS", "MANKIND", "SUNPHARMA", "DRREDDY", "DIVISLAB"],
+    "NIFTY INFRA":             ["LT", "NTPC", "POWERGRID", "GAIL", "ADANIPORTS", "BEL", "HAL"],
+    "NIFTY CONSUMER DURABLES": ["HAVELLS", "VOLTAS", "TITAN", "BLUESTARCO", "POLYCAB", "KEI", "DIXON"],
+    "NIFTY OIL GAS":           ["RELIANCE", "ONGC", "BPCL", "IOC", "GAIL", "OIL", "ATGL", "IGL", "HINDPETRO"],
+    "NIFTY PRIVATE BANK":      ["HDFCBANK", "ICICIBANK", "KOTAKBANK", "AXISBANK", "INDUSINDBK", "IDFCFIRSTB", "FEDERALBNK", "AUBANK"],
+    "NIFTY MIDCAP SELECT":     ["ABCAPITAL", "CHOLAFIN", "MUTHOOTFIN", "LTF", "SBICARD", "BSE", "HDFCAMC", "MOTILALOFS"],
+    "NIFTY SERVICES":          ["TCS", "INFY", "HCLTECH", "WIPRO", "TECHM", "ICICIBANK", "HDFCBANK", "KOTAKBANK", "INDIGO", "IRCTC"],
+    "NIFTY COMMODITIES":       ["TATASTEEL", "HINDALCO", "VEDL", "COALINDIA", "JSWSTEEL", "ONGC", "GAIL", "BPCL", "HINDZINC"],
+    "NIFTY MNC":               ["HINDUNILVR", "NESTLEIND", "BOSCHLTD", "SIEMENS", "ABB", "ASIANPAINT"],
+    "NIFTY DEFENCE":           ["HAL", "BEL", "MAZDOCK", "BDL"],
+    "NIFTY CAPITAL MARKETS":   ["BSE", "HDFCAMC", "MOTILALOFS", "SBICARD", "JIOFIN", "BAJFINANCE"],
+}
+
+_heatmap_state: dict[str, dict] = {}
+_heatmap_lock = threading.Lock()
+_tick_batch_counter: int = 0
+
 # Time caching for high-frequency tick updates
 _cached_day = ""
 _cached_candle_time = ""
@@ -400,6 +430,65 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
         sym = meta.get("symbol")
         if sym and sym in FNO_SYMBOL_TOKEN_MAP:
             _fno_tick_store[sym] = _tick_store.get(token) or _fno_tick_store.get(sym)
+
+    # Throttle: recompute heatmap every 5 ticks via modulo counter
+    global _tick_batch_counter
+    _tick_batch_counter += 1
+    if _tick_batch_counter % 5 == 0:
+        _update_heatmap_state()
+
+
+def _update_heatmap_state():
+    """Recompute sector heatmap from current _tick_store. Called every 5 ticks."""
+    with _store_lock:
+        tick_by_symbol = {v["symbol"]: v for v in _tick_store.values() if v.get("ltp", 0) > 0}
+
+    new_state = {}
+    for sector, symbols in SECTOR_CONSTITUENTS.items():
+        sector_ticks = [tick_by_symbol[s] for s in symbols if s in tick_by_symbol]
+        valid = [t for t in sector_ticks if t.get("prev_close", 0) > 0.01 and t.get("ltp", 0) > 0.01]
+
+        if not valid:
+            # Still include tile — show "Awaiting data" state
+            new_state[sector] = {
+                "sector": sector,
+                "change_pct": 0.0,
+                "constituent_count": 0,
+                "top_gainer": None,
+                "top_loser": None,
+            }
+            continue
+
+        avg_chg = sum(t["change_pct"] for t in valid) / len(valid)
+        top_gainer = max(valid, key=lambda x: x.get("change_pct", 0))
+        top_loser  = min(valid, key=lambda x: x.get("change_pct", 0))
+
+        def _stock_snap(t):
+            return {
+                "symbol":     t["symbol"],
+                "ltp":        t["ltp"],
+                "prev_close": t["prev_close"],
+                "change_pct": round(t["change_pct"], 2),
+                "volume":     t.get("volume", 0),
+            }
+
+        new_state[sector] = {
+            "sector":            sector,
+            "change_pct":        round(avg_chg, 2),
+            "constituent_count": len(valid),
+            "top_gainer":        _stock_snap(top_gainer),
+            "top_loser":         _stock_snap(top_loser),
+        }
+
+    with _heatmap_lock:
+        _heatmap_state.clear()
+        _heatmap_state.update(new_state)
+
+
+def get_heatmap_state() -> dict:
+    """Thread-safe snapshot of current sectoral heatmap state."""
+    with _heatmap_lock:
+        return dict(_heatmap_state)
 
 
 def get_all_ticks() -> list:

@@ -23,7 +23,7 @@ import json
 
 from groq import Groq
 from backend.signal_engine import calculate_all_signals, get_summary_stats, get_sector, FNO_STOCKS
-from backend.streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status, get_intraday_candles
+from backend.streamer import MarketStreamer, get_market_summary, get_all_ticks, get_prev_close_status, get_intraday_candles, get_heatmap_state
 from backend.historical import get_historical_summary, get_intraday_sparklines
 from backend.nse_holidays import is_trading_day
 from backend.tv_mcp_client import (
@@ -864,6 +864,43 @@ async def trading_day_check(
         "is_valid":   valid,
         "message":    reason,
     }
+
+
+# ── Heatmap Endpoints ─────────────────────────────────────────────────────
+
+from fastapi.responses import StreamingResponse
+
+@app.get("/api/heatmap/sectoral")
+async def get_sectoral_heatmap():
+    """Returns a snapshot of all sector index states with top gainer/loser each."""
+    state = get_heatmap_state()
+    return {
+        "timestamp": datetime.now(IST).astimezone().isoformat(),
+        "indices": list(state.values()),
+    }
+
+
+@app.get("/api/heatmap/stream")
+async def heatmap_sse_stream():
+    """SSE endpoint that pushes updated heatmap data every 2 seconds."""
+    async def event_generator():
+        while True:
+            try:
+                state = get_heatmap_state()
+                payload = json.dumps({
+                    "timestamp": datetime.now(IST).astimezone().isoformat(),
+                    "indices": list(state.values()),
+                })
+                yield f"data: {payload}\n\n"
+            except Exception as e:
+                logger.error(f"[SSE Heatmap] error: {e}")
+            await asyncio.sleep(2)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 # ── Serve React SPA (production build) ───────────────────────────────────────
 BUILD_DIR = os.path.join(os.path.dirname(__file__), "build")
