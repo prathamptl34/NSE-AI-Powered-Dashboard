@@ -1,20 +1,3 @@
-
-
-
-
-:root {
-  /* Dynamic Backgrounds */
-  --bg-hsl:        222, 47%, 4%;
-  --bg:            hsl(var(--bg-hsl));
-  --bg-soft:       hsl(222, 47%, 7%);
-  --bg-card-hsl:   222, 47%, 10%;
-  --bg-card:       hsla(var(--bg-card-hsl), 0.4);
-  --bg-elevated:   hsla(var(--bg-card-hsl), 0.7);
-
-
-
-
-
 :root {
   /* Dynamic Backgrounds */
   --bg-hsl:        222, 47%, 4%;
