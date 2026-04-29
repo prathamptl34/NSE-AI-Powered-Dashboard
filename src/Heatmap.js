@@ -76,27 +76,31 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
         {pct(tile.change_pct)}
       </div>
 
-      <div className="hm-table-header">
-        <span className="hm-th">SYMB</span>
-        <span className="hm-th hm-th-right">PRICE</span>
-        <span className="hm-th hm-th-right">CHG%</span>
+      <div className="hm-divider" />
+
+      <div className="hm-stock-row">
+        <span className="hm-row-label">Top Gainer</span>
+        <div className="hm-stock-line">
+          <span className="hm-stock-name">{tile.top_gainer?.symbol || "..."}</span>
+          <div className="hm-stock-right">
+            <span className="hm-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
+            {tile.top_gainer?.change_pct != null && (
+              <span className="hm-stock-pill pill-stock-up">{pct(tile.top_gainer.change_pct)}</span>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="hm-stock-table">
-        <div className="hm-stock-row">
-          <span className="hm-stock-name">{tile.top_gainer?.symbol || "..."}</span>
-          <span className="hm-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
-          <span className={`hm-stock-pill ${tile.top_gainer?.change_pct >= 0 ? "pill-stock-up" : "pill-stock-down"}`}>
-            {pct(tile.top_gainer?.change_pct)}
-          </span>
-        </div>
-
-        <div className="hm-stock-row">
+      <div className="hm-stock-row">
+        <span className="hm-row-label">Top Loser</span>
+        <div className="hm-stock-line">
           <span className="hm-stock-name">{tile.top_loser?.symbol || "..."}</span>
-          <span className="hm-stock-price">{fmt(tile.top_loser?.ltp)}</span>
-          <span className={`hm-stock-pill ${tile.top_loser?.change_pct >= 0 ? "pill-stock-up" : "pill-stock-down"}`}>
-            {pct(tile.top_loser?.change_pct)}
-          </span>
+          <div className="hm-stock-right">
+            <span className="hm-stock-price">{fmt(tile.top_loser?.ltp)}</span>
+            {tile.top_loser?.change_pct != null && (
+              <span className="hm-stock-pill pill-stock-down">{pct(tile.top_loser.change_pct)}</span>
+            )}
+          </div>
         </div>
       </div>
     </div>

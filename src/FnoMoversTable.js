@@ -250,8 +250,7 @@ export default function FnoMoversTable({ gainers, losers, onStockClick }) {
           font-size: 20px;
           font-weight: 900;
           color: #fff;
-          font-family: 'JetBrains Mono', monospace;
-          letter-spacing: -1px;
+          letter-spacing: -0.5px;
           line-height: 1;
         }
         .fno-change-pill {
