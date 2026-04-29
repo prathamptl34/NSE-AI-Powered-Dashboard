@@ -1718,7 +1718,7 @@ body {
   .ai-page-header { padding: 12px 16px; }
   .scanner-header { padding: 12px 16px; }
   .fg-wrapper { margin: 16px 16px 0; }
-  .sector-heatmap { margin: 12px 16px 0; }
+  .sector-heatmap { margin: 12px 16px 0; grid-template-columns: 1fr 1fr; }
 }
 
 /* ─── Insights Page Widgets ──────────────────────────────────────────────── */

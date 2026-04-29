@@ -574,14 +574,15 @@ export default function App() {
             </div>
             
             <div className="header-center">
-              <div className="view-toggle-container">
+              <div 
+                className="view-toggle-container"
+                onClick={() => setViewMode(prev => prev === 'normal' ? 'chart' : 'normal')}
+                style={{ cursor: 'pointer' }}
+              >
                 <span className={`toggle-label ${viewMode === 'normal' ? 'active' : ''}`}>Normal</span>
-                <button 
-                  className={`view-toggle-switch ${viewMode === 'chart' ? 'on' : ''}`}
-                  onClick={() => setViewMode(prev => prev === 'normal' ? 'chart' : 'normal')}
-                >
+                <div className={`view-toggle-switch ${viewMode === 'chart' ? 'on' : ''}`}>
                   <div className="toggle-handle" />
-                </button>
+                </div>
                 <span className={`toggle-label ${viewMode === 'chart' ? 'active' : ''}`}>Charts</span>
               </div>
             </div>
