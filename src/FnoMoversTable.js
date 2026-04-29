@@ -239,12 +239,20 @@ export default function FnoMoversTable({ gainers, losers, onStockClick }) {
           display: flex;
           flex-direction: column;
           align-items: flex-end;
-          gap: 6px;
+          gap: 4px;
+          background: rgba(0, 0, 0, 0.2);
+          padding: 8px 12px;
+          border-radius: 8px;
+          border: 1px solid rgba(255, 255, 255, 0.03);
+          min-width: 110px;
         }
         .fno-price {
-          font-size: 15px;
-          font-weight: 700;
+          font-size: 20px;
+          font-weight: 900;
           color: #fff;
+          font-family: 'JetBrains Mono', monospace;
+          letter-spacing: -1px;
+          line-height: 1;
         }
         .fno-change-pill {
           display: flex;

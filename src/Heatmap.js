@@ -46,16 +46,11 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
       return;
     }
     if (tile.change_pct !== prevPct.current) {
-      const diff = Math.abs(tile.change_pct - prevPct.current);
-      if (diff < 0.005) return; // Ignore tiny noise
-
       const cls = tile.change_pct > prevPct.current ? "tile-flash-green" : "tile-flash-red";
       tileRef.current.classList.add(cls);
-      const raf = requestAnimationFrame(() => {
-        setTimeout(() => tileRef.current?.classList.remove(cls), 600);
-      });
+      const timer = setTimeout(() => tileRef.current?.classList.remove(cls), 800);
       prevPct.current = tile.change_pct;
-      return () => cancelAnimationFrame(raf);
+      return () => clearTimeout(timer);
     }
   }, [tile.change_pct]);
 
@@ -63,17 +58,17 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
   const extremeClass = isBest ? "best-gainer" : isWorst ? "worst-loser" : "";
 
   const fmt = (n) =>
-    n != null ? "\u20b9" + Math.floor(n).toLocaleString("en-IN") : "\u2014";
+    n != null ? "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
 
   const pct = (n) =>
-    n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "\u2014";
+    n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "—";
 
   return (
     <div className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""}`} ref={tileRef}>
       <div className="hm-row-1">
         <span className="hm-index-name">{tile.sector}</span>
         <span className={`hm-arrow ${tile.change_pct >= 0 ? "hm-arrow-up" : "hm-arrow-down"}`}>
-          {tile.change_pct >= 0 ? "\u25b2" : "\u25bc"}
+          {tile.change_pct >= 0 ? "▲" : "▼"}
         </span>
       </div>
 
@@ -81,31 +76,27 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
         {pct(tile.change_pct)}
       </div>
 
-      <div className="hm-divider" />
-
-      <div className="hm-stock-row" style={{ marginBottom: '4px' }}>
-        <span className="hm-row-label">TOP GAINER</span>
-        <div className="hm-stock-line">
-          <span className="hm-stock-name" style={{ minWidth: '120px' }}>{tile.top_gainer?.symbol || "Awaiting\u2026"}</span>
-          <div className="hm-stock-right">
-            <span className="hm-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
-            {tile.top_gainer?.change_pct != null && (
-              <span className="hm-stock-pill pill-stock-up">{pct(tile.top_gainer.change_pct)}</span>
-            )}
-          </div>
-        </div>
+      <div className="hm-table-header">
+        <span className="hm-th">SYMB</span>
+        <span className="hm-th hm-th-right">PRICE</span>
+        <span className="hm-th hm-th-right">CHG%</span>
       </div>
 
-      <div className="hm-stock-row" style={{ marginBottom: '0' }}>
-        <span className="hm-row-label">TOP LOSER</span>
-        <div className="hm-stock-line">
-          <span className="hm-stock-name" style={{ minWidth: '120px' }}>{tile.top_loser?.symbol || "Awaiting\u2026"}</span>
-          <div className="hm-stock-right">
-            <span className="hm-stock-price">{fmt(tile.top_loser?.ltp)}</span>
-            {tile.top_loser?.change_pct != null && (
-              <span className="hm-stock-pill pill-stock-down">{pct(tile.top_loser.change_pct)}</span>
-            )}
-          </div>
+      <div className="hm-stock-table">
+        <div className="hm-stock-row">
+          <span className="hm-stock-name">{tile.top_gainer?.symbol || "..."}</span>
+          <span className="hm-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
+          <span className={`hm-stock-pill ${tile.top_gainer?.change_pct >= 0 ? "pill-stock-up" : "pill-stock-down"}`}>
+            {pct(tile.top_gainer?.change_pct)}
+          </span>
+        </div>
+
+        <div className="hm-stock-row">
+          <span className="hm-stock-name">{tile.top_loser?.symbol || "..."}</span>
+          <span className="hm-stock-price">{fmt(tile.top_loser?.ltp)}</span>
+          <span className={`hm-stock-pill ${tile.top_loser?.change_pct >= 0 ? "pill-stock-up" : "pill-stock-down"}`}>
+            {pct(tile.top_loser?.change_pct)}
+          </span>
         </div>
       </div>
     </div>
@@ -137,10 +128,24 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     });
   }, []);
 
-  // SSE
+  // SSE + Initial Fetch
   useEffect(() => {
     let es = null;
     let timer = null;
+
+    // Fast initial load
+    const fetchInitial = async () => {
+      try {
+        const base = window.location.port === "3000" ? "http://127.0.0.1:8000" : "";
+        const res = await fetch(`${base}/api/heatmap/sectoral`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.indices) setIndices(data.indices);
+        }
+      } catch (err) {
+        console.error("Heatmap initial fetch error:", err);
+      }
+    };
 
     function connect() {
       const base = window.location.port === "3000" ? "http://127.0.0.1:8000" : "";
@@ -159,10 +164,11 @@ export default function HeatmapPage({ onBack, wsStatus }) {
       es.onerror = () => {
         setStreaming(false);
         es.close();
-        timer = setTimeout(connect, 1000);
+        timer = setTimeout(connect, 3000);
       };
     }
 
+    fetchInitial();
     connect();
 
     return () => {

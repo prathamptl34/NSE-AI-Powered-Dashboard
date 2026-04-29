@@ -267,6 +267,12 @@ function Panel({ title, accent, data, type, lastUpdated, onStockClick, viewMode,
         <span className="panel-count">{items.length} stocks</span>
       </div>
       <div className="panel-body">
+        <div className="stock-table-header">
+          <span className="th-rank">#</span>
+          <span className="th-symbol">SYMBOL</span>
+          <span className="th-price">PRICE</span>
+          <span className="th-change">CHANGE</span>
+        </div>
         {items.length === 0
           ? <SkeletonList count={5} />
           : items.map((s, i) => (
