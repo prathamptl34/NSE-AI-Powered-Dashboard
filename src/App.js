@@ -629,67 +629,7 @@ export default function App() {
               onStockClick={openExplain} 
             />
         </main>
-          <div className="historical-explorer">
-            <div className="hist-card">
-              <div className="hist-controls-box">
-                <div className="hist-field">
-                  <span className="hist-label">Select Date</span>
-                  <input 
-                    type="date" 
-                    className="hist-date-input"
-                    value={selectedDate}
-                    onChange={(e) => { setSelectedDate(e.target.value); validateDate(e.target.value); }}
-                  />
-                  {dateValidation && selectedDate && (
-                    <div className={`trading-day-bubble ${dateValidation.is_valid ? 'bubble-valid' : 'bubble-invalid'}`}>
-                      {dateValidation.is_valid ? "✓ Valid Trading Day" : `✗ ${dateValidation.message}`}
-                    </div>
-                  )}
-                </div>
 
-                <div className="hist-field">
-                  <span className="hist-label">Market Index</span>
-                  <div className="hist-btn-group">
-                    <button className={histIndex === "nifty100" ? "active" : ""} onClick={() => { setHistIndex("nifty100"); setHistoricalData(null); }}>Nifty 100</button>
-                    <button className={histIndex === "midcap100" ? "active" : ""} onClick={() => { setHistIndex("midcap100"); setHistoricalData(null); }}>Midcap 100</button>
-                  </div>
-                </div>
-
-                <button 
-                  className="hist-action-btn" 
-                  onClick={fetchHistorical} 
-                  disabled={!selectedDate || !dateValidation?.is_valid || histLoading}
-                >
-                  {histLoading ? "Loading..." : "Explore History"}
-                </button>
-              </div>
-
-              {histError && <div style={{ color: "#ef4444", fontSize: "13px", textAlign: 'center', marginBottom: "24px", fontWeight: 600 }}>✗ Error: {histError}</div>}
-              
-              {historicalData && !histLoading && (
-                <div className="panels-wrapper" style={{ padding: 0 }}>
-                  <Panel 
-                    title={`${histIndex === "nifty100" ? "Nifty 100" : "Midcap 100"} Gainers`} 
-                    accent="green" 
-                    data={historicalData.gainers} 
-                    type="gainer" 
-                    lastUpdated={selectedDate} 
-                    viewMode="normal" 
-                    historyMap={{}} 
-                  />
-                  <Panel 
-                    title={`${histIndex === "nifty100" ? "Nifty 100" : "Midcap 100"} Losers`} 
-                    accent="red" 
-                    data={historicalData.losers} 
-                    type="loser" 
-                    lastUpdated={selectedDate} 
-                    viewMode="normal" 
-                    historyMap={{}} 
-                  />
-                </div>
-              )}
-            </div>
-          </div>
         </div>
       ) : currentPage === 'insights' ? (
         <InsightsPage onBack={() => setCurrentPage('home')} wsStatus={wsStatus} />
