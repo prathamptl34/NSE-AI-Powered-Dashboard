@@ -5,16 +5,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 function formatINR(num) {
   if (num === null || num === undefined) return "—";
   return Number(num).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   });
-}
-
-function formatVol(v) {
-  if (!v || v === 0) return "—";
-  if (v >= 1e7) return (v / 1e7).toFixed(2) + " Cr";
-  if (v >= 1e5) return (v / 1e5).toFixed(1) + " L";
-  return v.toLocaleString("en-IN");
 }
 
 function getTileClass(changePct, hasData) {
@@ -61,7 +54,6 @@ function PillStrip({ indices }) {
         idx.change_pct < b.max
     ).length,
   }));
-
   return (
     <div className="heatmap-pill-strip">
       {counts.map((b) =>
@@ -75,46 +67,7 @@ function PillStrip({ indices }) {
   );
 }
 
-// ─── Stock Row (always rendered, never conditional) ───────────────────────────
-
-function StockRow({ type, stock }) {
-  const isGainer = type === "gainer";
-  const label    = isGainer ? "📈 TOP GAINER" : "📉 TOP LOSER";
-  const sign     = isGainer ? "+" : "";
-
-  if (!stock) {
-    return (
-      <div className="tile-stock-row">
-        <span className={`tile-stock-label ${isGainer ? "gainer-label" : "loser-label"}`}>
-          {label}
-        </span>
-        <div className="tile-stock-body">
-          <span className="tile-stock-symbol">Awaiting…</span>
-          <span className="tile-stock-price">—</span>
-        </div>
-        <span className="tile-volume">Vol: —</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="tile-stock-row">
-      <span className={`tile-stock-label ${isGainer ? "gainer-label" : "loser-label"}`}>
-        {label}
-      </span>
-      <div className="tile-stock-body">
-        <span className="tile-stock-symbol">{stock.symbol}</span>
-        <span className="tile-stock-price">₹{formatINR(stock.ltp)}</span>
-        <span className={`tile-change-pill ${isGainer ? "positive" : "negative"}`}>
-          {sign}{stock.change_pct.toFixed(2)}%
-        </span>
-      </div>
-      <span className="tile-volume">Vol: {formatVol(stock.volume)}</span>
-    </div>
-  );
-}
-
-// ─── Index Tile — no click handler, no expand state ───────────────────────────
+// ─── Index Tile ───────────────────────────────────────────────────────────────
 
 const IndexTile = React.memo(function IndexTile({ data }) {
   const tileRef    = useRef(null);
@@ -126,59 +79,86 @@ const IndexTile = React.memo(function IndexTile({ data }) {
   const tileClass = getTileClass(data.change_pct, hasData);
   const sign      = data.change_pct >= 0 ? "+" : "";
 
-  // RAF-based flash on change_pct update — no remount, no key change
+  // RAF-based flash on change_pct update — no remount
   useEffect(() => {
     if (data.change_pct === prevPct.current) return;
     const dir = data.change_pct > prevPct.current ? "green" : "red";
     prevPct.current = data.change_pct;
-
     if (tileRef.current) {
       tileRef.current.classList.remove("tile-flash-green", "tile-flash-red");
       rafRef.current = requestAnimationFrame(() => {
-        if (tileRef.current) {
-          tileRef.current.classList.add(`tile-flash-${dir}`);
-        }
+        if (tileRef.current) tileRef.current.classList.add(`tile-flash-${dir}`);
       });
       timeoutRef.current = setTimeout(() => {
-        if (tileRef.current) {
-          tileRef.current.classList.remove("tile-flash-green", "tile-flash-red");
-        }
+        if (tileRef.current) tileRef.current.classList.remove("tile-flash-green", "tile-flash-red");
       }, 700);
     }
-
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [data.change_pct]);
 
+  const gainer = data.top_gainer;
+  const loser  = data.top_loser;
+
   return (
     <div ref={tileRef} className={`index-tile ${tileClass}`}>
-      {/* ── Header: name + arrow ── */}
+
+      {/* ── Row 1: Index name + arrow ── */}
       <div className="tile-header">
         <span className="tile-name">{data.sector}</span>
         <span className="tile-arrow">{data.change_pct >= 0 ? "▲" : "▼"}</span>
       </div>
 
-      {/* ── Change % ── */}
+      {/* ── Row 2: Big change% ── */}
       <div className="tile-change">
         {hasData ? `${sign}${data.change_pct.toFixed(2)}%` : "—"}
       </div>
 
-      {/* ── Detail panel — ALWAYS in DOM, ALWAYS visible ── */}
-      <div className="tile-detail-panel">
-        <div className="tile-divider" />
+      {/* ── Divider ── */}
+      <hr className="tile-divider" />
 
-        {!hasData ? (
-          <div className="tile-awaiting">⏳ Awaiting data…</div>
-        ) : (
-          <>
-            <StockRow type="gainer" stock={data.top_gainer} />
-            <div className="tile-mini-divider" />
-            <StockRow type="loser" stock={data.top_loser} />
-          </>
-        )}
-      </div>
+      {!hasData ? (
+        <div className="tile-awaiting">⏳ Awaiting data…</div>
+      ) : (
+        <>
+          {/* ── TOP GAINER ── */}
+          <div className="tile-section-label gainer">📈 TOP GAINER</div>
+          <div className="tile-stock-row">
+            <span className="tile-stock-symbol">
+              {gainer?.symbol ?? "Awaiting…"}
+            </span>
+            {gainer && (
+              <span className="tile-stock-right">
+                <span className="tile-stock-price">₹{formatINR(gainer.ltp)}</span>
+                <span className={`tile-change-pill ${gainer.change_pct >= 0 ? "positive" : "negative"}`}>
+                  {gainer.change_pct >= 0 ? "+" : ""}{gainer.change_pct?.toFixed(2)}%
+                </span>
+              </span>
+            )}
+          </div>
+
+          {/* ── Divider ── */}
+          <hr className="tile-divider" />
+
+          {/* ── TOP LOSER ── */}
+          <div className="tile-section-label loser">📉 TOP LOSER</div>
+          <div className="tile-stock-row">
+            <span className="tile-stock-symbol">
+              {loser?.symbol ?? "Awaiting…"}
+            </span>
+            {loser && (
+              <span className="tile-stock-right">
+                <span className="tile-stock-price">₹{formatINR(loser.ltp)}</span>
+                <span className={`tile-change-pill ${loser.change_pct >= 0 ? "positive" : "negative"}`}>
+                  {loser.change_pct >= 0 ? "+" : ""}{loser.change_pct?.toFixed(2)}%
+                </span>
+              </span>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 });
@@ -190,10 +170,8 @@ export default function HeatmapPage({ onBack, wsStatus }) {
   const [streaming, setStreaming] = useState(false);
   const [timestamp, setTimestamp] = useState(getTimestamp());
   const [loading,   setLoading]  = useState(true);
-
   const sseRef = useRef(null);
 
-  // Merge SSE diff by sector name — avoids full re-render on every tick
   const mergeIndices = useCallback((incoming) => {
     setIndices((prev) => {
       if (!prev.length) return incoming;
@@ -222,41 +200,29 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     fetchInitial();
   }, []);
 
-  // SSE connection — mandatory EventSource.close() cleanup on unmount/toggle
+  // SSE — mandatory EventSource.close() cleanup
   useEffect(() => {
     if (!streaming) {
-      if (sseRef.current) {
-        sseRef.current.close();
-        sseRef.current = null;
-      }
+      if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
       return;
     }
-
     const isDev   = window.location.port === "3000";
     const baseUrl = isDev ? "http://127.0.0.1:8000" : "";
     const es      = new EventSource(`${baseUrl}/api/heatmap/stream`);
     sseRef.current = es;
-
     es.onmessage = (e) => {
       try {
         const data = JSON.parse(e.data);
         if (data.indices) mergeIndices(data.indices);
       } catch {}
     };
-
-    es.onerror = () => {
-      console.warn("[Heatmap SSE] connection error");
-    };
-
-    return () => {
-      es.close();
-      sseRef.current = null;
-    };
+    es.onerror = () => console.warn("[Heatmap SSE] connection error");
+    return () => { es.close(); sseRef.current = null; };
   }, [streaming, mergeIndices]);
 
   return (
     <div className="heatmap-page">
-      {/* ── Sticky Header ── */}
+      {/* ── Header ── */}
       <div className="heatmap-header">
         <div className="heatmap-header-left">
           <button className="ai-back-btn" onClick={onBack}>← Back</button>
@@ -265,10 +231,8 @@ export default function HeatmapPage({ onBack, wsStatus }) {
             <span className="heatmap-badge">NSE Live</span>
           </div>
         </div>
-
         <div className="heatmap-header-right">
           <span className="heatmap-timestamp">{timestamp}</span>
-
           <div
             className="heatmap-stream-toggle"
             onClick={() => setStreaming((s) => !s)}
@@ -277,7 +241,6 @@ export default function HeatmapPage({ onBack, wsStatus }) {
             <div className={`stream-dot ${streaming ? "dot-live" : "dot-off"}`} />
             <span>{streaming ? "Streaming ON" : "Streaming OFF"}</span>
           </div>
-
           <div className={`conn-dot conn-${wsStatus}`}>
             <span className="dot-inner" />
             <span className="dot-label">{wsStatus === "live" ? "Live" : "Offline"}</span>

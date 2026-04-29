@@ -1,4 +1,4 @@
-/* ─── Premium Design System (HSL) ────────────────────────────────────────── */
+﻿/* â”€â”€â”€ Premium Design System (HSL) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
   /* Dynamic Backgrounds */
   --bg-hsl:        222, 47%, 4%;
@@ -46,7 +46,7 @@
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* ─── Global Base ───────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Global Base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
@@ -68,7 +68,7 @@ body {
   background-attachment: fixed;
 }
 
-/* ─── Premium Buttons ─────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Premium Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .premium-btn {
   background: hsla(0,0%,100%,0.05);
   border: 1px solid var(--glass-border);
@@ -104,7 +104,7 @@ body {
   box-shadow: 0 10px 30px hsla(var(--accent-blue), 0.4);
 }
 
-/* ─── View Toggle ────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ View Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .view-toggle-container {
   display: flex;
   align-items: center;
@@ -152,7 +152,7 @@ body {
 }
 .view-toggle-switch.on .toggle-handle { transform: translateX(20px); }
 
-/* ─── Header Buttons ─────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Header Buttons â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ai-insights-btn {
   background: linear-gradient(135deg, #3b82f6, #6366f1);
   color: white;
@@ -196,7 +196,7 @@ body {
   filter: brightness(1.1);
 }
 
-/* ─── Connection Dot ─────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Connection Dot â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .conn-dot {
   display: flex;
   align-items: center;
@@ -234,7 +234,7 @@ body {
 .conn-live  .dot-label { color: var(--green); }
 .conn-offline .dot-label { color: var(--red); }
 
-/* ─── Market Clock ───────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Market Clock â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .market-clock { display: flex; align-items: baseline; gap: 5px; }
 .clock-time {
   font-size: 16px;
@@ -245,7 +245,7 @@ body {
 }
 .clock-label { font-size: 10px; color: var(--text-muted); font-weight: 500; letter-spacing: 0.5px; }
 
-/* ─── Offline Notice ─────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Offline Notice â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .offline-notice {
   background: rgba(244,63,94,0.08);
   border: 1px solid var(--red-border);
@@ -274,7 +274,7 @@ body {
 }
 .retry-btn:hover { filter: brightness(1.2); }
 
-/* ─── Section Header ─────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Section Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .section-header {
   max-width: 1280px;
   margin: 36px auto 10px;
@@ -301,7 +301,7 @@ body {
   opacity: 0.7;
 }
 
-/* ─── Panels (Glassmorphism 2.0) ────────────────────────────────────────── */
+/* â”€â”€â”€ Panels (Glassmorphism 2.0) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .panels-wrapper {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -389,7 +389,7 @@ body {
   font-weight: 400;
 }
 
-/* ─── Stock Card ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Stock Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .stock-card {
   display: grid;
   grid-template-columns: 36px 1fr auto auto;
@@ -421,7 +421,7 @@ body {
   to   { opacity: 1; transform: translateX(0); }
 }
 
-/* ─── Price Flash Animations ─────────────────────────────────────────────── */
+/* â”€â”€â”€ Price Flash Animations â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes flash-up-anim {
   0%   { background: transparent; }
   10%  { background: hsla(160, 84%, 39%, 0.15); }
@@ -437,7 +437,7 @@ body {
 .flash-up   { animation: flash-up-anim 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
 .flash-down { animation: flash-down-anim 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
 
-/* ─── Rank Badge ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Rank Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .rank {
   font-size: 11px;
   font-weight: 700;
@@ -452,7 +452,7 @@ body {
 .rank-green { color: var(--green); background: var(--green-dim); }
 .rank-red   { color: var(--red);   background: var(--red-dim); }
 
-/* ─── Stock Meta ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Stock Meta â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .stock-meta { min-width: 80px; overflow: hidden; }
 .stock-symbol {
   font-size: 13px;
@@ -470,7 +470,7 @@ body {
   display: block;
 }
 
-/* ─── Price Block ────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Price Block â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .stock-price-block { text-align: right; }
 .stock-price {
   font-size: 13px;
@@ -488,7 +488,7 @@ body {
   margin-top: 1px;
 }
 
-/* ─── Change Badge ───────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Change Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .change-badge {
   display: flex;
   align-items: center;
@@ -521,7 +521,7 @@ body {
   letter-spacing: -0.5px;
 }
 
-/* ─── Sparkline ──────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Sparkline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .sparkline-container {
   flex: 1;
   height: 44px;
@@ -550,7 +550,7 @@ body {
   border-radius: 4px;
 }
 
-/* ─── Skeleton ───────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .skeleton-card {
   height: 50px;
   border-bottom: 1px solid rgba(255,255,255,0.04);
@@ -566,7 +566,7 @@ body {
   100% { background-position: -200% 0; }
 }
 
-/* ─── Historical Explorer ────────────────────────────────────────────────── */
+/* â”€â”€â”€ Historical Explorer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .historical-explorer {
   max-width: 1280px;
   margin: 40px auto 80px;
@@ -600,7 +600,7 @@ body {
   flex-wrap: wrap;
 }
 
-/* ─── Header Layout ──────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Header Layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .header {
   display: flex;
   align-items: center;
@@ -641,7 +641,7 @@ body {
 .title-separator { color: var(--text-muted); font-size: 14px; opacity: 0.5; }
 .title-sub { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
 
-/* ─── Scanner Helpers ────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Scanner Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .scanner-error-container {
   margin: 40px 32px;
   padding: 32px;
@@ -749,7 +749,7 @@ body {
 .bubble-valid   { background: var(--green-dim); color: var(--green); border: 1px solid var(--green-border); }
 .bubble-invalid { background: var(--red-dim);   color: var(--red);   border: 1px solid var(--red-border); }
 
-/* ─── Insights & Scanner page base ──────────────────────────────────────── */
+/* â”€â”€â”€ Insights & Scanner page base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .insights-page {
   min-height: 100vh;
   background: transparent;
@@ -796,7 +796,7 @@ body {
   background: var(--blue);
 }
 
-/* ─── Mobile Nav ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Mobile Nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .mobile-nav-bar {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -827,7 +827,7 @@ body {
 .mobile-nav-item.active { color: var(--blue); }
 .mobile-nav-icon { font-size: 18px; }
 
-/* ─── AI-Insights page styles ────────────────────────────────────────────── */
+/* â”€â”€â”€ AI-Insights page styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .insights-header {
   display: flex;
   align-items: center;
@@ -871,7 +871,7 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
-/* ─── Signal Scanner styles ──────────────────────────────────────────────── */
+/* â”€â”€â”€ Signal Scanner styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .sc-header {
   display: flex;
   align-items: center;
@@ -960,7 +960,7 @@ body {
   border: 1px solid var(--glass-border);
 }
 
-/* ─── Stock Deep Dive Modal ──────────────────────────────────────────────── */
+/* â”€â”€â”€ Stock Deep Dive Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .deepdive-backdrop, .sdm-backdrop {
   position: fixed;
   inset: 0;
@@ -984,7 +984,7 @@ body {
   animation: modal-in 0.25s ease;
 }
 
-/* ─── Stock Deep Dive (New) ──────────────────────────────────────────────── */
+/* â”€â”€â”€ Stock Deep Dive (New) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .deepdive-header {
   display: flex;
   align-items: center;
@@ -1065,7 +1065,7 @@ body {
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* ─── Multi-Agent Analysis Styles ────────────────────────────────────────── */
+/* â”€â”€â”€ Multi-Agent Analysis Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .deepdive-ma-card {
   background: rgba(255,255,255,0.03);
   border: 1px solid var(--glass-border);
@@ -1226,7 +1226,7 @@ body {
 .rr-label { font-size: 12px; color: var(--text-muted); }
 .rr-value { font-size: 14px; font-weight: 700; color: var(--text-primary); }
 
-/* ─── FnO Movers ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ FnO Movers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .fno-movers-section {
   margin-bottom: 32px;
   background: var(--bg-card);
@@ -1286,7 +1286,7 @@ body {
 .fno-bg-red   { color: var(--red);   font-weight: 600; }
 .fno-empty { text-align: center !important; color: var(--text-muted); padding: 24px !important; }
 
-/* ─── Market Pulse Banner ────────────────────────────────────────────────── */
+/* â”€â”€â”€ Market Pulse Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .market-pulse-banner {
   margin: 16px 24px 8px;
   padding: 16px 24px;
@@ -1332,7 +1332,7 @@ body {
   100% { transform: scale(1); opacity: 1; }
 }
 
-/* ─── Responsive ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ Responsive â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 768px) {
   .header {
     flex-direction: column;
@@ -1419,7 +1419,7 @@ body {
   to   { transform: translateY(0); }
 }
 
-/* ─── AI Variables ────────────────────────────────────────────── */
+/* â”€â”€â”€ AI Variables â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 :root {
   --ai-green:      #10b981;
   --ai-red:        #f43f5e;
@@ -1428,7 +1428,7 @@ body {
   --ai-glow-red:   0 0 20px rgba(244,63,94,0.3);
 }
 
-/* ─── AI Insights Page ───────────────────────────────────────── */
+/* â”€â”€â”€ AI Insights Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .insights-view { min-height: 100vh; padding-bottom: 40px; }
 
 .ai-page-header {
@@ -1590,7 +1590,7 @@ body {
 .sh-signal-neutral { background: rgba(255,255,255,0.05); color: var(--text-muted); border: 1px solid var(--glass-border); }
 .sh-preview { font-size: 12px; color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ─── Signal Scanner Page ───────────────────────────────────── */
+/* â”€â”€â”€ Signal Scanner Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .scanner-page { min-height: 100vh; padding-bottom: 40px; }
 .scanner-header {
   display: flex; align-items: center; gap: 12px; padding: 16px 24px;
@@ -1722,7 +1722,7 @@ body {
   .sector-heatmap { margin: 12px 16px 0; grid-template-columns: 1fr 1fr; }
 }
 
-/* ─── Insights Page Widgets ──────────────────────────────────────────────── */
+/* â”€â”€â”€ Insights Page Widgets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .insights-secondary-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1767,9 +1767,9 @@ body {
   .insights-secondary-grid { grid-template-columns: 1fr; margin: 16px 12px; }
 }
 
-/* ─────────────────────────────────────────────────────────────────────────────
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    SECTORAL HEATMAP PAGE
-   ───────────────────────────────────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 /* Orange nav button for Heatmap */
 .premium-btn-orange {
@@ -1880,7 +1880,7 @@ body {
   animation: spin 0.8s linear infinite;
 }
 
-/* ── Tile ── */
+/* â”€â”€ Tile â”€â”€ */
 .index-tile {
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,0.15);
@@ -1889,7 +1889,7 @@ body {
   user-select: none;
   transition: transform 0.18s, filter 0.18s;
   overflow: hidden;
-  /* Uniform height — always-visible detail panel makes every tile the same size */
+  /* Uniform height â€” always-visible detail panel makes every tile the same size */
   min-height: 200px;
   display: flex;
   flex-direction: column;
@@ -1921,7 +1921,7 @@ body {
   margin-bottom: 4px;
 }
 
-/* Always-visible detail panel — no transition, no max-height trick */
+/* Always-visible detail panel â€” no transition, no max-height trick */
 .tile-detail-panel {
   flex: 1;
   display: flex;
@@ -1950,8 +1950,8 @@ body {
   letter-spacing: 1px;
   margin-bottom: 1px;
 }
-.gainer-label { color: #86efac; }  /* light green — visible on dark green bg */
-.loser-label  { color: #fca5a5; }  /* light red — visible on dark red bg   */
+.gainer-label { color: #86efac; }  /* light green â€” visible on dark green bg */
+.loser-label  { color: #fca5a5; }  /* light red â€” visible on dark red bg   */
 
 .tile-stock-body {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
@@ -1985,7 +1985,7 @@ body {
 .tile-change-pill.positive { background: rgba(0,0,0,0.28); }
 .tile-change-pill.negative { background: rgba(0,0,0,0.28); }
 
-/* FIX 2: Volume text — 85% white opacity (up from 55%) */
+/* FIX 2: Volume text â€” 85% white opacity (up from 55%) */
 .tile-volume {
   font-size: 10px;
   color: rgba(255,255,255,0.85);
@@ -2001,7 +2001,7 @@ body {
 .tile-flash-green { animation: flash-up-anim   0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
 .tile-flash-red   { animation: flash-down-anim 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
 
-/* ── Mobile ── */
+/* â”€â”€ Mobile â”€â”€ */
 @media (max-width: 1100px) { .heatmap-grid { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 900px)  { .heatmap-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 600px)  { .heatmap-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -2010,4 +2010,102 @@ body {
   .heatmap-header { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
   .heatmap-body   { padding: 12px 16px 24px; }
   .heatmap-pills-row { padding: 10px 16px 0; }
+}
+
+
+/* ── Tile ── */
+.index-tile {
+  min-height: 200px;
+  height: 200px;
+  padding: 14px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 4px;
+  border: 1px solid rgba(255,255,255,0.12);
+  box-sizing: border-box;
+  overflow: hidden;
+  transition: transform 0.18s, filter 0.18s;
+  cursor: default;
+  user-select: none;
+}
+.index-tile:hover { filter: brightness(1.1); transform: translateY(-2px); }
+.index-tile.positive { background: hsl(142, 71%, 30%); }
+.index-tile.negative { background: hsl(0,   70%, 40%); }
+.index-tile.flat     { background: hsl(215, 16%, 30%); }
+
+/* Index Name Row */
+.tile-header { display: flex; justify-content: space-between; align-items: center; }
+.tile-name {
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.9);
+  letter-spacing: 0.5px; text-transform: uppercase;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85%;
+}
+.tile-arrow { font-size: 12px; color: rgba(255,255,255,0.8); flex-shrink: 0; }
+
+/* Big Change% */
+.tile-change {
+  font-size: 26px; font-weight: 800; color: #FFFFFF;
+  line-height: 1.1; margin: 2px 0;
+}
+
+/* Divider */
+.tile-divider { border: none; border-top: 1px solid rgba(255,255,255,0.2); margin: 4px 0; }
+
+/* Section Label */
+.tile-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; margin-bottom: 1px; line-height: 1.2;
+}
+.tile-section-label.gainer { color: #86efac; }
+.tile-section-label.loser  { color: #fca5a5; }
+
+/* Stock Row: name left, price+pill right — one line, never wraps */
+.tile-stock-row {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 4px; width: 100%; overflow: hidden;
+}
+.tile-stock-symbol {
+  font-size: 13px; font-weight: 700; color: #FFFFFF;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex-shrink: 1; max-width: 45%;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.35);
+}
+.tile-stock-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.tile-stock-price { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.95); white-space: nowrap; }
+.tile-change-pill {
+  font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+  white-space: nowrap; color: #FFFFFF;
+}
+.tile-change-pill.positive { background: rgba(0,0,0,0.22); }
+.tile-change-pill.negative { background: rgba(0,0,0,0.22); }
+.tile-awaiting { font-size: 11px; color: rgba(255,255,255,0.5); padding: 4px 0; }
+
+/* Flash animations */
+.tile-flash-green { animation: flash-up-anim   0.7s cubic-bezier(0.2,0.8,0.2,1) forwards; }
+.tile-flash-red   { animation: flash-down-anim 0.7s cubic-bezier(0.2,0.8,0.2,1) forwards; }
+
+/* Heatmap Grid */
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px; padding: 16px; align-items: start;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+  .heatmap-grid { grid-template-columns: repeat(4, 1fr); }
+  .index-tile   { height: 210px; min-height: 210px; }
+}
+@media (max-width: 768px) {
+  .heatmap-grid  { grid-template-columns: repeat(3, 1fr); }
+  .index-tile    { height: 220px; min-height: 220px; }
+  .heatmap-header    { padding: 12px 16px; flex-direction: column; align-items: flex-start; }
+  .heatmap-body      { padding: 4px 0 24px; }
+  .heatmap-pills-row { padding: 10px 16px 0; }
+}
+@media (max-width: 480px) {
+  .heatmap-grid { grid-template-columns: repeat(2, 1fr); }
+  .index-tile   { height: 220px; min-height: 220px; }
 }
