@@ -69,102 +69,91 @@ function PillStrip({ indices }) {
 
 // ─── Index Tile ───────────────────────────────────────────────────────────────
 
-const IndexTile = React.memo(function IndexTile({ data }) {
-  const tileRef    = useRef(null);
-  const prevPct    = useRef(data.change_pct);
-  const rafRef     = useRef(null);
-  const timeoutRef = useRef(null);
+const IndexTile = React.memo(({ tile }) => {
+  const tileRef = useRef(null);
+  const prevLtp = useRef(null);
 
-  const hasData   = data.constituent_count > 0;
-  const tileClass = getTileClass(data.change_pct, hasData);
-  const sign      = data.change_pct >= 0 ? "+" : "";
-
-  // RAF-based flash on change_pct update — no remount
+  // Price flash on change
   useEffect(() => {
-    if (data.change_pct === prevPct.current) return;
-    const dir = data.change_pct > prevPct.current ? "green" : "red";
-    prevPct.current = data.change_pct;
-    if (tileRef.current) {
-      tileRef.current.classList.remove("tile-flash-green", "tile-flash-red");
-      rafRef.current = requestAnimationFrame(() => {
-        if (tileRef.current) tileRef.current.classList.add(`tile-flash-${dir}`);
-      });
-      timeoutRef.current = setTimeout(() => {
-        if (tileRef.current) tileRef.current.classList.remove("tile-flash-green", "tile-flash-red");
-      }, 700);
+    if (!tileRef.current || prevLtp.current === null) {
+      prevLtp.current = tile.change_pct;
+      return;
     }
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [data.change_pct]);
+    if (tile.change_pct !== prevLtp.current) {
+      const cls = tile.change_pct > prevLtp.current
+        ? 'tile-flash-green' : 'tile-flash-red';
+      tileRef.current.classList.add(cls);
+      const raf = requestAnimationFrame(() => {
+        setTimeout(() => {
+          tileRef.current?.classList.remove(cls);
+        }, 600);
+      });
+      prevLtp.current = tile.change_pct;
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [tile.change_pct]);
 
-  const gainer = data.top_gainer;
-  const loser  = data.top_loser;
+  const tileClass = `index-tile ${
+    tile.change_pct > 0 ? 'positive' :
+    tile.change_pct < 0 ? 'negative' : 'flat'
+  }`;
+
+  const fmt = (n) => n != null
+    ? `₹${Number(n).toLocaleString('en-IN', { maximumFractionDigits: 1 })}`
+    : '—';
+
+  const pct = (n) => n != null
+    ? `${n >= 0 ? '+' : ''}${Number(n).toFixed(2)}%`
+    : '—';
 
   return (
-    <div ref={tileRef} className={`index-tile ${tileClass}`}>
+    <div className={tileClass} ref={tileRef}>
 
-      {/* ── Row 1: Index name + arrow ── */}
+      {/* Index Name + Arrow */}
       <div className="tile-header">
-        <span className="tile-index-name">{data.sector}</span>
-        <span className="tile-arrow">{data.change_pct >= 0 ? "▲" : "▼"}</span>
+        <span className="tile-index-name">{tile.sector}</span>
+        <span className="tile-arrow">
+          {tile.change_pct > 0 ? '▲' : tile.change_pct < 0 ? '▼' : '●'}
+        </span>
       </div>
 
-      {/* ── Row 2: Big change% ── */}
-      <div className="tile-change">
-        {hasData ? `${sign}${data.change_pct.toFixed(2)}%` : "—"}
-      </div>
+      {/* Big Change% */}
+      <div className="tile-change-pct">{pct(tile.change_pct)}</div>
 
-      {/* ── Divider ── */}
       <hr className="tile-divider" />
 
-      {!hasData ? (
-        <div className="tile-awaiting">⏳ Awaiting data…</div>
-      ) : (
-        <>
-          {/* ── TOP GAINER ── */}
-          <div className="tile-section-label gainer">📈 TOP GAINER</div>
-          <div className="tile-stock-row">
-            <span className="tile-stock-symbol">
-              {gainer?.symbol || gainer?.name || "—"}
+      {/* TOP GAINER */}
+      <div className="tile-section-label gainer">TOP GAINER</div>
+      <div className="tile-stock-row">
+        <span className="tile-stock-symbol">
+          {tile.top_gainer?.symbol || tile.top_gainer?.name || 'Awaiting…'}
+        </span>
+        <span className="tile-stock-right">
+          <span className="tile-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
+          {tile.top_gainer?.change_pct != null && (
+            <span className="tile-change-pill positive">
+              {pct(tile.top_gainer.change_pct)}
             </span>
-            <span className="tile-stock-right">
-              <span className="tile-stock-price">
-                ₹{gainer?.ltp?.toLocaleString("en-IN") ?? "—"}
-              </span>
-              <span className={`tile-change-pill ${
-                (gainer?.change_pct ?? 0) >= 0 ? "positive" : "negative"
-              }`}>
-                {(gainer?.change_pct ?? 0) >= 0 ? "+" : ""}
-                {gainer?.change_pct?.toFixed(2) ?? "—"}%
-              </span>
-            </span>
-          </div>
+          )}
+        </span>
+      </div>
 
-          {/* ── Divider ── */}
-          <hr className="tile-divider" />
+      {/* TOP LOSER */}
+      <div className="tile-section-label loser">TOP LOSER</div>
+      <div className="tile-stock-row">
+        <span className="tile-stock-symbol">
+          {tile.top_loser?.symbol || tile.top_loser?.name || 'Awaiting…'}
+        </span>
+        <span className="tile-stock-right">
+          <span className="tile-stock-price">{fmt(tile.top_loser?.ltp)}</span>
+          {tile.top_loser?.change_pct != null && (
+            <span className="tile-change-pill negative">
+              {pct(tile.top_loser.change_pct)}
+            </span>
+          )}
+        </span>
+      </div>
 
-          {/* ── TOP LOSER ── */}
-          <div className="tile-section-label loser">📉 TOP LOSER</div>
-          <div className="tile-stock-row">
-            <span className="tile-stock-symbol">
-              {loser?.symbol || loser?.name || "—"}
-            </span>
-            <span className="tile-stock-right">
-              <span className="tile-stock-price">
-                ₹{loser?.ltp?.toLocaleString("en-IN") ?? "—"}
-              </span>
-              <span className={`tile-change-pill ${
-                (loser?.change_pct ?? 0) >= 0 ? "positive" : "negative"
-              }`}>
-                {(loser?.change_pct ?? 0) >= 0 ? "+" : ""}
-                {loser?.change_pct?.toFixed(2) ?? "—"}%
-              </span>
-            </span>
-          </div>
-        </>
-      )}
     </div>
   );
 });
@@ -275,7 +264,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
         ) : (
           <div className="heatmap-grid">
             {indices.map((idx) => (
-              <IndexTile key={idx.sector} data={idx} />
+              <IndexTile key={idx.sector} tile={idx} />
             ))}
           </div>
         )}
