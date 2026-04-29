@@ -46,6 +46,9 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
       return;
     }
     if (tile.change_pct !== prevPct.current) {
+      const diff = Math.abs(tile.change_pct - prevPct.current);
+      if (diff < 0.005) return; // Ignore tiny noise
+
       const cls = tile.change_pct > prevPct.current ? "tile-flash-green" : "tile-flash-red";
       tileRef.current.classList.add(cls);
       const raf = requestAnimationFrame(() => {
@@ -68,13 +71,13 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
   return (
     <div className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""}`} ref={tileRef}>
       <div className="hm-row-1">
-        <span className="hm-index-name" style={{ fontSize: '13px', fontWeight: 600 }}>{tile.sector}</span>
+        <span className="hm-index-name">{tile.sector}</span>
         <span className={`hm-arrow ${tile.change_pct >= 0 ? "hm-arrow-up" : "hm-arrow-down"}`}>
           {tile.change_pct >= 0 ? "\u25b2" : "\u25bc"}
         </span>
       </div>
 
-      <div className={`hm-row-2 ${tile.change_pct > 0 ? "hm-pct-pos" : tile.change_pct < 0 ? "hm-pct-neg" : "hm-pct-zero"}`} style={{ fontSize: '28px', fontWeight: 800 }}>
+      <div className={`hm-row-2 ${tile.change_pct > 0 ? "hm-pct-pos" : tile.change_pct < 0 ? "hm-pct-neg" : "hm-pct-zero"}`}>
         {pct(tile.change_pct)}
       </div>
 
@@ -111,7 +114,7 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
 
 // ─── Main Heatmap Page ────────────────────────────────────────────────────────
 
-export default function HeatmapPage() {
+export default function HeatmapPage({ onBack, wsStatus }) {
   const [indices, setIndices] = useState([]);
   const [streaming, setStreaming] = useState(false);
   const [timeStr, setTimeStr] = useState(getISTTime());
@@ -207,12 +210,19 @@ export default function HeatmapPage() {
       {/* ── Terminal Header ── */}
       <header className="hm-terminal-header">
         <div className="hm-header-left">
-          <div className="hm-brand-line">&#x1F525; Market Pulse</div>
-          <div className="hm-status-line">
-            <span className={`hm-status-dot ${streaming ? "hm-dot-live" : "hm-dot-off"}`} />
-            <span className={streaming ? "hm-text-live" : "hm-text-off"}>
-              {streaming ? "\u25cf LIVE" : "\u25cf Streaming OFF"}
-            </span>
+          {onBack && (
+            <button className="hm-back-btn" onClick={onBack}>
+              ← Back
+            </button>
+          )}
+          <div className="hm-brand-group">
+            <div className="hm-brand-line">🔥 Market Heatmap</div>
+            <div className="hm-status-line">
+              <span className={`hm-status-dot ${streaming ? "hm-dot-live" : "hm-dot-off"}`} />
+              <span className={streaming ? "hm-text-live" : "hm-text-off"}>
+                {streaming ? "LIVE" : "OFFLINE"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -224,23 +234,20 @@ export default function HeatmapPage() {
           <div 
             className={`hm-pill pill-gain ${activeFilter === "gainers" ? "active" : ""}`}
             onClick={() => toggleFilter("gainers")}
-            style={{ cursor: 'pointer' }}
           >
-            &#9650; &gt;1% {stats.g}
+            ▲ &gt;1% {stats.g}
           </div>
           <div 
             className={`hm-pill pill-flat ${activeFilter === "flat" ? "active" : ""}`}
             onClick={() => toggleFilter("flat")}
-            style={{ cursor: 'pointer' }}
           >
-            &#8212; Flat {stats.f}
+            ● Flat {stats.f}
           </div>
           <div 
             className={`hm-pill pill-loss ${activeFilter === "losers" ? "active" : ""}`}
             onClick={() => toggleFilter("losers")}
-            style={{ cursor: 'pointer' }}
           >
-            &#9660; &lt;-1% {stats.l}
+            ▼ &lt;-1% {stats.l}
           </div>
         </div>
       </header>
