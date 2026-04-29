@@ -84,12 +84,10 @@ const IndexTile = React.memo(({ tile }) => {
         <span className="tile-stock-symbol">
           {tile.top_gainer?.symbol || tile.top_gainer?.name || "Awaiting\u2026"}
         </span>
-        <span className="tile-stock-right">
-          <span className="tile-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
-          {tile.top_gainer?.change_pct != null && (
-            <span className="tile-change-pill positive">{pct(tile.top_gainer.change_pct)}</span>
-          )}
-        </span>
+        <span className="tile-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
+        {tile.top_gainer?.change_pct != null && (
+          <span className="tile-change-pill positive">{pct(tile.top_gainer.change_pct)}</span>
+        )}
       </div>
 
       <div className="tile-section-label loser">TOP LOSER</div>
@@ -97,13 +95,12 @@ const IndexTile = React.memo(({ tile }) => {
         <span className="tile-stock-symbol">
           {tile.top_loser?.symbol || tile.top_loser?.name || "Awaiting\u2026"}
         </span>
-        <span className="tile-stock-right">
-          <span className="tile-stock-price">{fmt(tile.top_loser?.ltp)}</span>
-          {tile.top_loser?.change_pct != null && (
-            <span className="tile-change-pill negative">{pct(tile.top_loser.change_pct)}</span>
-          )}
-        </span>
+        <span className="tile-stock-price">{fmt(tile.top_loser?.ltp)}</span>
+        {tile.top_loser?.change_pct != null && (
+          <span className="tile-change-pill negative">{pct(tile.top_loser.change_pct)}</span>
+        )}
       </div>
+
     </div>
   );
 });
