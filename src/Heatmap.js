@@ -30,15 +30,13 @@ function SkeletonTile() {
     <div className="index-tile skeleton-tile">
       <div style={{ height: '14px', width: '50%', background: '#222', margin: '12px', borderRadius: '2px' }} />
       <div style={{ height: '36px', width: '80%', background: '#222', margin: '0 12px 12px 12px', borderRadius: '4px' }} />
-      <div style={{ height: '1px', background: '#222', margin: '0 12px 12px 12px' }} />
-      <div style={{ height: '40px', background: '#222', margin: '0 12px 12px 12px', borderRadius: '4px' }} />
     </div>
   );
 }
 
 // ─── Index Tile ───────────────────────────────────────────────────────────────
 
-const IndexTile = React.memo(({ tile, isBest, isWorst }) => {
+const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
   const tileRef = useRef(null);
   const prevPct = useRef(null);
 
@@ -68,24 +66,24 @@ const IndexTile = React.memo(({ tile, isBest, isWorst }) => {
     n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "\u2014";
 
   return (
-    <div className={`index-tile ${intensityClass} ${extremeClass}`} ref={tileRef}>
+    <div className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""}`} ref={tileRef}>
       <div className="hm-row-1">
-        <span className="hm-index-name">{tile.sector}</span>
+        <span className="hm-index-name" style={{ fontSize: '13px', fontWeight: 600 }}>{tile.sector}</span>
         <span className={`hm-arrow ${tile.change_pct >= 0 ? "hm-arrow-up" : "hm-arrow-down"}`}>
           {tile.change_pct >= 0 ? "\u25b2" : "\u25bc"}
         </span>
       </div>
 
-      <div className={`hm-row-2 ${tile.change_pct > 0 ? "hm-pct-pos" : tile.change_pct < 0 ? "hm-pct-neg" : "hm-pct-zero"}`}>
+      <div className={`hm-row-2 ${tile.change_pct > 0 ? "hm-pct-pos" : tile.change_pct < 0 ? "hm-pct-neg" : "hm-pct-zero"}`} style={{ fontSize: '28px', fontWeight: 800 }}>
         {pct(tile.change_pct)}
       </div>
 
       <div className="hm-divider" />
 
-      <div className="hm-stock-row">
+      <div className="hm-stock-row" style={{ marginBottom: '4px' }}>
         <span className="hm-row-label">TOP GAINER</span>
         <div className="hm-stock-line">
-          <span className="hm-stock-name">{tile.top_gainer?.symbol || "Awaiting\u2026"}</span>
+          <span className="hm-stock-name" style={{ minWidth: '120px' }}>{tile.top_gainer?.symbol || "Awaiting\u2026"}</span>
           <div className="hm-stock-right">
             <span className="hm-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
             {tile.top_gainer?.change_pct != null && (
@@ -95,10 +93,10 @@ const IndexTile = React.memo(({ tile, isBest, isWorst }) => {
         </div>
       </div>
 
-      <div className="hm-stock-row">
+      <div className="hm-stock-row" style={{ marginBottom: '0' }}>
         <span className="hm-row-label">TOP LOSER</span>
         <div className="hm-stock-line">
-          <span className="hm-stock-name">{tile.top_loser?.symbol || "Awaiting\u2026"}</span>
+          <span className="hm-stock-name" style={{ minWidth: '120px' }}>{tile.top_loser?.symbol || "Awaiting\u2026"}</span>
           <div className="hm-stock-right">
             <span className="hm-stock-price">{fmt(tile.top_loser?.ltp)}</span>
             {tile.top_loser?.change_pct != null && (
@@ -117,6 +115,7 @@ export default function HeatmapPage() {
   const [indices, setIndices] = useState([]);
   const [streaming, setStreaming] = useState(false);
   const [timeStr, setTimeStr] = useState(getISTTime());
+  const [activeFilter, setActiveFilter] = useState(null); // gainers, flat, losers
   const sseRef = useRef(null);
 
   // Live clock
@@ -135,7 +134,7 @@ export default function HeatmapPage() {
     });
   }, []);
 
-  // SSE: Immediate Connect + Reconnect
+  // SSE
   useEffect(() => {
     let es = null;
     let timer = null;
@@ -191,6 +190,18 @@ export default function HeatmapPage() {
     return { g, f, l };
   }, [indices]);
 
+  const toggleFilter = (type) => {
+    setActiveFilter(activeFilter === type ? null : type);
+  };
+
+  const getIsDimmed = (idx) => {
+    if (!activeFilter) return false;
+    if (activeFilter === "gainers") return idx.change_pct <= 1;
+    if (activeFilter === "losers") return idx.change_pct >= -1;
+    if (activeFilter === "flat") return idx.change_pct > 1 || idx.change_pct < -1;
+    return false;
+  };
+
   return (
     <div className="heatmap-wrapper">
       {/* ── Terminal Header ── */}
@@ -210,13 +221,25 @@ export default function HeatmapPage() {
         </div>
 
         <div className="hm-header-right">
-          <div className="hm-pill pill-gain">
+          <div 
+            className={`hm-pill pill-gain ${activeFilter === "gainers" ? "active" : ""}`}
+            onClick={() => toggleFilter("gainers")}
+            style={{ cursor: 'pointer' }}
+          >
             &#9650; &gt;1% {stats.g}
           </div>
-          <div className="hm-pill pill-flat">
+          <div 
+            className={`hm-pill pill-flat ${activeFilter === "flat" ? "active" : ""}`}
+            onClick={() => toggleFilter("flat")}
+            style={{ cursor: 'pointer' }}
+          >
             &#8212; Flat {stats.f}
           </div>
-          <div className="hm-pill pill-loss">
+          <div 
+            className={`hm-pill pill-loss ${activeFilter === "losers" ? "active" : ""}`}
+            onClick={() => toggleFilter("losers")}
+            style={{ cursor: 'pointer' }}
+          >
             &#9660; &lt;-1% {stats.l}
           </div>
         </div>
@@ -231,6 +254,7 @@ export default function HeatmapPage() {
                 tile={idx} 
                 isBest={idx.sector === extremes.best}
                 isWorst={idx.sector === extremes.worst}
+                isDimmed={getIsDimmed(idx)}
               />
             ))
           : Array.from({ length: 21 }).map((_, i) => (
