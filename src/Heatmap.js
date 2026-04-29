@@ -2,28 +2,25 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const SECTOR_SLOTS = 24; // 4 rows x 6 cols
-
 function getISTTime() {
-  return new Date().toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).replace(",", " ") + " IST";
+  const d = new Date();
+  const day = d.getDate().toString().padStart(2, '0');
+  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = monthNames[d.getMonth()];
+  const year = d.getFullYear();
+  const h = d.getHours().toString().padStart(2, '0');
+  const m = d.getMinutes().toString().padStart(2, '0');
+  const s = d.getSeconds().toString().padStart(2, '0');
+  return `${day} ${month} ${year}  ${h}:${m}:${s} IST`;
 }
 
 function getIntensityClass(pct) {
-  if (pct >= 1.5) return "hm-intensity-green-3";
-  if (pct >= 0.5) return "hm-intensity-green-2";
-  if (pct >= 0) return "hm-intensity-green-1";
-  if (pct > -0.5) return "hm-intensity-red-1";
-  if (pct > -1.5) return "hm-intensity-red-2";
-  return "hm-intensity-red-3";
+  if (pct >= 2.0) return "intensity-g3";
+  if (pct >= 1.0) return "intensity-g2";
+  if (pct >= 0) return "intensity-g1";
+  if (pct > -1.0) return "intensity-r1";
+  if (pct > -2.0) return "intensity-r2";
+  return "intensity-r3";
 }
 
 // ─── Skeleton Tile ────────────────────────────────────────────────────────────
@@ -31,18 +28,17 @@ function getIntensityClass(pct) {
 function SkeletonTile() {
   return (
     <div className="index-tile skeleton-tile">
-      <div style={{ width: '60%', height: '14px', background: '#222', borderRadius: '4px', marginBottom: '12px' }} />
-      <div style={{ width: '80%', height: '36px', background: '#222', borderRadius: '4px', marginBottom: '16px' }} />
-      <div style={{ borderTop: '1px solid #222', marginBottom: '12px' }} />
-      <div style={{ width: '100%', height: '20px', background: '#222', borderRadius: '4px', marginBottom: '8px' }} />
-      <div style={{ width: '100%', height: '20px', background: '#222', borderRadius: '4px' }} />
+      <div style={{ height: '14px', width: '50%', background: '#222', margin: '12px', borderRadius: '2px' }} />
+      <div style={{ height: '36px', width: '80%', background: '#222', margin: '0 12px 12px 12px', borderRadius: '4px' }} />
+      <div style={{ height: '1px', background: '#222', margin: '0 12px 12px 12px' }} />
+      <div style={{ height: '40px', background: '#222', margin: '0 12px 12px 12px', borderRadius: '4px' }} />
     </div>
   );
 }
 
 // ─── Index Tile ───────────────────────────────────────────────────────────────
 
-const IndexTile = React.memo(({ tile, isBiggestGainer, isBiggestLoser }) => {
+const IndexTile = React.memo(({ tile, isBest, isWorst }) => {
   const tileRef = useRef(null);
   const prevPct = useRef(null);
 
@@ -63,54 +59,52 @@ const IndexTile = React.memo(({ tile, isBiggestGainer, isBiggestLoser }) => {
   }, [tile.change_pct]);
 
   const intensityClass = getIntensityClass(tile.change_pct);
-  const borderClass = isBiggestGainer ? "biggest-gainer-border" : isBiggestLoser ? "biggest-loser-border" : "";
+  const extremeClass = isBest ? "best-gainer" : isWorst ? "worst-loser" : "";
 
   const fmt = (n) =>
-    n != null
-      ? "\u20b9" + Math.floor(n).toLocaleString("en-IN")
-      : "\u2014";
+    n != null ? "\u20b9" + Math.floor(n).toLocaleString("en-IN") : "\u2014";
 
   const pct = (n) =>
     n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "\u2014";
 
-  // Compute font size for sector name
-  const nameLen = tile.sector.length;
-  const nameFontSize = nameLen > 16 ? "10px" : "11px";
-
   return (
-    <div className={`index-tile ${intensityClass} ${borderClass}`} ref={tileRef}>
-      <div className="tile-header">
-        <span className="tile-index-name" style={{ fontSize: nameFontSize, fontWeight: 600 }}>{tile.sector}</span>
-        <span className="tile-arrow">
-          {tile.change_pct > 0 ? "\u25b2" : tile.change_pct < 0 ? "\u25bc" : "\u25cf"}
+    <div className={`index-tile ${intensityClass} ${extremeClass}`} ref={tileRef}>
+      <div className="hm-row-1">
+        <span className="hm-index-name">{tile.sector}</span>
+        <span className={`hm-arrow ${tile.change_pct >= 0 ? "hm-arrow-up" : "hm-arrow-down"}`}>
+          {tile.change_pct >= 0 ? "\u25b2" : "\u25bc"}
         </span>
       </div>
 
-      <div className={`tile-change-pct ${tile.change_pct >= 0 ? "text-green" : "text-red"}`} style={{ fontWeight: 700 }}>
+      <div className={`hm-row-2 ${tile.change_pct > 0 ? "hm-pct-pos" : tile.change_pct < 0 ? "hm-pct-neg" : "hm-pct-zero"}`}>
         {pct(tile.change_pct)}
       </div>
 
-      <div className="tile-divider" />
+      <div className="hm-divider" />
 
-      <div className="tile-row-block">
-        <div className="tile-label">TOP GAINER</div>
-        <div className="tile-stock-line">
-          <span className="stock-name" style={{ fontWeight: 500 }}>{tile.top_gainer?.symbol || "Awaiting\u2026"}</span>
-          <span className="stock-price">{fmt(tile.top_gainer?.ltp)}</span>
-          {tile.top_gainer?.change_pct != null && (
-            <span className="stock-badge bg-green">{pct(tile.top_gainer.change_pct)}</span>
-          )}
+      <div className="hm-stock-row">
+        <span className="hm-row-label">TOP GAINER</span>
+        <div className="hm-stock-line">
+          <span className="hm-stock-name">{tile.top_gainer?.symbol || "Awaiting\u2026"}</span>
+          <div className="hm-stock-right">
+            <span className="hm-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
+            {tile.top_gainer?.change_pct != null && (
+              <span className="hm-stock-pill pill-stock-up">{pct(tile.top_gainer.change_pct)}</span>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="tile-row-block">
-        <div className="tile-label">TOP LOSER</div>
-        <div className="tile-stock-line">
-          <span className="stock-name" style={{ fontWeight: 500 }}>{tile.top_loser?.symbol || "Awaiting\u2026"}</span>
-          <span className="stock-price">{fmt(tile.top_loser?.ltp)}</span>
-          {tile.top_loser?.change_pct != null && (
-            <span className="stock-badge bg-red">{pct(tile.top_loser.change_pct)}</span>
-          )}
+      <div className="hm-stock-row">
+        <span className="hm-row-label">TOP LOSER</span>
+        <div className="hm-stock-line">
+          <span className="hm-stock-name">{tile.top_loser?.symbol || "Awaiting\u2026"}</span>
+          <div className="hm-stock-right">
+            <span className="hm-stock-price">{fmt(tile.top_loser?.ltp)}</span>
+            {tile.top_loser?.change_pct != null && (
+              <span className="hm-stock-pill pill-stock-down">{pct(tile.top_loser.change_pct)}</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -119,8 +113,8 @@ const IndexTile = React.memo(({ tile, isBiggestGainer, isBiggestLoser }) => {
 
 // ─── Main Heatmap Page ────────────────────────────────────────────────────────
 
-export default function HeatmapPage({ onBack, wsStatus }) {
-  const [indices, setIndices] = useState([]);   
+export default function HeatmapPage() {
+  const [indices, setIndices] = useState([]);
   const [streaming, setStreaming] = useState(false);
   const [timeStr, setTimeStr] = useState(getISTTime());
   const sseRef = useRef(null);
@@ -131,7 +125,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     return () => clearInterval(id);
   }, []);
 
-  // Merge updates
+  // Merge logic
   const mergeIndices = useCallback((incoming) => {
     setIndices((prev) => {
       if (!prev.length) return incoming;
@@ -141,10 +135,10 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     });
   }, []);
 
-  // SSE: Immediate Connection
+  // SSE: Immediate Connect + Reconnect
   useEffect(() => {
     let es = null;
-    let retryTimer = null;
+    let timer = null;
 
     function connect() {
       const base = window.location.port === "3000" ? "http://127.0.0.1:8000" : "";
@@ -163,88 +157,86 @@ export default function HeatmapPage({ onBack, wsStatus }) {
       es.onerror = () => {
         setStreaming(false);
         es.close();
-        retryTimer = setTimeout(connect, 1000);
+        timer = setTimeout(connect, 1000);
       };
     }
 
-    connect(); // Connect immediately on mount
+    connect();
 
     return () => {
-      clearTimeout(retryTimer);
+      clearTimeout(timer);
       if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
     };
   }, [mergeIndices]);
 
-  // Find extremes
+  // Derived Extremes
   const extremes = useMemo(() => {
-    if (!indices.length) return { gainer: null, loser: null };
-    let gainer = indices[0], loser = indices[0];
+    if (!indices.length) return { best: null, worst: null };
+    let bestIdx = indices[0], worstIdx = indices[0];
     indices.forEach(idx => {
-      if (idx.change_pct > gainer.change_pct) gainer = idx;
-      if (idx.change_pct < loser.change_pct) loser = idx;
+      if (idx.change_pct > bestIdx.change_pct) bestIdx = idx;
+      if (idx.change_pct < worstIdx.change_pct) worstIdx = idx;
     });
-    return { gainer: gainer.sector, loser: loser.sector };
+    return { best: bestIdx.sector, worst: worstIdx.sector };
   }, [indices]);
 
-  // Stats
+  // Stats for pills
   const stats = useMemo(() => {
-    let gainers = 0, flat = 0, losers = 0;
-    indices.forEach((idx) => {
-      if (idx.change_pct > 1) gainers++;
-      else if (idx.change_pct < -1) losers++;
-      else flat++;
+    let g = 0, f = 0, l = 0;
+    indices.forEach(idx => {
+      if (idx.change_pct > 1) g++;
+      else if (idx.change_pct < -1) l++;
+      else f++;
     });
-    return { gainers, flat, losers };
+    return { g, f, l };
   }, [indices]);
 
   return (
-    <div className="heatmap-page">
-      {/* ── Compact Header ── */}
+    <div className="heatmap-wrapper">
+      {/* ── Terminal Header ── */}
       <header className="hm-terminal-header">
-        <div className="header-left">
-          <div className="brand-line">&#x1F525; Market Pulse</div>
-          <div className="status-line">
-            <span className={`status-dot ${streaming ? "dot-live" : "dot-off"}`} />
-            <span className={streaming ? "text-live" : "text-off"}>
-              {streaming ? "LIVE" : "Streaming OFF"}
+        <div className="hm-header-left">
+          <div className="hm-brand-line">&#x1F525; Market Pulse</div>
+          <div className="hm-status-line">
+            <span className={`hm-status-dot ${streaming ? "hm-dot-live" : "hm-dot-off"}`} />
+            <span className={streaming ? "hm-text-live" : "hm-text-off"}>
+              {streaming ? "\u25cf LIVE" : "\u25cf Streaming OFF"}
             </span>
           </div>
         </div>
 
-        <div className="header-center">
-          <div className="ist-clock" style={{ color: '#aaa' }}>{timeStr}</div>
+        <div className="hm-header-center">
+          {timeStr}
         </div>
 
-        <div className="header-right">
-          <div className="hm-pill-badge bg-green">
-            &#9650; &gt;1% {stats.gainers}
+        <div className="hm-header-right">
+          <div className="hm-pill pill-gain">
+            &#9650; &gt;1% {stats.g}
           </div>
-          <div className="hm-pill-badge bg-flat">
-            &#8212; Flat {stats.flat}
+          <div className="hm-pill pill-flat">
+            &#8212; Flat {stats.f}
           </div>
-          <div className="hm-pill-badge bg-red">
-            &#9660; &lt;-1% {stats.losers}
+          <div className="hm-pill pill-loss">
+            &#9660; &lt;-1% {stats.l}
           </div>
         </div>
       </header>
 
       {/* ── Grid ── */}
-      <div className="hm-terminal-body">
-        <div className="hm-terminal-grid">
-          {indices.length > 0
-            ? indices.map((idx) => (
-                <IndexTile 
-                  key={idx.sector} 
-                  tile={idx} 
-                  isBiggestGainer={idx.sector === extremes.gainer}
-                  isBiggestLoser={idx.sector === extremes.loser}
-                />
-              ))
-            : Array.from({ length: 21 }).map((_, i) => (
-                <SkeletonTile key={`skel-${i}`} />
-              ))
-          }
-        </div>
+      <div className="hm-terminal-grid">
+        {indices.length > 0
+          ? indices.map((idx) => (
+              <IndexTile 
+                key={idx.sector} 
+                tile={idx} 
+                isBest={idx.sector === extremes.best}
+                isWorst={idx.sector === extremes.worst}
+              />
+            ))
+          : Array.from({ length: 21 }).map((_, i) => (
+              <SkeletonTile key={`skel-${i}`} />
+            ))
+        }
       </div>
     </div>
   );
