@@ -25,36 +25,40 @@ function getTileClass(changePct, hasData) {
 }
 
 function getTimestamp() {
-  return new Date().toLocaleString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: true,
-  }) + " IST";
+  return (
+    new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
+    }) + " IST"
+  );
 }
 
 // ─── Pill Badge Strip ─────────────────────────────────────────────────────────
 
 const PILL_BUCKETS = [
-  { label: ">5%",   min:  5,    max: Infinity, cls: "pill-strong-green" },
-  { label: ">3%",   min:  3,    max: 5,        cls: "pill-green"        },
-  { label: ">1%",   min:  1,    max: 3,        cls: "pill-mild-green"   },
-  { label: "Flat",  min: -1,    max: 1,        cls: "pill-flat"         },
-  { label: "<-1%",  min: -3,    max: -1,       cls: "pill-mild-red"     },
-  { label: "<-3%",  min: -5,    max: -3,       cls: "pill-red"          },
-  { label: "<-5%",  min: -Infinity, max: -5,   cls: "pill-strong-red"   },
+  { label: ">5%",  min: 5,         max: Infinity, cls: "pill-strong-green" },
+  { label: ">3%",  min: 3,         max: 5,        cls: "pill-green"        },
+  { label: ">1%",  min: 1,         max: 3,        cls: "pill-mild-green"   },
+  { label: "Flat", min: -1,        max: 1,        cls: "pill-flat"         },
+  { label: "<-1%", min: -3,        max: -1,       cls: "pill-mild-red"     },
+  { label: "<-3%", min: -5,        max: -3,       cls: "pill-red"          },
+  { label: "<-5%", min: -Infinity, max: -5,       cls: "pill-strong-red"   },
 ];
 
 function PillStrip({ indices }) {
   const counts = PILL_BUCKETS.map((b) => ({
     ...b,
     count: indices.filter(
-      (idx) => idx.constituent_count > 0 &&
-               idx.change_pct >= b.min && idx.change_pct < b.max
+      (idx) =>
+        idx.constituent_count > 0 &&
+        idx.change_pct >= b.min &&
+        idx.change_pct < b.max
     ).length,
   }));
 
@@ -71,9 +75,48 @@ function PillStrip({ indices }) {
   );
 }
 
-// ─── Index Tile ───────────────────────────────────────────────────────────────
+// ─── Stock Row (always rendered, never conditional) ───────────────────────────
 
-const IndexTile = React.memo(function IndexTile({ data, expanded, onToggle }) {
+function StockRow({ type, stock }) {
+  const isGainer = type === "gainer";
+  const label    = isGainer ? "📈 TOP GAINER" : "📉 TOP LOSER";
+  const sign     = isGainer ? "+" : "";
+
+  if (!stock) {
+    return (
+      <div className="tile-stock-row">
+        <span className={`tile-stock-label ${isGainer ? "gainer-label" : "loser-label"}`}>
+          {label}
+        </span>
+        <div className="tile-stock-body">
+          <span className="tile-stock-symbol">Awaiting…</span>
+          <span className="tile-stock-price">—</span>
+        </div>
+        <span className="tile-volume">Vol: —</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tile-stock-row">
+      <span className={`tile-stock-label ${isGainer ? "gainer-label" : "loser-label"}`}>
+        {label}
+      </span>
+      <div className="tile-stock-body">
+        <span className="tile-stock-symbol">{stock.symbol}</span>
+        <span className="tile-stock-price">₹{formatINR(stock.ltp)}</span>
+        <span className={`tile-change-pill ${isGainer ? "positive" : "negative"}`}>
+          {sign}{stock.change_pct.toFixed(2)}%
+        </span>
+      </div>
+      <span className="tile-volume">Vol: {formatVol(stock.volume)}</span>
+    </div>
+  );
+}
+
+// ─── Index Tile — no click handler, no expand state ───────────────────────────
+
+const IndexTile = React.memo(function IndexTile({ data }) {
   const tileRef    = useRef(null);
   const prevPct    = useRef(data.change_pct);
   const rafRef     = useRef(null);
@@ -83,7 +126,7 @@ const IndexTile = React.memo(function IndexTile({ data, expanded, onToggle }) {
   const tileClass = getTileClass(data.change_pct, hasData);
   const sign      = data.change_pct >= 0 ? "+" : "";
 
-  // RAF-based flash on change_pct update (no remount)
+  // RAF-based flash on change_pct update — no remount, no key change
   useEffect(() => {
     if (data.change_pct === prevPct.current) return;
     const dir = data.change_pct > prevPct.current ? "green" : "red";
@@ -110,61 +153,29 @@ const IndexTile = React.memo(function IndexTile({ data, expanded, onToggle }) {
   }, [data.change_pct]);
 
   return (
-    <div
-      ref={tileRef}
-      className={`index-tile ${tileClass}`}
-      onClick={onToggle}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && onToggle()}
-      aria-expanded={expanded}
-    >
-      {/* ── Collapsed Header ── */}
+    <div ref={tileRef} className={`index-tile ${tileClass}`}>
+      {/* ── Header: name + arrow ── */}
       <div className="tile-header">
         <span className="tile-name">{data.sector}</span>
         <span className="tile-arrow">{data.change_pct >= 0 ? "▲" : "▼"}</span>
       </div>
+
+      {/* ── Change % ── */}
       <div className="tile-change">
         {hasData ? `${sign}${data.change_pct.toFixed(2)}%` : "—"}
       </div>
 
-      {/* ── Expanded Panel ── */}
-      <div className={`tile-expanded-panel${expanded ? " open" : ""}`}>
+      {/* ── Detail panel — ALWAYS in DOM, ALWAYS visible ── */}
+      <div className="tile-detail-panel">
         <div className="tile-divider" />
 
         {!hasData ? (
-          <div className="tile-awaiting">⏳ Awaiting market data…</div>
+          <div className="tile-awaiting">⏳ Awaiting data…</div>
         ) : (
           <>
-            {data.top_gainer && (
-              <div className="tile-stock-row">
-                <span className="tile-stock-label gainer-label">📈 TOP GAINER</span>
-                <div className="tile-stock-body">
-                  <span className="tile-stock-symbol">{data.top_gainer.symbol}</span>
-                  <span className="tile-stock-price">₹{formatINR(data.top_gainer.ltp)}</span>
-                  <span className="tile-change-pill pill-green-pill">
-                    +{data.top_gainer.change_pct.toFixed(2)}%
-                  </span>
-                </div>
-                <span className="tile-volume">Vol: {formatVol(data.top_gainer.volume)}</span>
-              </div>
-            )}
-
+            <StockRow type="gainer" stock={data.top_gainer} />
             <div className="tile-mini-divider" />
-
-            {data.top_loser && (
-              <div className="tile-stock-row">
-                <span className="tile-stock-label loser-label">📉 TOP LOSER</span>
-                <div className="tile-stock-body">
-                  <span className="tile-stock-symbol">{data.top_loser.symbol}</span>
-                  <span className="tile-stock-price">₹{formatINR(data.top_loser.ltp)}</span>
-                  <span className="tile-change-pill pill-red-pill">
-                    {data.top_loser.change_pct.toFixed(2)}%
-                  </span>
-                </div>
-                <span className="tile-volume">Vol: {formatVol(data.top_loser.volume)}</span>
-              </div>
-            )}
+            <StockRow type="loser" stock={data.top_loser} />
           </>
         )}
       </div>
@@ -175,15 +186,14 @@ const IndexTile = React.memo(function IndexTile({ data, expanded, onToggle }) {
 // ─── Main Heatmap Page ────────────────────────────────────────────────────────
 
 export default function HeatmapPage({ onBack, wsStatus }) {
-  const [indices, setIndices]       = useState([]);
-  const [expandedTile, setExpanded] = useState(null);
-  const [streaming, setStreaming]   = useState(false);
-  const [timestamp, setTimestamp]   = useState(getTimestamp());
-  const [loading, setLoading]       = useState(true);
+  const [indices,   setIndices]  = useState([]);
+  const [streaming, setStreaming] = useState(false);
+  const [timestamp, setTimestamp] = useState(getTimestamp());
+  const [loading,   setLoading]  = useState(true);
 
   const sseRef = useRef(null);
 
-  // Helper to merge live SSE diff into existing state by sector name
+  // Merge SSE diff by sector name — avoids full re-render on every tick
   const mergeIndices = useCallback((incoming) => {
     setIndices((prev) => {
       if (!prev.length) return incoming;
@@ -194,7 +204,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     setTimestamp(getTimestamp());
   }, []);
 
-  // Initial fetch
+  // Initial snapshot fetch
   useEffect(() => {
     const fetchInitial = async () => {
       try {
@@ -212,7 +222,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     fetchInitial();
   }, []);
 
-  // SSE connection — with mandatory cleanup (Amendment #3)
+  // SSE connection — mandatory EventSource.close() cleanup on unmount/toggle
   useEffect(() => {
     if (!streaming) {
       if (sseRef.current) {
@@ -234,20 +244,15 @@ export default function HeatmapPage({ onBack, wsStatus }) {
       } catch {}
     };
 
-    es.onerror = (e) => {
-      console.warn("[Heatmap SSE] connection error", e);
+    es.onerror = () => {
+      console.warn("[Heatmap SSE] connection error");
     };
 
-    // Mandatory cleanup — close SSE on unmount or streaming toggle
     return () => {
       es.close();
       sseRef.current = null;
     };
   }, [streaming, mergeIndices]);
-
-  const toggleTile = useCallback((sector) => {
-    setExpanded((prev) => (prev === sector ? null : sector));
-  }, []);
 
   return (
     <div className="heatmap-page">
@@ -264,7 +269,6 @@ export default function HeatmapPage({ onBack, wsStatus }) {
         <div className="heatmap-header-right">
           <span className="heatmap-timestamp">{timestamp}</span>
 
-          {/* Streaming toggle */}
           <div
             className="heatmap-stream-toggle"
             onClick={() => setStreaming((s) => !s)}
@@ -302,12 +306,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
         ) : (
           <div className="heatmap-grid">
             {indices.map((idx) => (
-              <IndexTile
-                key={idx.sector}
-                data={idx}
-                expanded={expandedTile === idx.sector}
-                onToggle={() => toggleTile(idx.sector)}
-              />
+              <IndexTile key={idx.sector} data={idx} />
             ))}
           </div>
         )}
