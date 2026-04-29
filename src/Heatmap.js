@@ -31,12 +31,11 @@ function getIntensityClass(pct) {
 function SkeletonTile() {
   return (
     <div className="index-tile skeleton-tile">
-      <div className="skel skel-name" />
-      <div className="skel skel-pct" />
-      <div className="tile-divider" />
-      <div className="skel skel-row" />
-      <div className="skel-label" />
-      <div className="skel skel-row" />
+      <div style={{ width: '60%', height: '14px', background: '#222', borderRadius: '4px', marginBottom: '12px' }} />
+      <div style={{ width: '80%', height: '36px', background: '#222', borderRadius: '4px', marginBottom: '16px' }} />
+      <div style={{ borderTop: '1px solid #222', marginBottom: '12px' }} />
+      <div style={{ width: '100%', height: '20px', background: '#222', borderRadius: '4px', marginBottom: '8px' }} />
+      <div style={{ width: '100%', height: '20px', background: '#222', borderRadius: '4px' }} />
     </div>
   );
 }
@@ -81,13 +80,13 @@ const IndexTile = React.memo(({ tile, isBiggestGainer, isBiggestLoser }) => {
   return (
     <div className={`index-tile ${intensityClass} ${borderClass}`} ref={tileRef}>
       <div className="tile-header">
-        <span className="tile-index-name" style={{ fontSize: nameFontSize }}>{tile.sector}</span>
+        <span className="tile-index-name" style={{ fontSize: nameFontSize, fontWeight: 600 }}>{tile.sector}</span>
         <span className="tile-arrow">
           {tile.change_pct > 0 ? "\u25b2" : tile.change_pct < 0 ? "\u25bc" : "\u25cf"}
         </span>
       </div>
 
-      <div className={`tile-change-pct ${tile.change_pct >= 0 ? "text-green" : "text-red"}`}>
+      <div className={`tile-change-pct ${tile.change_pct >= 0 ? "text-green" : "text-red"}`} style={{ fontWeight: 700 }}>
         {pct(tile.change_pct)}
       </div>
 
@@ -96,7 +95,7 @@ const IndexTile = React.memo(({ tile, isBiggestGainer, isBiggestLoser }) => {
       <div className="tile-row-block">
         <div className="tile-label">TOP GAINER</div>
         <div className="tile-stock-line">
-          <span className="stock-name">{tile.top_gainer?.symbol || "Awaiting\u2026"}</span>
+          <span className="stock-name" style={{ fontWeight: 500 }}>{tile.top_gainer?.symbol || "Awaiting\u2026"}</span>
           <span className="stock-price">{fmt(tile.top_gainer?.ltp)}</span>
           {tile.top_gainer?.change_pct != null && (
             <span className="stock-badge bg-green">{pct(tile.top_gainer.change_pct)}</span>
@@ -107,7 +106,7 @@ const IndexTile = React.memo(({ tile, isBiggestGainer, isBiggestLoser }) => {
       <div className="tile-row-block">
         <div className="tile-label">TOP LOSER</div>
         <div className="tile-stock-line">
-          <span className="stock-name">{tile.top_loser?.symbol || "Awaiting\u2026"}</span>
+          <span className="stock-name" style={{ fontWeight: 500 }}>{tile.top_loser?.symbol || "Awaiting\u2026"}</span>
           <span className="stock-price">{fmt(tile.top_loser?.ltp)}</span>
           {tile.top_loser?.change_pct != null && (
             <span className="stock-badge bg-red">{pct(tile.top_loser.change_pct)}</span>
@@ -121,28 +120,18 @@ const IndexTile = React.memo(({ tile, isBiggestGainer, isBiggestLoser }) => {
 // ─── Main Heatmap Page ────────────────────────────────────────────────────────
 
 export default function HeatmapPage({ onBack, wsStatus }) {
-  const [indices, setIndices] = useState([]);   // empty = skeleton mode
+  const [indices, setIndices] = useState([]);   
   const [streaming, setStreaming] = useState(false);
   const [timeStr, setTimeStr] = useState(getISTTime());
-  const [filter, setFilter] = useState("all");
   const sseRef = useRef(null);
 
-  // Live clock — every second
+  // Live clock
   useEffect(() => {
     const id = setInterval(() => setTimeStr(getISTTime()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Initial REST snapshot
-  useEffect(() => {
-    const base = window.location.port === "3000" ? "http://127.0.0.1:8000" : "";
-    fetch(`${base}/api/heatmap/sectoral`)
-      .then((r) => r.ok ? r.json() : Promise.reject())
-      .then((json) => { if (json.indices?.length) setIndices(json.indices); })
-      .catch(() => {});
-  }, []);
-
-  // Merge SSE updates
+  // Merge updates
   const mergeIndices = useCallback((incoming) => {
     setIndices((prev) => {
       if (!prev.length) return incoming;
@@ -152,7 +141,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     });
   }, []);
 
-  // SSE
+  // SSE: Immediate Connection
   useEffect(() => {
     let es = null;
     let retryTimer = null;
@@ -178,16 +167,15 @@ export default function HeatmapPage({ onBack, wsStatus }) {
       };
     }
 
-    connect();
+    connect(); // Connect immediately on mount
 
     return () => {
       clearTimeout(retryTimer);
       if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
-      setStreaming(false);
     };
   }, [mergeIndices]);
 
-  // Find extreme indices for highlighting
+  // Find extremes
   const extremes = useMemo(() => {
     if (!indices.length) return { gainer: null, loser: null };
     let gainer = indices[0], loser = indices[0];
@@ -198,7 +186,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     return { gainer: gainer.sector, loser: loser.sector };
   }, [indices]);
 
-  // Stats for pills
+  // Stats
   const stats = useMemo(() => {
     let gainers = 0, flat = 0, losers = 0;
     indices.forEach((idx) => {
@@ -209,22 +197,9 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     return { gainers, flat, losers };
   }, [indices]);
 
-  // Filtered list padded to SECTOR_SLOTS
-  const gridTiles = useMemo(() => {
-    let list = indices;
-    if (filter === "gainers") list = indices.filter((i) => i.change_pct > 1);
-    else if (filter === "losers") list = indices.filter((i) => i.change_pct < -1);
-    else if (filter === "flat") list = indices.filter((i) => i.change_pct >= -1 && i.change_pct <= 1);
-
-    const padded = [...list];
-    while (padded.length < SECTOR_SLOTS) padded.push(null);
-    return padded.slice(0, SECTOR_SLOTS);
-  }, [indices, filter]);
-
   return (
     <div className="heatmap-page">
-
-      {/* ── Terminal Header ── */}
+      {/* ── Compact Header ── */}
       <header className="hm-terminal-header">
         <div className="header-left">
           <div className="brand-line">&#x1F525; Market Pulse</div>
@@ -237,7 +212,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
         </div>
 
         <div className="header-center">
-          <div className="ist-clock">{timeStr}</div>
+          <div className="ist-clock" style={{ color: '#aaa' }}>{timeStr}</div>
         </div>
 
         <div className="header-right">
@@ -257,23 +232,20 @@ export default function HeatmapPage({ onBack, wsStatus }) {
       <div className="hm-terminal-body">
         <div className="hm-terminal-grid">
           {indices.length > 0
-            ? gridTiles.map((idx, i) =>
-                idx
-                  ? <IndexTile 
-                      key={idx.sector} 
-                      tile={idx} 
-                      isBiggestGainer={idx.sector === extremes.gainer}
-                      isBiggestLoser={idx.sector === extremes.loser}
-                    />
-                  : <div key={`empty-${i}`} className="index-tile empty-tile" />
-              )
+            ? indices.map((idx) => (
+                <IndexTile 
+                  key={idx.sector} 
+                  tile={idx} 
+                  isBiggestGainer={idx.sector === extremes.gainer}
+                  isBiggestLoser={idx.sector === extremes.loser}
+                />
+              ))
             : Array.from({ length: 21 }).map((_, i) => (
                 <SkeletonTile key={`skel-${i}`} />
               ))
           }
         </div>
       </div>
-
     </div>
   );
 }
