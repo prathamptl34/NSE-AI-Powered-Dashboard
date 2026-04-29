@@ -107,7 +107,7 @@ const IndexTile = React.memo(function IndexTile({ data }) {
 
       {/* ── Row 1: Index name + arrow ── */}
       <div className="tile-header">
-        <span className="tile-name">{data.sector}</span>
+        <span className="tile-index-name">{data.sector}</span>
         <span className="tile-arrow">{data.change_pct >= 0 ? "▲" : "▼"}</span>
       </div>
 
@@ -127,16 +127,19 @@ const IndexTile = React.memo(function IndexTile({ data }) {
           <div className="tile-section-label gainer">📈 TOP GAINER</div>
           <div className="tile-stock-row">
             <span className="tile-stock-symbol">
-              {gainer?.symbol ?? "Awaiting…"}
+              {gainer?.symbol || gainer?.name || "—"}
             </span>
-            {gainer && (
-              <span className="tile-stock-right">
-                <span className="tile-stock-price">₹{formatINR(gainer.ltp)}</span>
-                <span className={`tile-change-pill ${gainer.change_pct >= 0 ? "positive" : "negative"}`}>
-                  {gainer.change_pct >= 0 ? "+" : ""}{gainer.change_pct?.toFixed(2)}%
-                </span>
+            <span className="tile-stock-right">
+              <span className="tile-stock-price">
+                ₹{gainer?.ltp?.toLocaleString("en-IN") ?? "—"}
               </span>
-            )}
+              <span className={`tile-change-pill ${
+                (gainer?.change_pct ?? 0) >= 0 ? "positive" : "negative"
+              }`}>
+                {(gainer?.change_pct ?? 0) >= 0 ? "+" : ""}
+                {gainer?.change_pct?.toFixed(2) ?? "—"}%
+              </span>
+            </span>
           </div>
 
           {/* ── Divider ── */}
@@ -146,16 +149,19 @@ const IndexTile = React.memo(function IndexTile({ data }) {
           <div className="tile-section-label loser">📉 TOP LOSER</div>
           <div className="tile-stock-row">
             <span className="tile-stock-symbol">
-              {loser?.symbol ?? "Awaiting…"}
+              {loser?.symbol || loser?.name || "—"}
             </span>
-            {loser && (
-              <span className="tile-stock-right">
-                <span className="tile-stock-price">₹{formatINR(loser.ltp)}</span>
-                <span className={`tile-change-pill ${loser.change_pct >= 0 ? "positive" : "negative"}`}>
-                  {loser.change_pct >= 0 ? "+" : ""}{loser.change_pct?.toFixed(2)}%
-                </span>
+            <span className="tile-stock-right">
+              <span className="tile-stock-price">
+                ₹{loser?.ltp?.toLocaleString("en-IN") ?? "—"}
               </span>
-            )}
+              <span className={`tile-change-pill ${
+                (loser?.change_pct ?? 0) >= 0 ? "positive" : "negative"
+              }`}>
+                {(loser?.change_pct ?? 0) >= 0 ? "+" : ""}
+                {loser?.change_pct?.toFixed(2) ?? "—"}%
+              </span>
+            </span>
           </div>
         </>
       )}
