@@ -1,3 +1,4 @@
+# Deployment Version: 1.0.2 - Heatmap Color Fix
 # Stage 1: Build React Frontend
 FROM node:20-slim AS build-stage
 WORKDIR /app
