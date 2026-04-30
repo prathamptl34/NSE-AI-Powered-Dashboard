@@ -230,7 +230,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
             </button>
           )}
           <div className="hm-brand-group">
-            <div className="hm-brand-line">🔥 Market Heatmap</div>
+            <div className="hm-brand-line">🔥 Market Heatmap (Updated)</div>
             <div className="hm-status-line">
               <span className={`hm-status-dot ${streaming ? "hm-dot-live" : "hm-dot-off"}`} />
               <span className={streaming ? "hm-text-live" : "hm-text-off"}>
