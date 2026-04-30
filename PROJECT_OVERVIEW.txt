@@ -1,0 +1,69 @@
+# Market Pulse Dashboard — Technical Overview & Architecture
+==========================================================
+
+This document provides a detailed A-to-Z breakdown of the Market Pulse dashboard
+system for developers and AI models.
+
+1. PROJECT OBJECTIVE
+-------------------
+Market Pulse is a high-performance, real-time financial dashboard for the
+National Stock Exchange (NSE) of India. It provides sub-second price updates,
+AI-driven sentiment analysis, and technical signal scanning for 200+ symbols.
+
+2. TECHNOLOGY STACK
+------------------
+- Frontend: React 18 (Hooks, Memoization, requestAnimationFrame)
+- Styling: Custom CSS (Glassmorphism, Responsive Grid System)
+- Backend: FastAPI (Asynchronous Python 3.11)
+- Data Source: Angel One SmartAPI (WebSocket V2 & REST)
+- AI Engine: Google Gemini (Pro Model) via API
+- Deployment: Docker (Multi-stage build) on Hugging Face Spaces
+
+3. SYSTEM ARCHITECTURE
+----------------------
+A. Data Ingestion (streamer.py)
+   - Establishes an asynchronous WebSocket connection to Angel One.
+   - Normalizes raw binary tick data into structured JSON.
+   - Maintains a thread-safe local state of the Top 20 Gainers/Losers.
+   - Throttles updates to prevent UI bottlenecking while maintaining "Live" feel.
+
+B. Backend Logic (main.py)
+   - Exposes REST endpoints for Intraday Sparklines and Signal Scanning.
+   - Orchestrates LLM analysis: Pipes real-time stock data into structured
+     prompts to generate "Why it's moving" narratives.
+   - Implements SPA routing to handle React Router fallbacks.
+
+C. Frontend Engine (App.js)
+   - Reconciliation Strategy: Uses React.memo and useRef to skip expensive
+     re-renders on high-frequency price updates.
+   - Animation Engine: Uses CSS transforms and requestAnimationFrame to
+     trigger "Price Flashes" without unmounting components, eliminating
+     layout shifts.
+   - Responsive Header: A custom grid-based header that adapts to Hugging
+     Face Space's specific viewport constraints.
+
+4. KEY FEATURES
+---------------
+- Real-Time Heatmaps: Visual representation of sector-wise performance.
+- Market Analyst: On-demand AI deep-dives into specific stock catalysts.
+- Signal Scanner: Real-time tracking of volume breakouts and RSI momentum.
+- Historical Explorer: Full-index historical comparison tool.
+
+5. RECENT OPTIMIZATIONS
+-----------------------
+- Mobile UI: Fixed navigation visibility issues on small screens.
+- Build Process: Implemented a non-root user (UID 1000) for Hugging Face
+  security compliance.
+- UI Stability: Fixed the "blank space" glitch by removing forced component
+  remounts during price updates.
+
+6. REPOSITORY STRUCTURE
+-----------------------
+/src/           - React components and styling (index.css)
+/main.py        - FastAPI Application server
+/streamer.py    - Angel One WebSocket engine
+/Dockerfile     - Production build configuration
+/.env           - Environment variables (API Keys)
+
+==========================================================
+END OF DOCUMENT
