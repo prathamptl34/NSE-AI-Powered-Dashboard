@@ -1937,13 +1937,18 @@ body {
   z-index: 2;
 }
 
-/* Classic Full Background Mode */
-.intensity-g3 { background: #064e3b !important; color: #fff !important; border: 1px solid #10b981 !important; }
-.intensity-g2 { background: #065f46 !important; color: #fff !important; border: 1px solid rgba(16, 185, 129, 0.6) !important; }
-.intensity-g1 { background: #042f2e !important; color: #fff !important; border: 1px solid rgba(16, 185, 129, 0.3) !important; }
-.intensity-r1 { background: #450a0a !important; color: #fff !important; border: 1px solid rgba(239, 68, 68, 0.3) !important; }
-.intensity-r2 { background: #7f1d1d !important; color: #fff !important; border: 1px solid rgba(239, 68, 68, 0.6) !important; }
-.intensity-r3 { background: #991b1b !important; color: #fff !important; border: 1px solid #ef4444 !important; }
+/* Heatmap Intensities - Smoother Gradient */
+.intensity-g5 { background: #065f46 !important; color: #fff !important; border: 1px solid #10b981 !important; }
+.intensity-g4 { background: #064e3b !important; color: #fff !important; border: 1px solid rgba(16, 185, 129, 0.8) !important; }
+.intensity-g3 { background: #022c22 !important; color: #fff !important; border: 1px solid rgba(16, 185, 129, 0.6) !important; }
+.intensity-g2 { background: #011d1a !important; color: #fff !important; border: 1px solid rgba(16, 185, 129, 0.4) !important; }
+.intensity-g1 { background: #000a0a !important; color: #fff !important; border: 1px solid rgba(16, 185, 129, 0.2) !important; }
+
+.intensity-r1 { background: #0a0000 !important; color: #fff !important; border: 1px solid rgba(239, 68, 68, 0.2) !important; }
+.intensity-r2 { background: #1d0000 !important; color: #fff !important; border: 1px solid rgba(239, 68, 68, 0.4) !important; }
+.intensity-r3 { background: #450a0a !important; color: #fff !important; border: 1px solid rgba(239, 68, 68, 0.6) !important; }
+.intensity-r4 { background: #7f1d1d !important; color: #fff !important; border: 1px solid rgba(239, 68, 68, 0.8) !important; }
+.intensity-r5 { background: #991b1b !important; color: #fff !important; border: 1px solid #ef4444 !important; }
 
 .tile-dimmed { opacity: 0.2; filter: grayscale(1); }
 

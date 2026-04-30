@@ -15,12 +15,16 @@ function getISTTime() {
 }
 
 function getIntensityClass(pct) {
+  if (pct >= 4.0) return "intensity-g5";
+  if (pct >= 3.0) return "intensity-g4";
   if (pct >= 2.0) return "intensity-g3";
   if (pct >= 1.0) return "intensity-g2";
   if (pct >= 0) return "intensity-g1";
   if (pct > -1.0) return "intensity-r1";
   if (pct > -2.0) return "intensity-r2";
-  return "intensity-r3";
+  if (pct > -3.0) return "intensity-r3";
+  if (pct > -4.0) return "intensity-r4";
+  return "intensity-r5";
 }
 
 // ─── Skeleton Tile ────────────────────────────────────────────────────────────
