@@ -40,7 +40,7 @@ function SkeletonTile() {
 
 // ─── Index Tile ───────────────────────────────────────────────────────────────
 
-const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
+const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, isExpanded, onToggle }) => {
   const tileRef = useRef(null);
   const prevPct = useRef(null);
 
@@ -67,8 +67,16 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
   const pct = (n) =>
     n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "—";
 
+  const stocks = tile.stocks || [];
+
   return (
-    <div className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""}`} ref={tileRef}>
+    <div
+      className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""} ${isExpanded ? "tile-expanded" : ""}`}
+      ref={tileRef}
+      onClick={() => onToggle(tile.sector)}
+      style={{ cursor: "pointer" }}
+    >
+      {/* ── Existing header rows (unchanged) ── */}
       <div className="hm-row-1">
         <span className="hm-index-name">{tile.sector}</span>
         <span className={`hm-arrow ${tile.change_pct >= 0 ? "hm-arrow-up" : "hm-arrow-down"}`}>
@@ -107,6 +115,48 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed }) => {
           </div>
         </div>
       </div>
+
+      {/* ── Expanded Stock List ── */}
+      {isExpanded && (
+        <div
+          className="tile-stock-list"
+          onClick={(e) => e.stopPropagation()} // prevent collapse when scrolling the list
+        >
+          {stocks.length === 0 ? (
+            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "11px", textAlign: "center", padding: "8px 0" }}>
+              No live data yet
+            </div>
+          ) : (
+            stocks.map((s, idx) => {
+              const isPos = s.change_percent > 0;
+              const isNeg = s.change_percent < 0;
+              return (
+                <div key={s.symbol} className="tile-stock-list-row">
+                  <span className="tsl-rank">{idx + 1}</span>
+                  <span className="tsl-symbol">{s.symbol}</span>
+                  <span className="tsl-price">{fmt(s.ltp)}</span>
+                  <span
+                    className={`tsl-pill ${isPos ? "tsl-pill-up" : isNeg ? "tsl-pill-down" : "tsl-pill-flat"}`}
+                  >
+                    {pct(s.change_percent)}
+                  </span>
+                </div>
+              );
+            })
+          )}
+
+          {/* Close button */}
+          <div
+            className="tsl-close-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(tile.sector); // toggles off (collapses)
+            }}
+          >
+            ▲ Close
+          </div>
+        </div>
+      )}
     </div>
   );
 });
@@ -118,6 +168,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
   const [streaming, setStreaming] = useState(false);
   const [timeStr, setTimeStr] = useState(getISTTime());
   const [activeFilter, setActiveFilter] = useState(null); // gainers, flat, losers
+  const [expandedSector, setExpandedSector] = useState(null);
   const sseRef = useRef(null);
 
   // Live clock
@@ -211,6 +262,11 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     setActiveFilter(activeFilter === type ? null : type);
   };
 
+  // Toggle expand: only one tile open at a time
+  const handleTileToggle = useCallback((sector) => {
+    setExpandedSector((prev) => (prev === sector ? null : sector));
+  }, []);
+
   const getIsDimmed = (idx) => {
     if (!activeFilter) return false;
     if (activeFilter === "gainers") return idx.change_pct <= 1;
@@ -221,6 +277,78 @@ export default function HeatmapPage({ onBack, wsStatus }) {
 
   return (
     <div className="heatmap-wrapper">
+      {/* ── Scoped CSS for expand feature only ── */}
+      <style>{`
+        .tile-expanded {
+          height: auto !important;
+          min-height: auto !important;
+        }
+        .tile-stock-list {
+          max-height: 400px;
+          overflow-y: auto;
+          margin-top: 12px;
+          border-top: 1px solid rgba(255,255,255,0.1);
+          padding-top: 8px;
+        }
+        .tile-stock-list-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 4px 2px;
+          font-size: 12px;
+          border-radius: 4px;
+          transition: background 0.15s;
+        }
+        .tile-stock-list-row:hover {
+          background: rgba(255,255,255,0.04);
+        }
+        .tsl-rank {
+          color: rgba(255,255,255,0.4);
+          width: 20px;
+          flex-shrink: 0;
+          font-size: 10px;
+          text-align: right;
+        }
+        .tsl-symbol {
+          color: #fff;
+          font-weight: 700;
+          flex: 1;
+          margin-left: 6px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .tsl-price {
+          color: rgba(255,255,255,0.75);
+          margin-right: 8px;
+          font-size: 11px;
+          white-space: nowrap;
+        }
+        .tsl-pill {
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 10px;
+          font-weight: 700;
+          white-space: nowrap;
+          min-width: 52px;
+          text-align: center;
+        }
+        .tsl-pill-up   { background: rgba(16,185,129,0.18); color: #10b981; }
+        .tsl-pill-down { background: rgba(239,68,68,0.18);  color: #ef4444; }
+        .tsl-pill-flat { background: rgba(100,116,139,0.2); color: #94a3b8; }
+        .tsl-close-btn {
+          text-align: center;
+          margin-top: 8px;
+          padding: 4px 0;
+          color: rgba(255,255,255,0.5);
+          font-size: 11px;
+          cursor: pointer;
+          border-top: 1px solid rgba(255,255,255,0.07);
+          transition: color 0.15s;
+        }
+        .tsl-close-btn:hover { color: rgba(255,255,255,0.85); }
+      `}</style>
+
       {/* ── Terminal Header ── */}
       <header className="hm-terminal-header">
         <div className="hm-header-left">
@@ -276,6 +404,8 @@ export default function HeatmapPage({ onBack, wsStatus }) {
                 isBest={idx.sector === extremes.best}
                 isWorst={idx.sector === extremes.worst}
                 isDimmed={getIsDimmed(idx)}
+                isExpanded={expandedSector === idx.sector}
+                onToggle={handleTileToggle}
               />
             ))
           : Array.from({ length: 21 }).map((_, i) => (

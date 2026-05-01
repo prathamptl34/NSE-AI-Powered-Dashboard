@@ -263,6 +263,36 @@ _store_lock = threading.Lock()
 connected_clients = set()
 _METADATA_CACHE = os.path.join(".data", "metadata_cache.json")
 
+# ── Index Tokens (Official) ──────────────────────────────────────────────────
+# Mapping of Sector Name to Angel One Index Token for official LTP/Change
+INDEX_TOKEN_MAP: dict[str, str] = {
+    "NIFTY AUTO":              "99926029",
+    "NIFTY BANK":              "99926009",
+    "NIFTY ENERGY":            "99926017",
+    "NIFTY FINANCIAL SVCS":    "99926011",
+    "NIFTY FMCG":              "99926021",
+    "NIFTY IT":                "99926008",
+    "NIFTY METAL":             "99926030",
+    "NIFTY PHARMA":            "99926023",
+    "NIFTY PSU BANK":          "99926025",
+    "NIFTY REALTY":            "99926018",
+    "NIFTY HEALTHCARE":        "99926014",
+    "NIFTY INFRA":             "99926015",
+    "NIFTY CONSUMER DURABLES": "99926031",
+    "NIFTY OIL GAS":           "99926036",
+    "NIFTY PRIVATE BANK":      "99926040",
+    "NIFTY MIDCAP SELECT":     "99926034",
+    "NIFTY SERVICES":          "99926037",
+    "NIFTY COMMODITIES":       "99926019",
+    "NIFTY MNC":               "99926022",
+    "NIFTY DEFENCE":           "99926045",
+}
+
+# Add indices to ALL_TOKENS to ensure subscription
+for sector, token in INDEX_TOKEN_MAP.items():
+    if token not in ALL_TOKENS:
+        ALL_TOKENS[token] = {"symbol": sector, "prev_close": 0.0, "index": "official_index"}
+
 # ── Sectoral Heatmap State ────────────────────────────────────────────────────
 # Constituent symbols per NSE sector index (subset drawn from ALL_TOKENS universe)
 SECTOR_CONSTITUENTS: dict[str, list] = {
@@ -445,11 +475,26 @@ def _update_heatmap_state():
 
     new_state = {}
     for sector, symbols in SECTOR_CONSTITUENTS.items():
+        # 1. Try to get official index data if available
+        index_token = INDEX_TOKEN_MAP.get(sector)
+        index_tick = None
+        if index_token:
+            index_tick = _tick_store.get(index_token)
+            
         sector_ticks = [tick_by_symbol[s] for s in symbols if s in tick_by_symbol]
         valid = [t for t in sector_ticks if t.get("prev_close", 0) > 0.01 and t.get("ltp", 0) > 0.01]
-
-        if not valid:
-            # Still include tile — show "Awaiting data" state
+        
+        # Use official index value for the main tile if we have it
+        if index_tick and index_tick.get("ltp", 0) > 0:
+            avg_chg = index_tick["change_pct"]
+            ltp = index_tick["ltp"]
+            prev_close = index_tick["prev_close"]
+        elif valid:
+            avg_chg = sum(t["change_pct"] for t in valid) / len(valid)
+            ltp = sum(t["ltp"] for t in valid) / len(valid)
+            prev_close = sum(t["prev_close"] for t in valid) / len(valid)
+        else:
+            # No data at all for this sector
             new_state[sector] = {
                 "sector": sector,
                 "change_pct": 0.0,
@@ -459,11 +504,11 @@ def _update_heatmap_state():
             }
             continue
 
-        avg_chg = sum(t["change_pct"] for t in valid) / len(valid)
-        top_gainer = max(valid, key=lambda x: x.get("change_pct", 0))
-        top_loser  = min(valid, key=lambda x: x.get("change_pct", 0))
+        top_gainer = max(valid, key=lambda x: x.get("change_pct", 0)) if valid else None
+        top_loser  = min(valid, key=lambda x: x.get("change_pct", 0)) if valid else None
 
         def _stock_snap(t):
+            if not t: return None
             return {
                 "symbol":     t["symbol"],
                 "ltp":        t["ltp"],
@@ -472,12 +517,27 @@ def _update_heatmap_state():
                 "volume":     t.get("volume", 0),
             }
 
+        # Build sorted constituent list (gainer → loser), skip stocks with no live data
+        stocks_list = sorted(
+            [
+                {
+                    "symbol":         t["symbol"],
+                    "ltp":            round(t["ltp"], 2),
+                    "change_percent": round(t["change_pct"], 2),
+                }
+                for t in valid
+            ],
+            key=lambda x: x["change_percent"],
+            reverse=True,
+        )
+
         new_state[sector] = {
             "sector":            sector,
             "change_pct":        round(avg_chg, 2),
             "constituent_count": len(valid),
             "top_gainer":        _stock_snap(top_gainer),
             "top_loser":         _stock_snap(top_loser),
+            "stocks":            stocks_list,
         }
 
     with _heatmap_lock:
@@ -560,6 +620,7 @@ def _on_data(wsapp, message):
         close_price = message.get("closed_price", 0)
         if close_price:
             close_price = close_price / 100  # paise → rupees
+        
         live_prices[token] = ltp
         _update_tick(token, ltp, volume, close_price=close_price)
     except Exception as exc:
