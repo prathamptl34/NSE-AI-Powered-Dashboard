@@ -131,85 +131,126 @@ function SectorModal({ tile, onClose }) {
   const pct = (n) =>
     n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "—";
 
-  const pctColor = tile.change_pct > 0 ? "#4ade80" : tile.change_pct < 0 ? "#f87171" : "#94a3b8";
+  // Change% badge pill style for the header
+  const isPos = tile.change_pct > 0;
+  const isNeg = tile.change_pct < 0;
+  const badgeStyle = isPos
+    ? { background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80" }
+    : isNeg
+    ? { background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.3)", color: "#f87171" }
+    : { background: "rgba(148,163,184,0.12)", border: "1px solid rgba(148,163,184,0.3)", color: "#94a3b8" };
 
-  const pillStyle = (change) => {
-    if (change > 0)  return { background: "#166534", color: "#4ade80" };
-    if (change < 0)  return { background: "#7f1d1d", color: "#f87171" };
+  // Accent bar color per card
+  const accentColor = (chg) => chg > 0 ? "#4ade80" : chg < 0 ? "#f87171" : "#475569";
+
+  // Change% pill style per card
+  const pillStyle = (chg) => {
+    if (chg > 0) return { background: "#166534", color: "#4ade80" };
+    if (chg < 0) return { background: "#7f1d1d", color: "#f87171" };
     return { background: "#1e293b", color: "#94a3b8" };
   };
 
+  // Dynamic columns: 2 for ≤6 stocks, 3 otherwise
+  const cols = stocks.length <= 6 ? 2 : 3;
+
   return (
-    <div
-      className="heatmap-modal-overlay"
-      onClick={onClose}
-    >
-      <div
-        className="heatmap-modal"
-        onClick={e => e.stopPropagation()}
-      >
+    <div className="heatmap-modal-overlay" onClick={onClose}>
+      <div className="heatmap-modal" onClick={e => e.stopPropagation()}>
+
         {/* ── Modal Header ── */}
         <div className="hm-modal-header">
           <div>
-            <div style={{ fontSize: "18px", fontWeight: "700", color: "#fff", lineHeight: 1.2 }}>
+            <div style={{ fontSize: "20px", fontWeight: "800", color: "#fff", lineHeight: 1.2 }}>
               {tile.sector}
             </div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "4px" }}>
-              All Constituents
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "3px" }}>
+              All Constituents — Ranked by Performance
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-            <div style={{ fontSize: "28px", fontWeight: "900", color: pctColor, letterSpacing: "-1px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div style={{
+              ...badgeStyle,
+              borderRadius: "10px",
+              padding: "6px 16px",
+              fontSize: "32px",
+              fontWeight: "900",
+              letterSpacing: "-1.5px",
+              lineHeight: 1,
+            }}>
               {tile.change_pct >= 0 ? "+" : ""}{Number(tile.change_pct).toFixed(2)}%
             </div>
-            <button
-              className="hm-modal-close"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              ✕
-            </button>
+            <button className="hm-modal-close" onClick={onClose} aria-label="Close">✕</button>
           </div>
         </div>
 
-        {/* ── Stock List ── */}
-        <div className="hm-modal-list">
-          {stocks.length === 0 ? (
-            <div style={{ padding: "40px 24px", textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: "13px" }}>
-              No live data yet — waiting for market ticks
-            </div>
-          ) : (
-            stocks.map((s, idx) => {
+        {/* ── Stock Grid ── */}
+        {stocks.length === 0 ? (
+          <div style={{ padding: "40px 24px", textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: "13px" }}>
+            No live data yet — waiting for market ticks
+          </div>
+        ) : (
+          <div
+            className="modal-stock-grid"
+            style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+          >
+            {stocks.map((s, idx) => {
               const isFirst = idx === 0;
               const isLast  = idx === lastIdx;
-              const accentStyle = isFirst
-                ? { borderLeft: "3px solid #4ade80", paddingLeft: "21px" }
+              const glowStyle = isFirst
+                ? { boxShadow: "0 0 0 1px rgba(74,222,128,0.25), 0 4px 12px rgba(74,222,128,0.1)" }
                 : isLast
-                ? { borderLeft: "3px solid #f87171", paddingLeft: "21px" }
+                ? { boxShadow: "0 0 0 1px rgba(248,113,113,0.25), 0 4px 12px rgba(248,113,113,0.1)" }
                 : {};
 
               return (
-                <div
-                  key={s.symbol}
-                  className="modal-stock-row"
-                  style={accentStyle}
-                >
-                  <span className="msr-rank">{idx + 1}</span>
-                  <span className="msr-symbol">{s.symbol}</span>
-                  <span className="msr-price">{fmt(s.ltp)}</span>
-                  <span className="msr-pill" style={pillStyle(s.change_percent)}>
-                    {pct(s.change_percent)}
+                <div key={s.symbol} className="modal-stock-card" style={glowStyle}>
+                  {/* Left accent bar */}
+                  <div style={{
+                    width: "3px",
+                    height: "32px",
+                    borderRadius: "2px",
+                    flexShrink: 0,
+                    background: accentColor(s.change_percent),
+                  }} />
+
+                  {/* Rank */}
+                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", width: "16px", flexShrink: 0 }}>
+                    {idx + 1}
                   </span>
+
+                  {/* Symbol */}
+                  <span style={{ flex: 1, fontSize: "13px", fontWeight: "700", color: "#fff" }}>
+                    {s.symbol}
+                  </span>
+
+                  {/* Right: price + pill stacked */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
+                    <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>
+                      {fmt(s.ltp)}
+                    </span>
+                    <span style={{
+                      ...pillStyle(s.change_percent),
+                      fontSize: "11px",
+                      fontWeight: "700",
+                      padding: "2px 7px",
+                      borderRadius: "5px",
+                      textAlign: "center",
+                      whiteSpace: "nowrap",
+                    }}>
+                      {pct(s.change_percent)}
+                    </span>
+                  </div>
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
 
         {/* ── Modal Footer ── */}
         <div className="hm-modal-footer">
-          {stocks.length} stocks &bull; {positiveCount} advancing &middot; {negativeCount} declining
+          {stocks.length} stocks &bull; {positiveCount} advancing &bull; {negativeCount} declining
         </div>
+
       </div>
     </div>
   );
@@ -344,26 +385,24 @@ export default function HeatmapPage({ onBack, wsStatus }) {
           display: flex;
           align-items: center;
           justify-content: center;
+          padding: 20px;
+          box-sizing: border-box;
         }
         .heatmap-modal {
           background: #0f172a;
-          border: 1px solid rgba(255,255,255,0.1);
-          border-radius: 16px;
-          width: 480px;
-          max-width: 92vw;
-          max-height: 80vh;
-          display: flex;
-          flex-direction: column;
+          border: 1px solid rgba(255,255,255,0.12);
+          border-radius: 20px;
+          width: 760px;
+          max-width: 95vw;
           overflow: hidden;
-          box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+          box-shadow: 0 30px 80px rgba(0,0,0,0.7);
         }
         .hm-modal-header {
-          padding: 20px 24px 16px;
+          padding: 24px 28px 20px;
           border-bottom: 1px solid rgba(255,255,255,0.08);
           display: flex;
           align-items: center;
           justify-content: space-between;
-          flex-shrink: 0;
         }
         .hm-modal-close {
           font-size: 18px;
@@ -380,56 +419,38 @@ export default function HeatmapPage({ onBack, wsStatus }) {
           color: #fff;
           background: rgba(255,255,255,0.08);
         }
-        .hm-modal-list {
-          overflow-y: auto;
-          flex: 1;
-          padding: 8px 0;
+        .modal-stock-grid {
+          display: grid;
+          gap: 6px;
+          padding: 16px 20px 8px;
         }
-        .modal-stock-row {
+        .modal-stock-card {
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 10px;
+          padding: 10px 14px;
           display: flex;
           align-items: center;
-          padding: 10px 24px;
-          border-bottom: 1px solid rgba(255,255,255,0.04);
-          transition: background 0.12s;
+          gap: 10px;
+          transition: all 0.15s ease;
+          cursor: default;
         }
-        .modal-stock-row:hover {
-          background: rgba(255,255,255,0.04);
-        }
-        .msr-rank {
-          width: 28px;
-          font-size: 12px;
-          color: rgba(255,255,255,0.3);
-          flex-shrink: 0;
-        }
-        .msr-symbol {
-          flex: 1;
-          font-size: 14px;
-          font-weight: 700;
-          color: #fff;
-        }
-        .msr-price {
-          margin-right: 16px;
-          font-size: 13px;
-          color: rgba(255,255,255,0.65);
-          white-space: nowrap;
-        }
-        .msr-pill {
-          padding: 3px 8px;
-          border-radius: 6px;
-          font-size: 12px;
-          font-weight: 700;
-          min-width: 56px;
-          text-align: center;
-          flex-shrink: 0;
-          white-space: nowrap;
+        .modal-stock-card:hover {
+          background: rgba(255,255,255,0.08);
+          border-color: rgba(255,255,255,0.15);
+          transform: translateY(-1px);
         }
         .hm-modal-footer {
-          padding: 12px 24px;
-          border-top: 1px solid rgba(255,255,255,0.08);
+          padding: 12px 24px 18px;
           text-align: center;
+          color: rgba(255,255,255,0.3);
           font-size: 12px;
-          color: rgba(255,255,255,0.35);
-          flex-shrink: 0;
+        }
+        @media (max-width: 600px) {
+          .heatmap-modal { border-radius: 14px; }
+          .modal-stock-grid { grid-template-columns: repeat(2, 1fr) !important; padding: 12px 12px 8px; gap: 5px; }
+          .modal-stock-card { padding: 8px 10px; }
+          .modal-stock-card span[style*="font-size: 13px"] { font-size: 12px !important; }
         }
       `}</style>
 
