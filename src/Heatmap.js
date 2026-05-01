@@ -131,23 +131,45 @@ function SectorModal({ tile, onClose }) {
   const pct = (n) =>
     n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "—";
 
-  // Change% badge pill style for the header
   const isPos = tile.change_pct > 0;
   const isNeg = tile.change_pct < 0;
-  const badgeStyle = isPos
-    ? { background: "rgba(74,222,128,0.12)", border: "1px solid rgba(74,222,128,0.3)", color: "#4ade80" }
+
+  // Header banner gradient
+  const bannerGradient = isPos
+    ? "linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(8,15,30,0) 60%)"
     : isNeg
-    ? { background: "rgba(248,113,113,0.12)", border: "1px solid rgba(248,113,113,0.3)", color: "#f87171" }
-    : { background: "rgba(148,163,184,0.12)", border: "1px solid rgba(148,163,184,0.3)", color: "#94a3b8" };
+    ? "linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(8,15,30,0) 60%)"
+    : "linear-gradient(135deg, rgba(100,116,139,0.1) 0%, rgba(8,15,30,0) 60%)";
+  const bannerBorder = isPos
+    ? "1px solid rgba(16,185,129,0.15)"
+    : isNeg
+    ? "1px solid rgba(239,68,68,0.15)"
+    : "1px solid rgba(255,255,255,0.06)";
 
-  // Accent bar color per card
-  const accentColor = (chg) => chg > 0 ? "#4ade80" : chg < 0 ? "#f87171" : "#475569";
+  // Change% color
+  const pctColor = isPos ? "#4ade80" : isNeg ? "#f87171" : "#94a3b8";
 
-  // Change% pill style per card
+  // Per-card background/border based on change%
+  const cardStyle = (chg) => {
+    if (chg > 0) return {
+      background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.04))",
+      border: "1px solid rgba(16,185,129,0.18)",
+    };
+    if (chg < 0) return {
+      background: "linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.04))",
+      border: "1px solid rgba(239,68,68,0.15)",
+    };
+    return {
+      background: "rgba(255,255,255,0.03)",
+      border: "1px solid rgba(255,255,255,0.07)",
+    };
+  };
+
+  // Change% pill per card
   const pillStyle = (chg) => {
-    if (chg > 0) return { background: "#166534", color: "#4ade80" };
-    if (chg < 0) return { background: "#7f1d1d", color: "#f87171" };
-    return { background: "#1e293b", color: "#94a3b8" };
+    if (chg > 0) return { background: "rgba(74,222,128,0.18)", color: "#4ade80" };
+    if (chg < 0) return { background: "rgba(248,113,113,0.18)", color: "#f87171" };
+    return { background: "rgba(148,163,184,0.12)", color: "#94a3b8" };
   };
 
   // Dynamic columns: 2 for ≤6 stocks, 3 otherwise
@@ -157,30 +179,55 @@ function SectorModal({ tile, onClose }) {
     <div className="heatmap-modal-overlay" onClick={onClose}>
       <div className="heatmap-modal" onClick={e => e.stopPropagation()}>
 
-        {/* ── Modal Header ── */}
-        <div className="hm-modal-header">
+        {/* ── Header banner ── */}
+        <div style={{
+          padding: "22px 28px 18px",
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          background: bannerGradient,
+          borderBottom: bannerBorder,
+          position: "relative",
+        }}>
+          {/* Left block */}
           <div>
-            <div style={{ fontSize: "20px", fontWeight: "800", color: "#fff", lineHeight: 1.2 }}>
+            <div style={{ fontSize: "22px", fontWeight: "800", letterSpacing: "0.5px", color: "#fff", lineHeight: 1.2 }}>
               {tile.sector}
             </div>
-            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.35)", marginTop: "3px" }}>
-              All Constituents — Ranked by Performance
+            <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+              <span style={{
+                background: "rgba(74,222,128,0.12)", color: "#4ade80",
+                borderRadius: "20px", padding: "2px 10px",
+                fontSize: "11px", fontWeight: "600",
+              }}>
+                ↑ {positiveCount} Advancing
+              </span>
+              <span style={{
+                background: "rgba(248,113,113,0.12)", color: "#f87171",
+                borderRadius: "20px", padding: "2px 10px",
+                fontSize: "11px", fontWeight: "600",
+              }}>
+                ↓ {negativeCount} Declining
+              </span>
             </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-            <div style={{
-              ...badgeStyle,
-              borderRadius: "10px",
-              padding: "6px 16px",
-              fontSize: "32px",
-              fontWeight: "900",
-              letterSpacing: "-1.5px",
-              lineHeight: 1,
-            }}>
-              {tile.change_pct >= 0 ? "+" : ""}{Number(tile.change_pct).toFixed(2)}%
-            </div>
-            <button className="hm-modal-close" onClick={onClose} aria-label="Close">✕</button>
+
+          {/* Right block: large change% */}
+          <div style={{
+            fontSize: "38px", fontWeight: "900", letterSpacing: "-1px",
+            color: pctColor, lineHeight: 1, paddingRight: "44px",
+          }}>
+            {tile.change_pct >= 0 ? "+" : ""}{Number(tile.change_pct).toFixed(2)}%
           </div>
+
+          {/* Close button — absolute top-right */}
+          <button
+            className="hm-modal-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ✕
+          </button>
         </div>
 
         {/* ── Stock Grid ── */}
@@ -196,49 +243,55 @@ function SectorModal({ tile, onClose }) {
             {stocks.map((s, idx) => {
               const isFirst = idx === 0;
               const isLast  = idx === lastIdx;
-              const glowStyle = isFirst
-                ? { boxShadow: "0 0 0 1px rgba(74,222,128,0.25), 0 4px 12px rgba(74,222,128,0.1)" }
+
+              const baseCardStyle = cardStyle(s.change_percent);
+              const specialStyle = isFirst
+                ? { borderColor: "rgba(74,222,128,0.4)", boxShadow: "0 0 20px rgba(74,222,128,0.08)" }
                 : isLast
-                ? { boxShadow: "0 0 0 1px rgba(248,113,113,0.25), 0 4px 12px rgba(248,113,113,0.1)" }
+                ? { borderColor: "rgba(248,113,113,0.4)", boxShadow: "0 0 20px rgba(248,113,113,0.08)" }
                 : {};
 
+              const rankBg = isFirst
+                ? { background: "rgba(74,222,128,0.2)", color: "#4ade80" }
+                : { background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.35)" };
+
               return (
-                <div key={s.symbol} className="modal-stock-card" style={glowStyle}>
-                  {/* Left accent bar */}
-                  <div style={{
-                    width: "3px",
-                    height: "32px",
-                    borderRadius: "2px",
-                    flexShrink: 0,
-                    background: accentColor(s.change_percent),
-                  }} />
-
-                  {/* Rank */}
-                  <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", width: "16px", flexShrink: 0 }}>
-                    {idx + 1}
-                  </span>
-
-                  {/* Symbol */}
-                  <span style={{ flex: 1, fontSize: "13px", fontWeight: "700", color: "#fff" }}>
-                    {s.symbol}
-                  </span>
-
-                  {/* Right: price + pill stacked */}
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
-                    <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>
-                      {fmt(s.ltp)}
+                <div
+                  key={s.symbol}
+                  className="modal-stock-card"
+                  style={{ ...baseCardStyle, ...specialStyle }}
+                >
+                  {/* Row 1: rank badge | symbol | change% pill */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <div style={{
+                      ...rankBg,
+                      width: "22px", height: "22px",
+                      borderRadius: "6px",
+                      fontSize: "10px", fontWeight: "700",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      {isFirst ? "🏆" : idx + 1}
+                    </div>
+                    <span style={{ flex: 1, fontSize: "13px", fontWeight: "800", color: "#fff", letterSpacing: "0.3px" }}>
+                      {s.symbol}
                     </span>
                     <span style={{
                       ...pillStyle(s.change_percent),
-                      fontSize: "11px",
-                      fontWeight: "700",
-                      padding: "2px 7px",
-                      borderRadius: "5px",
-                      textAlign: "center",
-                      whiteSpace: "nowrap",
+                      fontSize: "12px", fontWeight: "700",
+                      padding: "3px 9px", borderRadius: "7px",
+                      whiteSpace: "nowrap", flexShrink: 0,
                     }}>
                       {pct(s.change_percent)}
                     </span>
+                  </div>
+
+                  {/* Row 2: price */}
+                  <div style={{
+                    marginTop: "6px", marginLeft: "30px",
+                    fontSize: "12px", color: "rgba(255,255,255,0.45)", fontWeight: "500",
+                  }}>
+                    {fmt(s.ltp)}
                   </div>
                 </div>
               );
@@ -246,9 +299,17 @@ function SectorModal({ tile, onClose }) {
           </div>
         )}
 
-        {/* ── Modal Footer ── */}
+        {/* ── Footer ── */}
         <div className="hm-modal-footer">
-          {stocks.length} stocks &bull; {positiveCount} advancing &bull; {negativeCount} declining
+          <span style={{ background: "rgba(255,255,255,0.05)", borderRadius: "20px", padding: "4px 12px", fontSize: "11px", margin: "0 4px" }}>
+            {stocks.length} Stocks
+          </span>
+          <span style={{ background: "rgba(74,222,128,0.08)", color: "#4ade80", borderRadius: "20px", padding: "4px 12px", fontSize: "11px", margin: "0 4px" }}>
+            ↑ {positiveCount} Advancing
+          </span>
+          <span style={{ background: "rgba(248,113,113,0.08)", color: "#f87171", borderRadius: "20px", padding: "4px 12px", fontSize: "11px", margin: "0 4px" }}>
+            ↓ {negativeCount} Declining
+          </span>
         </div>
 
       </div>
@@ -380,7 +441,9 @@ export default function HeatmapPage({ onBack, wsStatus }) {
           position: fixed;
           top: 0; left: 0;
           width: 100vw; height: 100vh;
-          background: rgba(0,0,0,0.75);
+          background: rgba(0,0,0,0.65);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
           z-index: 2000;
           display: flex;
           align-items: center;
@@ -389,68 +452,61 @@ export default function HeatmapPage({ onBack, wsStatus }) {
           box-sizing: border-box;
         }
         .heatmap-modal {
-          background: #0f172a;
-          border: 1px solid rgba(255,255,255,0.12);
-          border-radius: 20px;
-          width: 760px;
+          background: #080f1e;
+          border: 1px solid rgba(255,255,255,0.09);
+          border-radius: 22px;
+          width: 780px;
           max-width: 95vw;
           overflow: hidden;
-          box-shadow: 0 30px 80px rgba(0,0,0,0.7);
-        }
-        .hm-modal-header {
-          padding: 24px 28px 20px;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
+          box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
         }
         .hm-modal-close {
-          font-size: 18px;
-          color: rgba(255,255,255,0.4);
+          position: absolute;
+          top: 18px;
+          right: 20px;
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.07);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(255,255,255,0.5);
+          font-size: 14px;
           cursor: pointer;
-          padding: 4px 8px;
-          border-radius: 6px;
-          background: transparent;
           border: none;
-          line-height: 1;
-          transition: color 0.15s, background 0.15s;
+          transition: background 0.15s, color 0.15s;
+          flex-shrink: 0;
         }
         .hm-modal-close:hover {
+          background: rgba(255,255,255,0.14);
           color: #fff;
-          background: rgba(255,255,255,0.08);
         }
         .modal-stock-grid {
           display: grid;
-          gap: 6px;
-          padding: 16px 20px 8px;
+          gap: 8px;
+          padding: 16px 20px 16px;
         }
         .modal-stock-card {
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 10px;
-          padding: 10px 14px;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          transition: all 0.15s ease;
+          border-radius: 12px;
+          padding: 12px 14px;
           cursor: default;
+          transition: transform 0.15s, box-shadow 0.15s;
         }
         .modal-stock-card:hover {
-          background: rgba(255,255,255,0.08);
-          border-color: rgba(255,255,255,0.15);
-          transform: translateY(-1px);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         }
         .hm-modal-footer {
-          padding: 12px 24px 18px;
+          padding: 10px 24px 20px;
           text-align: center;
-          color: rgba(255,255,255,0.3);
+          color: rgba(255,255,255,0.4);
           font-size: 12px;
         }
         @media (max-width: 600px) {
-          .heatmap-modal { border-radius: 14px; }
-          .modal-stock-grid { grid-template-columns: repeat(2, 1fr) !important; padding: 12px 12px 8px; gap: 5px; }
-          .modal-stock-card { padding: 8px 10px; }
-          .modal-stock-card span[style*="font-size: 13px"] { font-size: 12px !important; }
+          .heatmap-modal { border-radius: 16px; }
+          .modal-stock-grid { grid-template-columns: repeat(2, 1fr) !important; padding: 12px; gap: 6px; }
+          .modal-stock-card { padding: 10px 12px; }
         }
       `}</style>
 
