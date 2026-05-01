@@ -120,8 +120,6 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, onClick }) => {
 
 function SectorModal({ tile, onClose }) {
   const stocks = tile.stocks || [];
-  const lastIdx = stocks.length - 1;
-
   const positiveCount = stocks.filter(s => s.change_percent > 0).length;
   const negativeCount = stocks.filter(s => s.change_percent < 0).length;
 
@@ -134,180 +132,69 @@ function SectorModal({ tile, onClose }) {
   const isPos = tile.change_pct > 0;
   const isNeg = tile.change_pct < 0;
 
-  // Header banner gradient
-  const bannerGradient = isPos
-    ? "linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(8,15,30,0) 60%)"
-    : isNeg
-    ? "linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(8,15,30,0) 60%)"
-    : "linear-gradient(135deg, rgba(100,116,139,0.1) 0%, rgba(8,15,30,0) 60%)";
-  const bannerBorder = isPos
-    ? "1px solid rgba(16,185,129,0.15)"
-    : isNeg
-    ? "1px solid rgba(239,68,68,0.15)"
-    : "1px solid rgba(255,255,255,0.06)";
-
-  // Change% color
-  const pctColor = isPos ? "#4ade80" : isNeg ? "#f87171" : "#94a3b8";
-
-  // Per-card background/border based on change%
-  const cardStyle = (chg) => {
-    if (chg > 0) return {
-      background: "linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.04))",
-      border: "1px solid rgba(16,185,129,0.18)",
-    };
-    if (chg < 0) return {
-      background: "linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.04))",
-      border: "1px solid rgba(239,68,68,0.15)",
-    };
-    return {
-      background: "rgba(255,255,255,0.03)",
-      border: "1px solid rgba(255,255,255,0.07)",
-    };
-  };
-
-  // Change% pill per card
-  const pillStyle = (chg) => {
-    if (chg > 0) return { background: "rgba(74,222,128,0.18)", color: "#4ade80" };
-    if (chg < 0) return { background: "rgba(248,113,113,0.18)", color: "#f87171" };
-    return { background: "rgba(148,163,184,0.12)", color: "#94a3b8" };
-  };
-
-  // Dynamic columns: 2 for ≤6 stocks, 3 otherwise
-  const cols = stocks.length <= 6 ? 2 : 3;
+  // Find min and max for gainer/loser cards
+  const sortedByChange = [...stocks].sort((a, b) => b.change_percent - a.change_percent);
+  const topGainerSymbol = sortedByChange[0]?.symbol;
+  const topLoserSymbol = sortedByChange[sortedByChange.length - 1]?.symbol;
 
   return (
     <div className="heatmap-modal-overlay" onClick={onClose}>
       <div className="heatmap-modal" onClick={e => e.stopPropagation()}>
-
-        {/* ── Header banner ── */}
-        <div className="hm-modal-banner" style={{
-          background: bannerGradient,
-          borderBottom: bannerBorder,
-          position: "relative",
-        }}>
-          {/* Left block */}
-          <div>
-            <div className="hm-modal-index-name">
-              {tile.sector}
+        
+        <div className="hm-modal-header">
+          <div className="hm-modal-header-left">
+            <div className="hm-modal-index-name">{tile.sector}</div>
+            <div className={`hm-modal-pct-change ${isPos ? "hm-pct-pos" : isNeg ? "hm-pct-neg" : "hm-pct-zero"}`}>
+              {pct(tile.change_pct)}
             </div>
-            <div className="hm-modal-stats-row" style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
-              <span className="hm-modal-stat-badge" style={{
-                background: "rgba(74,222,128,0.12)", color: "#4ade80",
-                borderRadius: "20px",
-                fontWeight: "600",
-              }}>
-                ↑ {positiveCount} Advancing
-              </span>
-              <span className="hm-modal-stat-badge" style={{
-                background: "rgba(248,113,113,0.12)", color: "#f87171",
-                borderRadius: "20px",
-                fontWeight: "600",
-              }}>
-                ↓ {negativeCount} Declining
-              </span>
+            <div className="hm-modal-badges">
+              <span className="hm-modal-badge badge-adv">↑ {positiveCount} Advancing</span>
+              <span className="hm-modal-badge badge-dec">↓ {negativeCount} Declining</span>
             </div>
           </div>
-
-          {/* Right block: large change% */}
-          <div className="hm-modal-pct-change" style={{
-            fontWeight: "900", letterSpacing: "-1px",
-            color: pctColor, lineHeight: 1,
-          }}>
-            {tile.change_pct >= 0 ? "+" : ""}{Number(tile.change_pct).toFixed(2)}%
-          </div>
-
-          {/* Close button — absolute top-right */}
-          <button
-            className="hm-modal-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            ✕
-          </button>
+          <button className="hm-modal-close" onClick={onClose}>×</button>
         </div>
 
-        {/* ── Stock Grid ── */}
-        {stocks.length === 0 ? (
-          <div style={{ padding: "40px 24px", textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: "13px" }}>
-            No live data yet — waiting for market ticks
-          </div>
-        ) : (
-          <div
-            className="modal-stock-grid"
-            style={{ gridTemplateColumns: stocks.length > 0 ? `repeat(${cols}, 1fr)` : undefined }}
-          >
-            {stocks.map((s, idx) => {
-              const isFirst = idx === 0;
-              const isLast  = idx === lastIdx;
-
-              const baseCardStyle = cardStyle(s.change_percent);
-              const specialStyle = isFirst
-                ? { borderColor: "rgba(74,222,128,0.4)", boxShadow: "0 0 20px rgba(74,222,128,0.08)" }
-                : isLast
-                ? { borderColor: "rgba(248,113,113,0.4)", boxShadow: "0 0 20px rgba(248,113,113,0.08)" }
-                : {};
-
-              const rankBg = isFirst
-                ? { background: "rgba(74,222,128,0.2)", color: "#4ade80" }
-                : { background: "rgba(255,255,255,0.07)", color: "rgba(255,255,255,0.35)" };
-
-              return (
-                <div
-                  key={s.symbol}
-                  className="modal-stock-card"
-                  style={{ ...baseCardStyle, ...specialStyle }}
-                >
-                  {/* Left Group: rank badge | symbol */}
-                  <div className="modal-stock-left-group">
-                    <div className="modal-stock-rank" style={{
-                      ...rankBg,
-                      width: "22px", height: "22px",
-                      borderRadius: "6px",
-                      fontSize: "10px", fontWeight: "700",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      flexShrink: 0,
-                    }}>
-                      {isFirst ? "🏆" : idx + 1}
+        <div className="hm-modal-content">
+          {stocks.length === 0 ? (
+            <div className="hm-modal-empty">No live data yet — waiting for market ticks</div>
+          ) : (
+            <div className="hm-modal-grid">
+              {stocks.map((s, idx) => {
+                const isTopGainer = s.symbol === topGainerSymbol && s.change_percent > 0;
+                const isTopLoser = s.symbol === topLoserSymbol && s.change_percent < 0;
+                
+                return (
+                  <div
+                    key={s.symbol}
+                    className={`hm-modal-card ${isTopGainer ? "hm-card-best" : ""} ${isTopLoser ? "hm-card-worst" : ""}`}
+                  >
+                    <div className="hm-card-row-1">
+                      <span className="hm-card-rank">{idx + 1}</span>
+                      <span className="hm-card-symbol">{s.symbol}</span>
                     </div>
-                    <span className="modal-stock-symbol">
-                      {s.symbol}
-                    </span>
+                    <div className="hm-card-price">{fmt(s.ltp)}</div>
+                    <div className="hm-card-row-3">
+                      <span className={`hm-card-pill ${s.change_percent >= 0 ? "pill-up" : "pill-down"}`}>
+                        {pct(s.change_percent)}
+                      </span>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-                  {/* Price */}
-                  <div className="modal-stock-price">
-                    {fmt(s.ltp)}
-                  </div>
-
-                  {/* Change% pill */}
-                  <span className="modal-stock-pill" style={{
-                    ...pillStyle(s.change_percent),
-                  }}>
-                    {pct(s.change_percent)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* ── Footer ── */}
         <div className="hm-modal-footer">
-          <span style={{ background: "rgba(255,255,255,0.05)", borderRadius: "20px" }}>
-            {stocks.length} Stocks
-          </span>
-          <span style={{ background: "rgba(74,222,128,0.08)", color: "#4ade80", borderRadius: "20px" }}>
-            ↑ {positiveCount} Advancing
-          </span>
-          <span style={{ background: "rgba(248,113,113,0.08)", color: "#f87171", borderRadius: "20px" }}>
-            ↓ {negativeCount} Declining
-          </span>
+          {stocks.length} Stocks · ↑ {positiveCount} Advancing · ↓ {negativeCount} Declining
         </div>
 
       </div>
     </div>
   );
 }
+
 
 // ─── Main Heatmap Page ────────────────────────────────────────────────────────
 
