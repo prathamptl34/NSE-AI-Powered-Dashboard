@@ -180,32 +180,28 @@ function SectorModal({ tile, onClose }) {
       <div className="heatmap-modal" onClick={e => e.stopPropagation()}>
 
         {/* ── Header banner ── */}
-        <div style={{
-          padding: "22px 28px 18px",
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
+        <div className="hm-modal-banner" style={{
           background: bannerGradient,
           borderBottom: bannerBorder,
           position: "relative",
         }}>
           {/* Left block */}
           <div>
-            <div style={{ fontSize: "22px", fontWeight: "800", letterSpacing: "0.5px", color: "#fff", lineHeight: 1.2 }}>
+            <div className="hm-modal-index-name">
               {tile.sector}
             </div>
-            <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
-              <span style={{
+            <div className="hm-modal-stats-row" style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
+              <span className="hm-modal-stat-badge" style={{
                 background: "rgba(74,222,128,0.12)", color: "#4ade80",
-                borderRadius: "20px", padding: "2px 10px",
-                fontSize: "11px", fontWeight: "600",
+                borderRadius: "20px",
+                fontWeight: "600",
               }}>
                 ↑ {positiveCount} Advancing
               </span>
-              <span style={{
+              <span className="hm-modal-stat-badge" style={{
                 background: "rgba(248,113,113,0.12)", color: "#f87171",
-                borderRadius: "20px", padding: "2px 10px",
-                fontSize: "11px", fontWeight: "600",
+                borderRadius: "20px",
+                fontWeight: "600",
               }}>
                 ↓ {negativeCount} Declining
               </span>
@@ -213,9 +209,9 @@ function SectorModal({ tile, onClose }) {
           </div>
 
           {/* Right block: large change% */}
-          <div style={{
-            fontSize: "38px", fontWeight: "900", letterSpacing: "-1px",
-            color: pctColor, lineHeight: 1, paddingRight: "44px",
+          <div className="hm-modal-pct-change" style={{
+            fontWeight: "900", letterSpacing: "-1px",
+            color: pctColor, lineHeight: 1,
           }}>
             {tile.change_pct >= 0 ? "+" : ""}{Number(tile.change_pct).toFixed(2)}%
           </div>
@@ -238,7 +234,7 @@ function SectorModal({ tile, onClose }) {
         ) : (
           <div
             className="modal-stock-grid"
-            style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+            style={{ gridTemplateColumns: stocks.length > 0 ? `repeat(${cols}, 1fr)` : undefined }}
           >
             {stocks.map((s, idx) => {
               const isFirst = idx === 0;
@@ -261,9 +257,9 @@ function SectorModal({ tile, onClose }) {
                   className="modal-stock-card"
                   style={{ ...baseCardStyle, ...specialStyle }}
                 >
-                  {/* Row 1: rank badge | symbol | change% pill */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <div style={{
+                  {/* Left Group: rank badge | symbol */}
+                  <div className="modal-stock-left-group">
+                    <div className="modal-stock-rank" style={{
                       ...rankBg,
                       width: "22px", height: "22px",
                       borderRadius: "6px",
@@ -273,26 +269,22 @@ function SectorModal({ tile, onClose }) {
                     }}>
                       {isFirst ? "🏆" : idx + 1}
                     </div>
-                    <span style={{ flex: 1, fontSize: "13px", fontWeight: "800", color: "#fff", letterSpacing: "0.3px" }}>
+                    <span className="modal-stock-symbol">
                       {s.symbol}
-                    </span>
-                    <span style={{
-                      ...pillStyle(s.change_percent),
-                      fontSize: "12px", fontWeight: "700",
-                      padding: "3px 9px", borderRadius: "7px",
-                      whiteSpace: "nowrap", flexShrink: 0,
-                    }}>
-                      {pct(s.change_percent)}
                     </span>
                   </div>
 
-                  {/* Row 2: price */}
-                  <div style={{
-                    marginTop: "6px", marginLeft: "30px",
-                    fontSize: "12px", color: "rgba(255,255,255,0.45)", fontWeight: "500",
-                  }}>
+                  {/* Price */}
+                  <div className="modal-stock-price">
                     {fmt(s.ltp)}
                   </div>
+
+                  {/* Change% pill */}
+                  <span className="modal-stock-pill" style={{
+                    ...pillStyle(s.change_percent),
+                  }}>
+                    {pct(s.change_percent)}
+                  </span>
                 </div>
               );
             })}
@@ -301,13 +293,13 @@ function SectorModal({ tile, onClose }) {
 
         {/* ── Footer ── */}
         <div className="hm-modal-footer">
-          <span style={{ background: "rgba(255,255,255,0.05)", borderRadius: "20px", padding: "4px 12px", fontSize: "11px", margin: "0 4px" }}>
+          <span style={{ background: "rgba(255,255,255,0.05)", borderRadius: "20px" }}>
             {stocks.length} Stocks
           </span>
-          <span style={{ background: "rgba(74,222,128,0.08)", color: "#4ade80", borderRadius: "20px", padding: "4px 12px", fontSize: "11px", margin: "0 4px" }}>
+          <span style={{ background: "rgba(74,222,128,0.08)", color: "#4ade80", borderRadius: "20px" }}>
             ↑ {positiveCount} Advancing
           </span>
-          <span style={{ background: "rgba(248,113,113,0.08)", color: "#f87171", borderRadius: "20px", padding: "4px 12px", fontSize: "11px", margin: "0 4px" }}>
+          <span style={{ background: "rgba(248,113,113,0.08)", color: "#f87171", borderRadius: "20px" }}>
             ↓ {negativeCount} Declining
           </span>
         </div>
@@ -435,80 +427,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
 
   return (
     <div className="heatmap-wrapper">
-      {/* ── Scoped CSS for modal only ── */}
-      <style>{`
-        .heatmap-modal-overlay {
-          position: fixed;
-          top: 0; left: 0;
-          width: 100vw; height: 100vh;
-          background: rgba(0,0,0,0.65);
-          backdrop-filter: blur(4px);
-          -webkit-backdrop-filter: blur(4px);
-          z-index: 2000;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 20px;
-          box-sizing: border-box;
-        }
-        .heatmap-modal {
-          background: #080f1e;
-          border: 1px solid rgba(255,255,255,0.09);
-          border-radius: 22px;
-          width: 780px;
-          max-width: 95vw;
-          overflow: hidden;
-          box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
-        }
-        .hm-modal-close {
-          position: absolute;
-          top: 18px;
-          right: 20px;
-          width: 30px;
-          height: 30px;
-          border-radius: 50%;
-          background: rgba(255,255,255,0.07);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: rgba(255,255,255,0.5);
-          font-size: 14px;
-          cursor: pointer;
-          border: none;
-          transition: background 0.15s, color 0.15s;
-          flex-shrink: 0;
-        }
-        .hm-modal-close:hover {
-          background: rgba(255,255,255,0.14);
-          color: #fff;
-        }
-        .modal-stock-grid {
-          display: grid;
-          gap: 8px;
-          padding: 16px 20px 16px;
-        }
-        .modal-stock-card {
-          border-radius: 12px;
-          padding: 12px 14px;
-          cursor: default;
-          transition: transform 0.15s, box-shadow 0.15s;
-        }
-        .modal-stock-card:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-        }
-        .hm-modal-footer {
-          padding: 10px 24px 20px;
-          text-align: center;
-          color: rgba(255,255,255,0.4);
-          font-size: 12px;
-        }
-        @media (max-width: 600px) {
-          .heatmap-modal { border-radius: 16px; }
-          .modal-stock-grid { grid-template-columns: repeat(2, 1fr) !important; padding: 12px; gap: 6px; }
-          .modal-stock-card { padding: 10px 12px; }
-        }
-      `}</style>
+      {/* Scoped CSS moved to index.css */}
 
       {/* ── Terminal Header ── */}
       <header className="hm-terminal-header">
