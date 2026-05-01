@@ -40,7 +40,7 @@ function SkeletonTile() {
 
 // ─── Index Tile ───────────────────────────────────────────────────────────────
 
-const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, isExpanded, onToggle }) => {
+const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, onClick }) => {
   const tileRef = useRef(null);
   const prevPct = useRef(null);
 
@@ -67,20 +67,13 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, isExpanded, onT
   const pct = (n) =>
     n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "—";
 
-  const stocks = tile.stocks || [];
-
   return (
     <div
-      className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""} ${isExpanded ? "tile-expanded" : ""}`}
+      className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""}`}
       ref={tileRef}
-      onClick={() => onToggle(tile.sector)}
-      style={{
-        cursor: "pointer",
-        // Override index.css height:220px!important and overflow:hidden when expanded
-        ...(isExpanded ? { height: "auto", minHeight: "auto", overflow: "visible" } : {}),
-      }}
+      onClick={onClick}
+      style={{ cursor: "pointer" }}
     >
-      {/* ── Existing header rows (unchanged) ── */}
       <div className="hm-row-1">
         <span className="hm-index-name">{tile.sector}</span>
         <span className={`hm-arrow ${tile.change_pct >= 0 ? "hm-arrow-up" : "hm-arrow-down"}`}>
@@ -119,51 +112,108 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, isExpanded, onT
           </div>
         </div>
       </div>
+    </div>
+  );
+});
 
-      {/* ── Expanded Stock List ── */}
-      {isExpanded && (
-        <div
-          className="tile-stock-list"
-          onClick={(e) => e.stopPropagation()} // prevent collapse when scrolling the list
-        >
+// ─── Sector Modal ─────────────────────────────────────────────────────────────
+
+function SectorModal({ tile, onClose }) {
+  const stocks = tile.stocks || [];
+  const lastIdx = stocks.length - 1;
+
+  const positiveCount = stocks.filter(s => s.change_percent > 0).length;
+  const negativeCount = stocks.filter(s => s.change_percent < 0).length;
+
+  const fmt = (n) =>
+    n != null ? "₹" + Number(n).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "—";
+
+  const pct = (n) =>
+    n != null ? `${n >= 0 ? "+" : ""}${Number(n).toFixed(2)}%` : "—";
+
+  const pctColor = tile.change_pct > 0 ? "#4ade80" : tile.change_pct < 0 ? "#f87171" : "#94a3b8";
+
+  const pillStyle = (change) => {
+    if (change > 0)  return { background: "#166534", color: "#4ade80" };
+    if (change < 0)  return { background: "#7f1d1d", color: "#f87171" };
+    return { background: "#1e293b", color: "#94a3b8" };
+  };
+
+  return (
+    <div
+      className="heatmap-modal-overlay"
+      onClick={onClose}
+    >
+      <div
+        className="heatmap-modal"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* ── Modal Header ── */}
+        <div className="hm-modal-header">
+          <div>
+            <div style={{ fontSize: "18px", fontWeight: "700", color: "#fff", lineHeight: 1.2 }}>
+              {tile.sector}
+            </div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", marginTop: "4px" }}>
+              All Constituents
+            </div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            <div style={{ fontSize: "28px", fontWeight: "900", color: pctColor, letterSpacing: "-1px" }}>
+              {tile.change_pct >= 0 ? "+" : ""}{Number(tile.change_pct).toFixed(2)}%
+            </div>
+            <button
+              className="hm-modal-close"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+
+        {/* ── Stock List ── */}
+        <div className="hm-modal-list">
           {stocks.length === 0 ? (
-            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: "11px", textAlign: "center", padding: "8px 0" }}>
-              No live data yet
+            <div style={{ padding: "40px 24px", textAlign: "center", color: "rgba(255,255,255,0.35)", fontSize: "13px" }}>
+              No live data yet — waiting for market ticks
             </div>
           ) : (
             stocks.map((s, idx) => {
-              const isPos = s.change_percent > 0;
-              const isNeg = s.change_percent < 0;
+              const isFirst = idx === 0;
+              const isLast  = idx === lastIdx;
+              const accentStyle = isFirst
+                ? { borderLeft: "3px solid #4ade80", paddingLeft: "21px" }
+                : isLast
+                ? { borderLeft: "3px solid #f87171", paddingLeft: "21px" }
+                : {};
+
               return (
-                <div key={s.symbol} className="tile-stock-list-row">
-                  <span className="tsl-rank">{idx + 1}</span>
-                  <span className="tsl-symbol">{s.symbol}</span>
-                  <span className="tsl-price">{fmt(s.ltp)}</span>
-                  <span
-                    className={`tsl-pill ${isPos ? "tsl-pill-up" : isNeg ? "tsl-pill-down" : "tsl-pill-flat"}`}
-                  >
+                <div
+                  key={s.symbol}
+                  className="modal-stock-row"
+                  style={accentStyle}
+                >
+                  <span className="msr-rank">{idx + 1}</span>
+                  <span className="msr-symbol">{s.symbol}</span>
+                  <span className="msr-price">{fmt(s.ltp)}</span>
+                  <span className="msr-pill" style={pillStyle(s.change_percent)}>
                     {pct(s.change_percent)}
                   </span>
                 </div>
               );
             })
           )}
-
-          {/* Close button */}
-          <div
-            className="tsl-close-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle(tile.sector); // toggles off (collapses)
-            }}
-          >
-            ▲ Close
-          </div>
         </div>
-      )}
+
+        {/* ── Modal Footer ── */}
+        <div className="hm-modal-footer">
+          {stocks.length} stocks &bull; {positiveCount} advancing &middot; {negativeCount} declining
+        </div>
+      </div>
     </div>
   );
-});
+}
 
 // ─── Main Heatmap Page ────────────────────────────────────────────────────────
 
@@ -171,7 +221,8 @@ export default function HeatmapPage({ onBack, wsStatus }) {
   const [indices, setIndices] = useState([]);
   const [streaming, setStreaming] = useState(false);
   const [timeStr, setTimeStr] = useState(getISTTime());
-  const [activeFilter, setActiveFilter] = useState(null); // gainers, flat, losers
+  const [activeFilter, setActiveFilter] = useState(null);
+  // expandedSector holds the full tile data object (or null)
   const [expandedSector, setExpandedSector] = useState(null);
   const sseRef = useRef(null);
 
@@ -179,6 +230,13 @@ export default function HeatmapPage({ onBack, wsStatus }) {
   useEffect(() => {
     const id = setInterval(() => setTimeStr(getISTTime()), 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // ESC key closes modal
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") setExpandedSector(null); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   // Merge logic
@@ -196,7 +254,6 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     let es = null;
     let timer = null;
 
-    // Fast initial load
     const fetchInitial = async () => {
       try {
         const base = window.location.port === "3000" ? "http://127.0.0.1:8000" : "";
@@ -266,117 +323,114 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     setActiveFilter(activeFilter === type ? null : type);
   };
 
-  // Toggle expand: only one tile open at a time
-  const handleTileToggle = useCallback((sector) => {
-    setExpandedSector((prev) => (prev === sector ? null : sector));
-  }, []);
-
   const getIsDimmed = (idx) => {
     if (!activeFilter) return false;
     if (activeFilter === "gainers") return idx.change_pct <= 1;
-    if (activeFilter === "losers") return idx.change_pct >= -1;
-    if (activeFilter === "flat") return idx.change_pct > 1 || idx.change_pct < -1;
+    if (activeFilter === "losers")  return idx.change_pct >= -1;
+    if (activeFilter === "flat")    return idx.change_pct > 1 || idx.change_pct < -1;
     return false;
   };
 
   return (
     <div className="heatmap-wrapper">
-      {/* ── Scoped CSS for expand feature only ── */}
+      {/* ── Scoped CSS for modal only ── */}
       <style>{`
-        /* Grid: prevent row-siblings from stretching to match the expanded tile's height */
-        .hm-terminal-grid {
-          align-items: start;
+        .heatmap-modal-overlay {
+          position: fixed;
+          top: 0; left: 0;
+          width: 100vw; height: 100vh;
+          background: rgba(0,0,0,0.75);
+          z-index: 2000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
-
-        /* Expanded tile: override the 220px fixed height and overflow:hidden from index.css.
-           Inline styles on the element also override these, but the class is kept for clarity. */
-        .tile-expanded {
-          height: auto !important;
-          min-height: auto !important;
-          overflow: visible !important;
+        .heatmap-modal {
+          background: #0f172a;
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 16px;
+          width: 480px;
+          max-width: 92vw;
+          max-height: 80vh;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          box-shadow: 0 25px 60px rgba(0,0,0,0.6);
         }
-
-        /* Stock list container — inside the tile card, no absolute positioning */
-        .tile-stock-list {
-          width: 100%;
-          max-height: 320px;
-          overflow-y: auto;
-          margin-top: 10px;
-          border-top: 1px solid rgba(255,255,255,0.12);
-          padding-top: 8px;
-          box-sizing: border-box;
-        }
-
-        /* Each stock row */
-        .tile-stock-list-row {
+        .hm-modal-header {
+          padding: 20px 24px 16px;
+          border-bottom: 1px solid rgba(255,255,255,0.08);
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 5px 4px;
-          border-radius: 4px;
-          font-size: 12px;
+          flex-shrink: 0;
+        }
+        .hm-modal-close {
+          font-size: 18px;
+          color: rgba(255,255,255,0.4);
+          cursor: pointer;
+          padding: 4px 8px;
+          border-radius: 6px;
+          background: transparent;
+          border: none;
+          line-height: 1;
+          transition: color 0.15s, background 0.15s;
+        }
+        .hm-modal-close:hover {
+          color: #fff;
+          background: rgba(255,255,255,0.08);
+        }
+        .hm-modal-list {
+          overflow-y: auto;
+          flex: 1;
+          padding: 8px 0;
+        }
+        .modal-stock-row {
+          display: flex;
+          align-items: center;
+          padding: 10px 24px;
+          border-bottom: 1px solid rgba(255,255,255,0.04);
           transition: background 0.12s;
         }
-        .tile-stock-list-row:hover {
-          background: rgba(255,255,255,0.05);
+        .modal-stock-row:hover {
+          background: rgba(255,255,255,0.04);
         }
-
-        /* Rank number */
-        .tsl-rank {
-          width: 18px;
+        .msr-rank {
+          width: 28px;
+          font-size: 12px;
+          color: rgba(255,255,255,0.3);
           flex-shrink: 0;
-          color: rgba(255,255,255,0.35);
-          font-size: 11px;
-          text-align: right;
         }
-
-        /* Symbol */
-        .tsl-symbol {
+        .msr-symbol {
           flex: 1;
-          margin-left: 6px;
+          font-size: 14px;
           font-weight: 700;
           color: #fff;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
         }
-
-        /* Price */
-        .tsl-price {
-          margin-right: 8px;
-          color: rgba(255,255,255,0.7);
-          font-size: 11px;
+        .msr-price {
+          margin-right: 16px;
+          font-size: 13px;
+          color: rgba(255,255,255,0.65);
           white-space: nowrap;
         }
-
-        /* Change% pill */
-        .tsl-pill {
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-size: 11px;
+        .msr-pill {
+          padding: 3px 8px;
+          border-radius: 6px;
+          font-size: 12px;
           font-weight: 700;
-          white-space: nowrap;
-          flex-shrink: 0;
           min-width: 56px;
           text-align: center;
+          flex-shrink: 0;
+          white-space: nowrap;
         }
-        .tsl-pill-up   { background: #166534; color: #4ade80; }
-        .tsl-pill-down { background: #991b1b; color: #fca5a5; }
-        .tsl-pill-flat { background: #334155; color: #94a3b8; }
-
-        /* Close button */
-        .tsl-close-btn {
-          text-align: center;
-          padding: 8px 0 2px;
-          color: rgba(255,255,255,0.45);
-          font-size: 11px;
-          cursor: pointer;
-          letter-spacing: 0.5px;
+        .hm-modal-footer {
+          padding: 12px 24px;
           border-top: 1px solid rgba(255,255,255,0.08);
-          margin-top: 6px;
-          transition: color 0.15s;
+          text-align: center;
+          font-size: 12px;
+          color: rgba(255,255,255,0.35);
+          flex-shrink: 0;
         }
-        .tsl-close-btn:hover { color: rgba(255,255,255,0.85); }
       `}</style>
 
       {/* ── Terminal Header ── */}
@@ -403,19 +457,19 @@ export default function HeatmapPage({ onBack, wsStatus }) {
         </div>
 
         <div className="hm-header-right">
-          <div 
+          <div
             className={`hm-pill pill-gain ${activeFilter === "gainers" ? "active" : ""}`}
             onClick={() => toggleFilter("gainers")}
           >
             ▲ &gt;1% {stats.g}
           </div>
-          <div 
+          <div
             className={`hm-pill pill-flat ${activeFilter === "flat" ? "active" : ""}`}
             onClick={() => toggleFilter("flat")}
           >
             ● Flat {stats.f}
           </div>
-          <div 
+          <div
             className={`hm-pill pill-loss ${activeFilter === "losers" ? "active" : ""}`}
             onClick={() => toggleFilter("losers")}
           >
@@ -428,14 +482,13 @@ export default function HeatmapPage({ onBack, wsStatus }) {
       <div className="hm-terminal-grid">
         {indices.length > 0
           ? indices.map((idx) => (
-              <IndexTile 
-                key={idx.sector} 
-                tile={idx} 
+              <IndexTile
+                key={idx.sector}
+                tile={idx}
                 isBest={idx.sector === extremes.best}
                 isWorst={idx.sector === extremes.worst}
                 isDimmed={getIsDimmed(idx)}
-                isExpanded={expandedSector === idx.sector}
-                onToggle={handleTileToggle}
+                onClick={() => setExpandedSector(idx)}
               />
             ))
           : Array.from({ length: 21 }).map((_, i) => (
@@ -443,6 +496,14 @@ export default function HeatmapPage({ onBack, wsStatus }) {
             ))
         }
       </div>
+
+      {/* ── Sector Modal (outside grid, fixed overlay) ── */}
+      {expandedSector && (
+        <SectorModal
+          tile={expandedSector}
+          onClose={() => setExpandedSector(null)}
+        />
+      )}
     </div>
   );
 }
