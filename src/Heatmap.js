@@ -74,7 +74,11 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, isExpanded, onT
       className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""} ${isExpanded ? "tile-expanded" : ""}`}
       ref={tileRef}
       onClick={() => onToggle(tile.sector)}
-      style={{ cursor: "pointer" }}
+      style={{
+        cursor: "pointer",
+        // Override index.css height:220px!important and overflow:hidden when expanded
+        ...(isExpanded ? { height: "auto", minHeight: "auto", overflow: "visible" } : {}),
+      }}
     >
       {/* ── Existing header rows (unchanged) ── */}
       <div className="hm-row-1">
@@ -279,71 +283,97 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     <div className="heatmap-wrapper">
       {/* ── Scoped CSS for expand feature only ── */}
       <style>{`
+        /* Grid: prevent row-siblings from stretching to match the expanded tile's height */
+        .hm-terminal-grid {
+          align-items: start;
+        }
+
+        /* Expanded tile: override the 220px fixed height and overflow:hidden from index.css.
+           Inline styles on the element also override these, but the class is kept for clarity. */
         .tile-expanded {
           height: auto !important;
           min-height: auto !important;
+          overflow: visible !important;
         }
+
+        /* Stock list container — inside the tile card, no absolute positioning */
         .tile-stock-list {
-          max-height: 400px;
+          width: 100%;
+          max-height: 320px;
           overflow-y: auto;
-          margin-top: 12px;
-          border-top: 1px solid rgba(255,255,255,0.1);
+          margin-top: 10px;
+          border-top: 1px solid rgba(255,255,255,0.12);
           padding-top: 8px;
+          box-sizing: border-box;
         }
+
+        /* Each stock row */
         .tile-stock-list-row {
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          padding: 4px 2px;
-          font-size: 12px;
+          justify-content: space-between;
+          padding: 5px 4px;
           border-radius: 4px;
-          transition: background 0.15s;
+          font-size: 12px;
+          transition: background 0.12s;
         }
         .tile-stock-list-row:hover {
-          background: rgba(255,255,255,0.04);
+          background: rgba(255,255,255,0.05);
         }
+
+        /* Rank number */
         .tsl-rank {
-          color: rgba(255,255,255,0.4);
-          width: 20px;
+          width: 18px;
           flex-shrink: 0;
-          font-size: 10px;
+          color: rgba(255,255,255,0.35);
+          font-size: 11px;
           text-align: right;
         }
+
+        /* Symbol */
         .tsl-symbol {
-          color: #fff;
-          font-weight: 700;
           flex: 1;
           margin-left: 6px;
+          font-weight: 700;
+          color: #fff;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
+
+        /* Price */
         .tsl-price {
-          color: rgba(255,255,255,0.75);
           margin-right: 8px;
+          color: rgba(255,255,255,0.7);
           font-size: 11px;
           white-space: nowrap;
         }
+
+        /* Change% pill */
         .tsl-pill {
           padding: 2px 6px;
           border-radius: 4px;
-          font-size: 10px;
+          font-size: 11px;
           font-weight: 700;
           white-space: nowrap;
-          min-width: 52px;
+          flex-shrink: 0;
+          min-width: 56px;
           text-align: center;
         }
-        .tsl-pill-up   { background: rgba(16,185,129,0.18); color: #10b981; }
-        .tsl-pill-down { background: rgba(239,68,68,0.18);  color: #ef4444; }
-        .tsl-pill-flat { background: rgba(100,116,139,0.2); color: #94a3b8; }
+        .tsl-pill-up   { background: #166534; color: #4ade80; }
+        .tsl-pill-down { background: #991b1b; color: #fca5a5; }
+        .tsl-pill-flat { background: #334155; color: #94a3b8; }
+
+        /* Close button */
         .tsl-close-btn {
           text-align: center;
-          margin-top: 8px;
-          padding: 4px 0;
-          color: rgba(255,255,255,0.5);
+          padding: 8px 0 2px;
+          color: rgba(255,255,255,0.45);
           font-size: 11px;
           cursor: pointer;
-          border-top: 1px solid rgba(255,255,255,0.07);
+          letter-spacing: 0.5px;
+          border-top: 1px solid rgba(255,255,255,0.08);
+          margin-top: 6px;
           transition: color 0.15s;
         }
         .tsl-close-btn:hover { color: rgba(255,255,255,0.85); }
