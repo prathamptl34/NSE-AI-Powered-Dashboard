@@ -569,8 +569,8 @@ export default function App() {
 
       {currentPage === 'home' ? (
         <div className="dashboard-plane">
-          <header className="header">
-            <div className="header-left">
+          <header className="header app-header">
+            <div className="header-left header-brand">
               <div className="logo-mark">MP</div>
               <div className="header-title">
                 <span className="title-main">Market Pulse</span>
@@ -578,31 +578,33 @@ export default function App() {
                 <span className="title-sub">NSE Live Dashboard</span>
               </div>
             </div>
-            
 
-            <div className="header-right">
-              <div className="header-nav-row">
-                <button 
-                  className="ai-insights-btn premium-btn"
-                  onClick={() => setCurrentPage('insights')}
-                >
-                  ✨ Market Analyst
-                </button>
-                <button 
-                  className="scanner-nav-btn premium-btn-blue"
-                  onClick={() => setCurrentPage('scanner')}
-                >
-                  ◉ Signal Scanner
-                </button>
-                <button
-                  className="heatmap-nav-btn premium-btn-orange"
-                  onClick={() => setCurrentPage('heatmap')}
-                >
-                  🔥 Heatmap
-                </button>
-              </div>
-              <div className="header-status-row">
+            <div className="header-right header-nav">
+              <button 
+                className="ai-insights-btn premium-btn"
+                onClick={() => setCurrentPage('insights')}
+              >
+                ✨ Market Analyst
+              </button>
+              <button 
+                className="scanner-nav-btn premium-btn-blue"
+                onClick={() => setCurrentPage('scanner')}
+              >
+                ◉ Signal Scanner
+              </button>
+              <button
+                className="heatmap-nav-btn premium-btn-orange"
+                onClick={() => setCurrentPage('heatmap')}
+              >
+                🔥 Heatmap
+              </button>
+            </div>
+
+            <div className="header-bottom-row">
+              <div className="header-status">
                 <ConnectionDot status={wsStatus} />
+              </div>
+              <div className="header-clock">
                 <MarketClock />
               </div>
             </div>

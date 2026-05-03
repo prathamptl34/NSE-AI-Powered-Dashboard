@@ -1404,157 +1404,341 @@ body {
 }
 
 /* ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————— */
+/* --- MOBILE OVERHAUL (MAX-WIDTH: 768px) --- */
 @media (max-width: 768px) {
-  /* PROBLEM 5 — Global Overflow Fixes */
+  /* Global Layout */
   body, html, #root, .app-shell, .app-container, .heatmap-wrapper, .dashboard-plane {
     overflow-x: hidden !important;
     max-width: 100vw !important;
   }
 
-  /* PROBLEM 1 — Main App Header */
-  .header {
+  /* ISSUE 1 — Main Dashboard Header */
+  .app-header {
+    display: flex !important;
     flex-direction: column !important;
     height: auto !important;
-    max-height: 120px !important;
-    padding: 8px 12px !important;
+    padding: 10px 14px !important;
     gap: 8px !important;
-    align-items: flex-start !important;
+    background: rgba(13, 17, 23, 0.95) !important;
   }
-  .header-left {
-    width: 100% !important;
+
+  .header-brand {
+    display: flex !important;
+    align-items: center !important;
     justify-content: flex-start !important;
+    width: 100% !important;
     gap: 10px !important;
   }
-  .logo-mark {
+
+  .header-brand .logo-mark {
     width: 32px !important;
     height: 32px !important;
     font-size: 14px !important;
   }
-  .header-title {
-    display: flex !important;
-    align-items: center !important;
+
+  .header-brand .title-main {
+    font-size: 18px !important;
+    font-weight: 800 !important;
   }
-  .title-main {
-    font-size: 16px !important;
-    font-weight: 700 !important;
-  }
-  .title-separator, .title-sub {
+
+  .header-brand .title-separator,
+  .header-brand .title-sub {
     display: none !important;
   }
-  .header-right {
-    width: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-    gap: 8px !important;
-    align-items: flex-start !important;
-  }
-  .header-nav-row {
+
+  .header-nav {
     display: flex !important;
     width: 100% !important;
     gap: 6px !important;
   }
-  .header-nav-row .premium-btn, 
-  .header-nav-row .premium-btn-blue, 
-  .header-nav-row .premium-btn-orange {
+
+  .header-nav .premium-btn,
+  .header-nav .premium-btn-blue,
+  .header-nav .premium-btn-orange {
     flex: 1 !important;
     font-size: 11px !important;
-    padding: 6px 4px !important;
+    padding: 8px 4px !important;
     border-radius: 8px !important;
     min-height: auto !important;
     text-align: center !important;
     white-space: nowrap !important;
+    justify-content: center !important;
   }
-  .header-status-row {
+
+  .header-bottom-row {
     display: flex !important;
     width: 100% !important;
     justify-content: space-between !important;
     align-items: center !important;
     padding-top: 4px !important;
+    border-top: 1px solid rgba(255,255,255,0.05) !important;
   }
-  .header-status-row .conn-dot, 
-  .header-status-row .market-clock {
-    margin: 0 !important;
-    padding: 0 !important;
+
+  .header-status .conn-dot {
     background: none !important;
     border: none !important;
+    padding: 0 !important;
   }
-  .clock-time {
-    font-size: 12px !important;
+
+  .header-clock .market-clock {
+    display: flex !important;
+    align-items: center !important;
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: #fff !important;
     white-space: nowrap !important;
   }
-  .clock-label { font-size: 10px !important; margin-left: 4px !important; }
-  .dot-label { font-size: 11px !important; }
 
-  /* PROBLEM 4 — Dashboard Content */
+  .header-clock .clock-label {
+    display: inline !important;
+    font-size: 10px !important;
+    margin-left: 4px !important;
+    color: #64748b !important;
+  }
+
+  /* ISSUE 2 — AI Stock Modal */
+  .sdm-modal {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    padding: 20px !important;
+    margin: 0 !important;
+  }
+
+  .stock-modal-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .stock-modal-title {
+    font-size: 24px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    display: block !important;
+  }
+
+  .stock-modal-price {
+    font-size: 24px !important;
+    font-weight: 800 !important;
+    color: #fff !important;
+    text-align: left !important;
+    display: block !important;
+  }
+
+  .sdm-price {
+    text-align: left !important;
+  }
+
+  .sdm-header > div:last-child {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-end !important;
+  }
+
+  /* ISSUE 3 — Heatmap Header */
+  .hm-terminal-header {
+    height: auto !important;
+    flex-direction: column !important;
+    padding: 10px 14px !important;
+    gap: 10px !important;
+  }
+
+  .hm-header-row1 {
+    display: flex !important;
+    width: 100% !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  .hm-header-title {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+  }
+
+  .hm-live-dot {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    color: #10b981 !important;
+  }
+
+  .hm-header-row2 {
+    display: flex !important;
+    width: 100% !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-top: 8px !important;
+    border-top: 1px solid rgba(255,255,255,0.05) !important;
+  }
+
+  .hm-header-time {
+    font-size: 11px !important;
+    color: #64748b !important;
+  }
+
+  .hm-filter-pills {
+    display: flex !important;
+    gap: 4px !important;
+  }
+
+  .hm-pill {
+    padding: 4px 8px !important;
+    font-size: 10px !important;
+    border-radius: 6px !important;
+  }
+
+  /* ISSUE 4 — Heatmap Grid */
+  .hm-terminal-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 6px !important;
+    padding: 8px !important;
+  }
+
+  .index-tile {
+    height: 160px !important;
+    padding: 10px !important;
+  }
+
+  .hm-index-name {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+  }
+
+  .hm-row-2 {
+    font-size: 22px !important;
+    font-weight: 800 !important;
+    margin-bottom: 6px !important;
+    padding: 0 !important;
+  }
+
+  .hm-stock-row {
+    padding: 0 !important;
+    margin-top: 6px !important;
+  }
+
+  .hm-row-label {
+    font-size: 8px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .hm-stock-name {
+    font-size: 11px !important;
+  }
+
+  .hm-stock-price {
+    display: none !important;
+  }
+
+  .hm-stock-pill {
+    font-size: 9px !important;
+    min-width: 50px !important;
+    padding: 1px 4px !important;
+  }
+
+  /* ISSUE 5 — Sector Modal Fix */
+  .heatmap-modal {
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    padding: 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .hm-modal-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .hm-modal-card {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 10px 12px !important;
+    background: #141414 !important;
+    border: 1px solid #1e1e1e !important;
+    border-radius: 10px !important;
+    gap: 8px !important;
+  }
+
+  .hm-modal-rank {
+    font-size: 11px !important;
+    color: #444 !important;
+    min-width: 18px !important;
+  }
+
+  .hm-modal-symbol {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    flex: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    min-width: 80px !important;
+    max-width: 140px !important;
+  }
+
+  .hm-modal-price {
+    font-size: 12px !important;
+    color: #888 !important;
+    min-width: 70px !important;
+    text-align: right !important;
+    margin: 0 8px !important;
+  }
+
+  .hm-modal-badge {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    padding: 3px 8px !important;
+    border-radius: 6px !important;
+    min-width: 65px !important;
+    text-align: center !important;
+  }
+
+  /* Dashboard Panels */
+  .panels-wrapper {
+    grid-template-columns: 1fr !important;
+    padding: 12px !important;
+    gap: 16px !important;
+  }
+
   .stock-table-header {
     display: none !important;
   }
+
   .stock-card {
     display: flex !important;
     justify-content: space-between !important;
-    align-items: center !important;
-    padding: 8px 12px !important;
-    grid-template-columns: none !important;
+    padding: 12px !important;
   }
-  .rank { display: none !important; }
-  .stock-meta {
-    display: flex !important;
-    flex-direction: column !important;
-    min-width: 0 !important;
+
+  .rank {
+    display: none !important;
   }
-  .stock-symbol {
-    font-size: 13px !important;
-    font-weight: 700 !important;
-  }
-  .stock-exchange {
-    font-size: 10px !important;
-    color: #666 !important;
-  }
+
   .stock-price-block {
     background: none !important;
     border: none !important;
     padding: 0 !important;
     align-items: flex-end !important;
-    flex: 1 !important;
-    margin-right: 12px !important;
   }
+
   .stock-price {
-    font-size: 12px !important;
-    font-weight: 600 !important;
+    font-size: 14px !important;
   }
+
   .stock-prev {
     display: none !important;
   }
-  .change-badge {
-    font-size: 11px !important;
-    padding: 4px 8px !important;
-    min-width: 60px !important;
-    border-radius: 20px !important;
-  }
-  .panel-count {
-    font-size: 10px !important;
-  }
-  .panels-wrapper { grid-template-columns: 1fr; padding: 8px 16px 16px; gap: 16px; }
-  .section-header { padding: 20px 16px 8px; margin-top: 20px; }
 }
 
-@media (max-width: 600px) {
-  .stock-card {
-    grid-template-columns: 26px minmax(60px,1fr) auto auto;
-    gap: 8px;
-    padding: 10px 14px;
-  }
-  .stock-card.card-chart-mode {
-    grid-template-columns: 26px minmax(55px,auto) 1fr auto;
-    gap: 8px;
-    padding: 8px 14px;
-  }
-  .stock-symbol { font-size: 12px; }
-  .stock-price  { font-size: 12px; }
-  .change-badge { font-size: 11px; padding: 3px 7px; min-width: 58px; }
-  .rank { width: 22px; height: 22px; font-size: 10px; }
-  .price-levels-grid { grid-template-columns: 1fr; }
-}
 
 @keyframes slide-up {
   from { transform: translateY(100%); }
@@ -1846,23 +2030,7 @@ body {
 .score-bar-track { flex: 1; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px;  }
 .score-bar-fill  { height: 100%; border-radius: 2px; }
 
-@media (max-width: 768px) {
-  .signal-grid { grid-template-columns: 1fr; }
-  .stock-ai-cards-grid { grid-template-columns: 1fr; padding: 12px 16px 0; }
-  .scanner-summary-strip { padding: 12px 16px 0; }
-  .sc-filter-bar { padding: 12px 16px 0; }
-  .signal-scanner-body { padding: 12px 16px 0; }
-  .scanner-summary-card { margin: 12px 16px 0; }
-  .scanner-disclaimer { margin: 16px 16px 0; }
-  .sector-bias-strip { margin: 10px 16px 0; }
-  .market-status-banner { margin: 12px 16px 0; }
-  .ai-content-single { padding: 12px 16px 0; }
-  .signal-history { margin: 12px 16px 0; }
-  .ai-page-header { padding: 12px 16px; }
-  .scanner-header { padding: 12px 16px; }
-  .fg-wrapper { margin: 16px 16px 0; }
-  .sector-heatmap { margin: 12px 16px 0; grid-template-columns: 1fr 1fr; }
-}
+/* Cleaned up redundant styles */
 
 /* â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    HEATMAP PAGE: Premium Pro Trader UI (Refined)
@@ -2191,186 +2359,6 @@ body {
 @media (max-width: 1536px) { .hm-terminal-grid { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 1024px) { .hm-terminal-grid { grid-template-columns: repeat(3, 1fr); padding: 16px; } }
 
-@media (max-width: 768px) {
-  .heatmap-wrapper { overflow-x: hidden !important; max-width: 100vw !important; }
-  
-  /* PROBLEM 2 — Heatmap Header */
-  .hm-terminal-header {
-    display: flex !important;
-    flex-direction: column !important;
-    height: auto !important;
-    max-height: 90px !important;
-    padding: 8px 12px !important;
-    gap: 6px !important;
-    overflow: hidden !important;
-  }
-  .hm-header-left {
-    width: 100% !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-  }
-  .hm-back-btn {
-    font-size: 12px !important;
-    padding: 6px 12px !important;
-    margin: 0 !important;
-  }
-  .hm-brand-group {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 8px !important;
-  }
-  .hm-brand-line {
-    font-size: 14px !important;
-    font-weight: 700 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    max-width: 150px !important;
-  }
-  .hm-status-line {
-    font-size: 9px !important;
-  }
-  
-  .hm-header-sub-row {
-    width: 100% !important;
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-  }
-  .hm-header-center {
-    display: block !important;
-    background: none !important;
-    border: none !important;
-    padding: 0 !important;
-    font-size: 11px !important;
-    color: var(--text-muted) !important;
-  }
-  .hm-header-right {
-    display: flex !important;
-    gap: 4px !important;
-  }
-  .hm-pill {
-    font-size: 10px !important;
-    padding: 3px 8px !important;
-    min-width: auto !important;
-  }
-
-  /* PROBLEM 3 — Heatmap Grid */
-  .hm-terminal-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 4px !important;
-    padding: 8px !important;
-  }
-  .index-tile {
-    height: 155px !important;
-    padding: 8px 10px !important;
-    overflow: hidden !important;
-  }
-  .hm-index-name {
-    font-size: 10px !important;
-    font-weight: 600 !important;
-    max-width: calc(100% - 18px) !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-  .hm-row-2 {
-    font-size: 22px !important;
-    font-weight: 800 !important;
-    line-height: 1.1 !important;
-    margin-bottom: 4px !important;
-    padding: 0 !important;
-  }
-  .hm-row-label {
-    font-size: 8px !important;
-    color: #666 !important;
-  }
-  .hm-stock-name {
-    font-size: 11px !important;
-    font-weight: 700 !important;
-    max-width: 55% !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-  .hm-stock-price {
-    font-size: 10px !important;
-    color: #999 !important;
-  }
-  .hm-stock-pill {
-    font-size: 9px !important;
-    padding: 1px 4px !important;
-    min-width: auto !important;
-  }
-
-  /* CRITICAL BUG — Stock Name Truncation & Modal Card */
-  .hm-modal-stock-symbol {
-    max-width: 45% !important;
-    min-width: 80px !important;
-    font-size: 12px !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-  }
-  .hm-modal-stock-card {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    padding: 10px 12px !important;
-    gap: 8px !important;
-    background: #141414 !important;
-    border: 1px solid #1e1e1e !important;
-    border-radius: 8px !important;
-    margin-bottom: 8px !important;
-  }
-  .hm-modal-rank {
-    min-width: 20px !important;
-    flex-shrink: 0 !important;
-    font-size: 11px !important;
-    color: #555 !important;
-  }
-  .hm-modal-stock-left-group {
-    flex: 1 !important;
-    min-width: 0 !important;
-    overflow: hidden !important;
-  }
-  .hm-modal-price {
-    flex-shrink: 0 !important;
-    font-size: 11px !important;
-    color: #999 !important;
-    min-width: 65px !important;
-    text-align: center !important;
-  }
-  .hm-modal-pill {
-    flex-shrink: 0 !important;
-    min-width: 58px !important;
-    text-align: right !important;
-    font-size: 11px !important;
-    font-weight: 600 !important;
-    padding: 2px 8px !important;
-    border-radius: 4px !important;
-  }
-  
-  .heatmap-modal {
-    width: 100vw !important;
-    height: 100vh !important;
-    max-width: 100vw !important;
-    max-height: 100vh !important;
-    border-radius: 0 !important;
-    padding: 16px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .hm-terminal-grid { grid-template-columns: repeat(2, 1fr); }
-}
-
-@media (max-width: 375px) {
-  .hm-modal-footer { gap: 6px; font-size: 10px; }
-}
+/* End of Mobile Design System */
 
 

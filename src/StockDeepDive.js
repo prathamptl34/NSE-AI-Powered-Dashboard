@@ -106,15 +106,15 @@ export function StockDeepDiveModal({ stock, explanation, multiAgentData, loading
       `}</style>
 
       <div className="sdm-modal" style={{ borderTop: `4px solid ${accent}` }}>
-        <div className="sdm-header">
+        <div className="sdm-header stock-modal-header">
            <div>
-             <span className="sdm-symbol">{stock.symbol}</span>
+             <div className="sdm-symbol stock-modal-title">{stock.symbol}</div>
              <span style={{ fontSize: '14px', fontWeight: '800', color: accent }}>
                {isUp ? '▲' : '▼'} {Math.abs(stock.change_pct).toFixed(2)}%
              </span>
            </div>
            <div>
-             <span className="sdm-price">₹{formatINR(stock.price)}</span>
+             <div className="sdm-price stock-modal-price">₹{formatINR(stock.price)}</div>
              <span style={{ display: 'block', textAlign: 'right', fontSize: '11px', color: 'var(--text-muted)' }}>LIVE CMP</span>
            </div>
         </div>

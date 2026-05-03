@@ -167,14 +167,12 @@ function SectorModal({ tile, onClose }) {
                 return (
                   <div
                     key={s.symbol}
-                    className={`hm-modal-stock-card ${isTopGainer ? "hm-card-best" : ""} ${isTopLoser ? "hm-card-worst" : ""}`}
+                    className={`hm-modal-card ${isTopGainer ? "hm-card-best" : ""} ${isTopLoser ? "hm-card-worst" : ""}`}
                   >
                     <span className="hm-modal-rank">{idx + 1}</span>
-                    <div className="hm-modal-stock-left-group">
-                      <span className="hm-modal-stock-symbol">{s.symbol}</span>
-                    </div>
+                    <span className="hm-modal-symbol">{s.symbol}</span>
                     <span className="hm-modal-price">{fmt(s.ltp)}</span>
-                    <span className={`hm-modal-pill ${s.change_percent >= 0 ? 'pill-up' : 'pill-down'}`}>
+                    <span className={`hm-modal-badge ${s.change_percent >= 0 ? 'pill-up' : 'pill-down'}`}>
                       {pct(s.change_percent)}
                     </span>
                   </div>
@@ -316,29 +314,21 @@ export default function HeatmapPage({ onBack, wsStatus }) {
 
       {/* ── Terminal Header ── */}
       <header className="hm-terminal-header">
-        <div className="hm-header-left">
+        <div className="hm-header-row1">
           {onBack && (
             <button className="hm-back-btn" onClick={onBack}>
               ← Back
             </button>
           )}
-          <div className="hm-brand-group">
-            <div className="hm-brand-line">🔥 Market Heatmap (Updated)</div>
-            <div className="hm-status-line">
-              <span className={`hm-status-dot ${streaming ? "hm-dot-live" : "hm-dot-off"}`} />
-              <span className={streaming ? "hm-text-live" : "hm-text-off"}>
-                {streaming ? "LIVE" : "OFFLINE"}
-              </span>
-            </div>
-          </div>
+          <span className="hm-header-title">Market Heatmap</span>
+          <span className="hm-live-dot">
+            {streaming ? '● LIVE' : '● OFF'}
+          </span>
         </div>
 
-        <div className="hm-header-sub-row">
-          <div className="hm-header-center">
-            {timeStr}
-          </div>
-
-          <div className="hm-header-right">
+        <div className="hm-header-row2">
+          <span className="hm-header-time">{timeStr}</span>
+          <div className="hm-filter-pills">
             <div
               className={`hm-pill pill-gain ${activeFilter === "gainers" ? "active" : ""}`}
               onClick={() => toggleFilter("gainers")}
