@@ -1600,13 +1600,24 @@ body {
     align-items: start !important;
   }
 
+  .hm-row-1 {
+    padding: 10px 11px 2px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    gap: 8px !important;
+    overflow: hidden !important;
+  }
+
   .hm-index-name {
     font-size: 11px !important;
+    font-weight: 800 !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
-    display: inline-block !important;
-    max-width: 85% !important;
+    display: block !important;
+    flex: 1 !important;
+    min-width: 0 !important;
     line-height: 1.2 !important;
   }
 
