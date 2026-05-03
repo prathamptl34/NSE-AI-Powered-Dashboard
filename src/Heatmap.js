@@ -167,18 +167,16 @@ function SectorModal({ tile, onClose }) {
                 return (
                   <div
                     key={s.symbol}
-                    className={`hm-modal-card ${isTopGainer ? "hm-card-best" : ""} ${isTopLoser ? "hm-card-worst" : ""}`}
+                    className={`hm-modal-stock-card ${isTopGainer ? "hm-card-best" : ""} ${isTopLoser ? "hm-card-worst" : ""}`}
                   >
-                    <div className="hm-card-row-1">
-                      <span className="hm-card-rank">{idx + 1}</span>
-                      <span className="hm-card-symbol">{s.symbol}</span>
+                    <span className="hm-modal-rank">{idx + 1}</span>
+                    <div className="hm-modal-stock-left-group">
+                      <span className="hm-modal-stock-symbol">{s.symbol}</span>
                     </div>
-                    <div className="hm-card-price">{fmt(s.ltp)}</div>
-                    <div className="hm-card-row-3">
-                      <span className={`hm-card-pill ${s.change_percent >= 0 ? "pill-up" : "pill-down"}`}>
-                        {pct(s.change_percent)}
-                      </span>
-                    </div>
+                    <span className="hm-modal-price">{fmt(s.ltp)}</span>
+                    <span className={`hm-modal-pill ${s.change_percent >= 0 ? 'pill-up' : 'pill-down'}`}>
+                      {pct(s.change_percent)}
+                    </span>
                   </div>
                 );
               })}
@@ -335,28 +333,30 @@ export default function HeatmapPage({ onBack, wsStatus }) {
           </div>
         </div>
 
-        <div className="hm-header-center">
-          {timeStr}
-        </div>
+        <div className="hm-header-sub-row">
+          <div className="hm-header-center">
+            {timeStr}
+          </div>
 
-        <div className="hm-header-right">
-          <div
-            className={`hm-pill pill-gain ${activeFilter === "gainers" ? "active" : ""}`}
-            onClick={() => toggleFilter("gainers")}
-          >
-            ▲ &gt;1% {stats.g}
-          </div>
-          <div
-            className={`hm-pill pill-flat ${activeFilter === "flat" ? "active" : ""}`}
-            onClick={() => toggleFilter("flat")}
-          >
-            ● Flat {stats.f}
-          </div>
-          <div
-            className={`hm-pill pill-loss ${activeFilter === "losers" ? "active" : ""}`}
-            onClick={() => toggleFilter("losers")}
-          >
-            ▼ &lt;-1% {stats.l}
+          <div className="hm-header-right">
+            <div
+              className={`hm-pill pill-gain ${activeFilter === "gainers" ? "active" : ""}`}
+              onClick={() => toggleFilter("gainers")}
+            >
+              ▲ &gt;1% {stats.g}
+            </div>
+            <div
+              className={`hm-pill pill-flat ${activeFilter === "flat" ? "active" : ""}`}
+              onClick={() => toggleFilter("flat")}
+            >
+              ● Flat {stats.f}
+            </div>
+            <div
+              className={`hm-pill pill-loss ${activeFilter === "losers" ? "active" : ""}`}
+              onClick={() => toggleFilter("losers")}
+            >
+              ▼ &lt;-1% {stats.l}
+            </div>
           </div>
         </div>
       </header>

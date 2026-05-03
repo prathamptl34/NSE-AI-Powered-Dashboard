@@ -581,26 +581,30 @@ export default function App() {
             
 
             <div className="header-right">
-              <button 
-                className="ai-insights-btn premium-btn"
-                onClick={() => setCurrentPage('insights')}
-              >
-                ✨ Market Analyst
-              </button>
-              <button 
-                className="scanner-nav-btn premium-btn-blue"
-                onClick={() => setCurrentPage('scanner')}
-              >
-                ◉ Signal Scanner
-              </button>
-              <button
-                className="heatmap-nav-btn premium-btn-orange"
-                onClick={() => setCurrentPage('heatmap')}
-              >
-                🔥 Heatmap
-              </button>
-              <ConnectionDot status={wsStatus} />
-              <MarketClock />
+              <div className="header-nav-row">
+                <button 
+                  className="ai-insights-btn premium-btn"
+                  onClick={() => setCurrentPage('insights')}
+                >
+                  ✨ Market Analyst
+                </button>
+                <button 
+                  className="scanner-nav-btn premium-btn-blue"
+                  onClick={() => setCurrentPage('scanner')}
+                >
+                  ◉ Signal Scanner
+                </button>
+                <button
+                  className="heatmap-nav-btn premium-btn-orange"
+                  onClick={() => setCurrentPage('heatmap')}
+                >
+                  🔥 Heatmap
+                </button>
+              </div>
+              <div className="header-status-row">
+                <ConnectionDot status={wsStatus} />
+                <MarketClock />
+              </div>
             </div>
           </header>
 

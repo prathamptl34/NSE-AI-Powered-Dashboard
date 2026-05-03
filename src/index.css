@@ -1405,66 +1405,137 @@ body {
 
 /* ———————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————— */
 @media (max-width: 768px) {
+  /* PROBLEM 5 — Global Overflow Fixes */
+  body, html, #root, .app-shell, .app-container, .heatmap-wrapper, .dashboard-plane {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
+  }
+
+  /* PROBLEM 1 — Main App Header */
   .header {
-    flex-direction: column;
-    height: auto;
-    padding: 14px 16px;
-    gap: 12px;
-    align-items: flex-start;
+    flex-direction: column !important;
+    height: auto !important;
+    max-height: 120px !important;
+    padding: 8px 12px !important;
+    gap: 8px !important;
+    align-items: flex-start !important;
   }
   .header-left {
-    width: 100%;
-    justify-content: space-between;
+    width: 100% !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
   }
-  /* Chart toggle hidden on mobile (and disabled globally now) */
-  .header-center { display: none; }
-  .header-right {
-    width: 100%;
-    display: grid;
-    /* 3 nav buttons in first row, clock + dot in second row */
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
+  .logo-mark {
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 14px !important;
   }
-  /* Clock and connection dot span all 3 columns together */
-  .header-right .conn-dot,
-  .header-right .market-clock {
-    grid-column: span 1;
-    justify-content: center;
-    width: 100%;
-  }
-  /* Force all three nav buttons fully visible and touch-friendly */
-  .ai-insights-btn, .scanner-nav-btn, .heatmap-nav-btn {
+  .header-title {
     display: flex !important;
-    width: 100%;
-    justify-content: center;
-    padding: 10px 8px;
+    align-items: center !important;
+  }
+  .title-main {
+    font-size: 16px !important;
+    font-weight: 700 !important;
+  }
+  .title-separator, .title-sub {
+    display: none !important;
+  }
+  .header-right {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    align-items: flex-start !important;
+  }
+  .header-nav-row {
+    display: flex !important;
+    width: 100% !important;
+    gap: 6px !important;
+  }
+  .header-nav-row .premium-btn, 
+  .header-nav-row .premium-btn-blue, 
+  .header-nav-row .premium-btn-orange {
+    flex: 1 !important;
+    font-size: 11px !important;
+    padding: 6px 4px !important;
+    border-radius: 8px !important;
+    min-height: auto !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+  .header-status-row {
+    display: flex !important;
+    width: 100% !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding-top: 4px !important;
+  }
+  .header-status-row .conn-dot, 
+  .header-status-row .market-clock {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+    border: none !important;
+  }
+  .clock-time {
     font-size: 12px !important;
+    white-space: nowrap !important;
   }
-  .dashboard-plane { padding-bottom: 20px; }
+  .clock-label { font-size: 10px !important; margin-left: 4px !important; }
+  .dot-label { font-size: 11px !important; }
+
+  /* PROBLEM 4 — Dashboard Content */
+  .stock-table-header {
+    display: none !important;
+  }
+  .stock-card {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 8px 12px !important;
+    grid-template-columns: none !important;
+  }
+  .rank { display: none !important; }
+  .stock-meta {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+  }
+  .stock-symbol {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+  }
+  .stock-exchange {
+    font-size: 10px !important;
+    color: #666 !important;
+  }
+  .stock-price-block {
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    align-items: flex-end !important;
+    flex: 1 !important;
+    margin-right: 12px !important;
+  }
+  .stock-price {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+  }
+  .stock-prev {
+    display: none !important;
+  }
+  .change-badge {
+    font-size: 11px !important;
+    padding: 4px 8px !important;
+    min-width: 60px !important;
+    border-radius: 20px !important;
+  }
+  .panel-count {
+    font-size: 10px !important;
+  }
   .panels-wrapper { grid-template-columns: 1fr; padding: 8px 16px 16px; gap: 16px; }
-  .fno-movers-grid { grid-template-columns: 1fr !important; }
   .section-header { padding: 20px 16px 8px; margin-top: 20px; }
-  .historical-explorer { padding: 0 16px; margin: 24px auto 80px; }
-  .hist-card { padding: 20px; }
-  .hist-controls-box { gap: 16px; }
-  .market-pulse-banner { margin: 12px 16px 8px; flex-direction: column; gap: 16px; padding: 18px; }
-  .pulse-signal-box {
-    flex-direction: row;
-    border-right: none;
-    border-bottom: 1px solid var(--glass-border);
-    width: 100%;
-    padding-bottom: 12px; padding-right: 0;
-    justify-content: space-between;
-  }
-  .modal-drag-handle { display: block; }
-  .deepdive-backdrop, .sdm-backdrop { padding: 0; align-items: flex-end; }
-  .deepdive-modal, .sdm-modal {
-    border-radius: 20px 20px 0 0;
-    max-width: 100%;
-    max-height: 90vh;
-    animation: slide-up 0.3s cubic-bezier(0,0,0.2,1);
-  }
-  .clock-time { font-size: 15px; }
 }
 
 @media (max-width: 600px) {
@@ -2121,77 +2192,176 @@ body {
 @media (max-width: 1024px) { .hm-terminal-grid { grid-template-columns: repeat(3, 1fr); padding: 16px; } }
 
 @media (max-width: 768px) {
-  .heatmap-wrapper { overflow-x: hidden; }
-  .hm-terminal-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 12px; }
-  .index-tile { height: 160px !important; }
-  .hm-index-name { font-size: 11px !important; }
-  .hm-row-2 { font-size: 22px !important; padding: 0 12px; margin-bottom: 8px; }
-  .hm-stock-name { font-size: 11px; }
-  .hm-row-1 { padding: 12px 12px 2px; }
-  .hm-divider, .hm-stock-row { padding: 0 12px; }
+  .heatmap-wrapper { overflow-x: hidden !important; max-width: 100vw !important; }
   
-  /* Mobile Modal */
+  /* PROBLEM 2 — Heatmap Header */
+  .hm-terminal-header {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    max-height: 90px !important;
+    padding: 8px 12px !important;
+    gap: 6px !important;
+    overflow: hidden !important;
+  }
+  .hm-header-left {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  .hm-back-btn {
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+    margin: 0 !important;
+  }
+  .hm-brand-group {
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+  }
+  .hm-brand-line {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 150px !important;
+  }
+  .hm-status-line {
+    font-size: 9px !important;
+  }
+  
+  .hm-header-sub-row {
+    width: 100% !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+  .hm-header-center {
+    display: block !important;
+    background: none !important;
+    border: none !important;
+    padding: 0 !important;
+    font-size: 11px !important;
+    color: var(--text-muted) !important;
+  }
+  .hm-header-right {
+    display: flex !important;
+    gap: 4px !important;
+  }
+  .hm-pill {
+    font-size: 10px !important;
+    padding: 3px 8px !important;
+    min-width: auto !important;
+  }
+
+  /* PROBLEM 3 — Heatmap Grid */
+  .hm-terminal-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 4px !important;
+    padding: 8px !important;
+  }
+  .index-tile {
+    height: 155px !important;
+    padding: 8px 10px !important;
+    overflow: hidden !important;
+  }
+  .hm-index-name {
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    max-width: calc(100% - 18px) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .hm-row-2 {
+    font-size: 22px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    margin-bottom: 4px !important;
+    padding: 0 !important;
+  }
+  .hm-row-label {
+    font-size: 8px !important;
+    color: #666 !important;
+  }
+  .hm-stock-name {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    max-width: 55% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .hm-stock-price {
+    font-size: 10px !important;
+    color: #999 !important;
+  }
+  .hm-stock-pill {
+    font-size: 9px !important;
+    padding: 1px 4px !important;
+    min-width: auto !important;
+  }
+
+  /* CRITICAL BUG — Stock Name Truncation & Modal Card */
+  .hm-modal-stock-symbol {
+    max-width: 45% !important;
+    min-width: 80px !important;
+    font-size: 12px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  .hm-modal-stock-card {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    background: #141414 !important;
+    border: 1px solid #1e1e1e !important;
+    border-radius: 8px !important;
+    margin-bottom: 8px !important;
+  }
+  .hm-modal-rank {
+    min-width: 20px !important;
+    flex-shrink: 0 !important;
+    font-size: 11px !important;
+    color: #555 !important;
+  }
+  .hm-modal-stock-left-group {
+    flex: 1 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  .hm-modal-price {
+    flex-shrink: 0 !important;
+    font-size: 11px !important;
+    color: #999 !important;
+    min-width: 65px !important;
+    text-align: center !important;
+  }
+  .hm-modal-pill {
+    flex-shrink: 0 !important;
+    min-width: 58px !important;
+    text-align: right !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+  }
+  
   .heatmap-modal {
-    width: 100vw;
-    height: 100vh;
-    max-width: 100vw;
-    max-height: 100vh;
-    border-radius: 0;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-  }
-  
-  .hm-modal-header { margin-bottom: 16px; padding-right: 44px; }
-  .hm-modal-index-name { font-size: 18px; }
-  .hm-modal-pct-change { font-size: 24px; }
-  .hm-modal-badge { font-size: 11px; }
-  .hm-modal-close {
-    top: 12px;
-    right: 12px;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 28px;
-  }
-  
-  .hm-modal-grid { grid-template-columns: 1fr; gap: 8px; }
-  .hm-modal-card {
-    padding: 12px 14px;
-    border-radius: 8px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-  
-  .hm-card-row-1 { gap: 8px; }
-  .hm-card-symbol {
-    font-size: 13px;
-    max-width: 40%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  
-  .hm-card-price {
-    font-size: 12px;
-    margin-top: 0;
-    text-align: center;
-    flex: 1;
-  }
-  
-  .hm-card-row-3 { margin-top: 0; }
-  .hm-card-pill { margin-top: 0; font-size: 11px; min-width: 64px; text-align: right; }
-  
-  .hm-modal-footer {
-    font-size: 11px;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    padding-top: 10px;
-    margin-top: auto;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    padding: 16px !important;
   }
 }
 
