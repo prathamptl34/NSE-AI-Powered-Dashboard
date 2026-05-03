@@ -87,29 +87,23 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, onClick }) => {
 
       <div className="hm-divider" />
 
-      <div className="hm-stock-row">
-        <span className="hm-row-label">Top Gainer</span>
-        <div className="hm-stock-line">
-          <span className="hm-stock-name">{tile.top_gainer?.symbol || "..."}</span>
-          <div className="hm-stock-right">
-            <span className="hm-stock-price">{fmt(tile.top_gainer?.ltp)}</span>
-            {tile.top_gainer?.change_pct != null && (
-              <span className="hm-stock-pill pill-stock-up">{pct(tile.top_gainer.change_pct)}</span>
-            )}
-          </div>
+      <div className="hm-stock-row hm-gainer-section">
+        <span className="hm-label-row">TOP GAINER</span>
+        <div className="hm-stock-line hm-gainer-row">
+          <span className="hm-stock-name hm-gainer-name">{tile.top_gainer?.symbol || "..."}</span>
+          <span className="hm-stock-pill hm-gainer-badge pill-stock-up">
+            {tile.top_gainer?.change_pct != null ? pct(tile.top_gainer.change_pct) : "..."}
+          </span>
         </div>
       </div>
 
-      <div className="hm-stock-row">
-        <span className="hm-row-label">Top Loser</span>
-        <div className="hm-stock-line">
-          <span className="hm-stock-name">{tile.top_loser?.symbol || "..."}</span>
-          <div className="hm-stock-right">
-            <span className="hm-stock-price">{fmt(tile.top_loser?.ltp)}</span>
-            {tile.top_loser?.change_pct != null && (
-              <span className="hm-stock-pill pill-stock-down">{pct(tile.top_loser.change_pct)}</span>
-            )}
-          </div>
+      <div className="hm-stock-row hm-loser-section">
+        <span className="hm-label-row">TOP LOSER</span>
+        <div className="hm-stock-line hm-loser-row">
+          <span className="hm-stock-name hm-loser-name">{tile.top_loser?.symbol || "..."}</span>
+          <span className="hm-stock-pill hm-loser-badge pill-stock-down">
+            {tile.top_loser?.change_pct != null ? pct(tile.top_loser.change_pct) : "..."}
+          </span>
         </div>
       </div>
     </div>
@@ -233,7 +227,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
 
     const fetchInitial = async () => {
       try {
-        const base = window.location.port === "3000" ? "http://127.0.0.1:8000" : "";
+        const base = window.location.port === "3000" ? "http://127.0.0.1:8001" : "";
         const res = await fetch(`${base}/api/heatmap/sectoral`);
         if (res.ok) {
           const data = await res.json();
@@ -245,7 +239,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     };
 
     function connect() {
-      const base = window.location.port === "3000" ? "http://127.0.0.1:8000" : "";
+      const base = window.location.port === "3000" ? "http://127.0.0.1:8001" : "";
       es = new EventSource(`${base}/api/heatmap/stream`);
       sseRef.current = es;
 

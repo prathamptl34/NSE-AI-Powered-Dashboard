@@ -1592,50 +1592,87 @@ body {
 
   /* ISSUE 4 — Heatmap Grid */
   .hm-terminal-grid {
+    display: grid !important;
     grid-template-columns: repeat(2, 1fr) !important;
-    gap: 6px !important;
-    padding: 8px !important;
-  }
-
-  .index-tile {
-    height: 160px !important;
-    padding: 10px !important;
+    grid-auto-rows: 195px !important;
+    gap: 4px !important;
+    padding: 4px !important;
+    align-items: start !important;
   }
 
   .hm-index-name {
     font-size: 11px !important;
-    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: inline-block !important;
+    max-width: 85% !important;
+    line-height: 1.2 !important;
+  }
+
+  .index-tile {
+    height: 195px !important;
+    max-height: 195px !important;
+    min-height: 195px !important;
+    overflow: hidden !important;
+    padding: 10px 11px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
   }
 
   .hm-row-2 {
-    font-size: 22px !important;
+    font-size: 28px !important;
     font-weight: 800 !important;
-    margin-bottom: 6px !important;
-    padding: 0 !important;
+    line-height: 1 !important;
+    margin: 4px 0 !important;
+    white-space: nowrap !important;
   }
 
-  .hm-stock-row {
-    padding: 0 !important;
-    margin-top: 6px !important;
+  .hm-gainer-section,
+  .hm-loser-section {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 1px !important;
   }
 
-  .hm-row-label {
+  .hm-label-row {
     font-size: 8px !important;
-    margin-bottom: 2px !important;
+    color: #666 !important;
+    letter-spacing: 0.05em !important;
+    margin-bottom: 1px !important;
   }
 
-  .hm-stock-name {
+  .hm-gainer-row,
+  .hm-loser-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 4px !important;
+    overflow: hidden !important;
+  }
+
+  .hm-gainer-name,
+  .hm-loser-name {
     font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #ffffff !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    flex: 1 !important;
+    min-width: 0 !important;
   }
 
-  .hm-stock-price {
-    display: none !important;
-  }
-
-  .hm-stock-pill {
+  .hm-gainer-badge,
+  .hm-loser-badge {
     font-size: 9px !important;
-    min-width: 50px !important;
-    padding: 1px 4px !important;
+    padding: 1px 5px !important;
+    border-radius: 4px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    min-width: auto !important;
   }
 
   /* ISSUE 5 — Sector Modal Fix */
