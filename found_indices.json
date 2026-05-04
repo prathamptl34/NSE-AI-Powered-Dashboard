@@ -1,0 +1,202 @@
+{
+  "SENSEX": [
+    {
+      "token": "19224",
+      "symbol": "SENSEXETF-EQ",
+      "name": "SENSEXETF",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "NSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "10515",
+      "symbol": "SENSEXBETA-EQ",
+      "name": "SENSEXBETA",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "NSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "11593",
+      "symbol": "HDFCSENSEX-EQ",
+      "name": "HDFCSENSEX",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "NSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "17613",
+      "symbol": "SENSEXADD-EQ",
+      "name": "SENSEXADD",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "NSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "14742",
+      "symbol": "AXSENSEX-EQ",
+      "name": "AXSENSEX",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "NSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "759995",
+      "symbol": "ESENSEX-EQ",
+      "name": "ESENSEX",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "NSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "4378",
+      "symbol": "SENSEXIETF-EQ",
+      "name": "SENSEXIETF",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "NSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "540154",
+      "symbol": "IDFSENSEXE",
+      "name": "IDFSENSEXE",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "543999",
+      "symbol": "SENSEXETF",
+      "name": "SENSEXETF",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "535276",
+      "symbol": "SBISENSEX",
+      "name": "SBISENSEX",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "539517",
+      "symbol": "HDFCSENSEX",
+      "name": "HDFCSENSEX",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "532985",
+      "symbol": "SENSEX1",
+      "name": "SENSEX1",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "544618",
+      "symbol": "ESENSEX",
+      "name": "ESENSEX",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "538683",
+      "symbol": "SENSEXBEES",
+      "name": "SENSEXBEES",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "543853",
+      "symbol": "AXSENSEX",
+      "name": "AXSENSEX",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "539312",
+      "symbol": "SENSEXBETA",
+      "name": "SENSEXBETA",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "543947",
+      "symbol": "SENSEXADD",
+      "name": "SENSEXADD",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    },
+    {
+      "token": "555555",
+      "symbol": "SENSEXIETF",
+      "name": "SENSEXIETF",
+      "expiry": "",
+      "strike": "-1.000000",
+      "lotsize": "1",
+      "instrumenttype": "",
+      "exch_seg": "BSE",
+      "tick_size": "1.000000"
+    }
+  ]
+}
