@@ -1622,10 +1622,8 @@ body {
   }
 
   .index-tile {
-    height: 195px !important;
-    max-height: 195px !important;
-    min-height: 195px !important;
-    overflow: hidden !important;
+    min-height: 225px !important;
+    overflow: visible !important;
     padding: 10px 11px !important;
     box-sizing: border-box !important;
     display: flex !important;
@@ -2205,14 +2203,14 @@ body {
 
 /* ── Heatmap Tile ── */
 .index-tile {
-  height: 190px !important; 
+  min-height: 225px !important; 
   background: rgba(18, 18, 18, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
   position: relative;
 }
