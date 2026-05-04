@@ -5,6 +5,7 @@ import SignalScanner from "./SignalScanner";
 import { useStockExplain, StockDeepDiveModal } from './StockDeepDive';
 import FnoMoversTable from "./FnoMoversTable";
 import HeatmapPage from "./Heatmap";
+import MoversSection from "./MoversSection";
 
 // ── Utility functions ─────────────────────────────────────────────────────────
 
@@ -303,6 +304,7 @@ export default function App() {
   const [niftyData, setNiftyData] = useState({ gainers: [], losers: [] });
   const [midcapData, setMidcapData] = useState({ gainers: [], losers: [] });
   const [fnoMovers, setFnoMovers] = useState({ gainers: [], losers: [] });
+  const [moversData, setMoversData] = useState({ gainers: [], losers: [] });
   const [wsStatus, setWsStatus] = useState('offline');
   const [aiInsight, setAiInsight] = useState(null);
   const [aiSignal, setAiSignal] = useState(null);
@@ -356,6 +358,12 @@ export default function App() {
       if (ai.insight) setAiInsight(ai.insight);
       if (ai.signal) setAiSignal(ai.signal);
     }
+
+    // 4. Movers Alert
+    const movers = await fetchWithFallback("/api/movers");
+    if (movers) {
+      setMoversData(movers);
+    }
   }, []);
 
   const [showBanner, setShowBanner] = useState(false);
@@ -398,6 +406,9 @@ export default function App() {
               }
               if (msg.fno_movers) {
                 setFnoMovers({ gainers: msg.fno_movers.gainers || [], losers: msg.fno_movers.losers || [] });
+              }
+              if (msg.movers) {
+                setMoversData(msg.movers);
               }
               setLastUpdated(formatIST());
               setWsStatus('live');
@@ -648,7 +659,11 @@ export default function App() {
       ) : currentPage === 'scanner' ? (
         <SignalScanner onBack={() => setCurrentPage('home')} />
       ) : (
-        <HeatmapPage onBack={() => setCurrentPage('home')} wsStatus={wsStatus} />
+        <div className="unified-heatmap-view">
+          <HeatmapPage onBack={() => setCurrentPage('home')} wsStatus={wsStatus} />
+          <MoversSection moversData={moversData} />
+          <SignalScanner onBack={() => setCurrentPage('home')} />
+        </div>
       )}
 
       <StockDeepDiveModal

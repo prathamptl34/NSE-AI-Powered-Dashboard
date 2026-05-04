@@ -21,6 +21,9 @@ from collections import defaultdict
 _intraday_candles = defaultdict(list)
 _last_cumulative_vol = defaultdict(int)
 _current_trading_day = datetime.now().strftime("%Y-%m-%d")
+MOVER_THRESHOLD = 3.0
+MOVERS_UP = set()    # Set of tokens
+MOVERS_DOWN = set()  # Set of tokens
 
 # Enable JSON logging if running in Cloud Run
 if os.environ.get("K_SERVICE"):
@@ -461,6 +464,18 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
         if sym and sym in FNO_SYMBOL_TOKEN_MAP:
             _fno_tick_store[sym] = _tick_store.get(token) or _fno_tick_store.get(sym)
 
+    # ── Movers Alert Logic ──────────────────────────────────────────────────
+    if prev > 0.01:
+        if change_pct >= MOVER_THRESHOLD:
+            MOVERS_UP.add(token)
+            MOVERS_DOWN.discard(token)
+        elif change_pct <= -MOVER_THRESHOLD:
+            MOVERS_DOWN.add(token)
+            MOVERS_UP.discard(token)
+        else:
+            MOVERS_UP.discard(token)
+            MOVERS_DOWN.discard(token)
+
     # Throttle: recompute heatmap every 5 ticks via modulo counter
     global _tick_batch_counter
     _tick_batch_counter += 1
@@ -605,6 +620,32 @@ def get_market_summary(top_n: int = 5) -> dict:
         },
         "last_updated": datetime.now(timezone.utc).isoformat(),
         "total_tokens_tracked": len(ticks),
+    }
+
+
+def get_movers() -> dict:
+    """Return sorted lists of stocks crossing the MOVER_THRESHOLD."""
+    with _store_lock:
+        up_ticks = [_tick_store[t] for t in list(MOVERS_UP) if t in _tick_store]
+        down_ticks = [_tick_store[t] for t in list(MOVERS_DOWN) if t in _tick_store]
+
+    # Sort gainers by change_pct desc, losers by change_pct asc
+    gainers = sorted(up_ticks, key=lambda x: x["change_pct"], reverse=True)
+    losers = sorted(down_ticks, key=lambda x: x["change_pct"])
+
+    def _movers_snap(t):
+        return {
+            "symbol":     t["symbol"],
+            "ltp":        t["ltp"],
+            "change_pct": t["change_pct"],
+            "volume":     t.get("volume", 0),
+            "sector":     t.get("index", "EQUITY")
+        }
+
+    return {
+        "gainers":      [_movers_snap(t) for t in gainers],
+        "losers":       [_movers_snap(t) for t in losers],
+        "last_updated": datetime.now(timezone.utc).isoformat()
     }
 
 
@@ -895,6 +936,9 @@ async def market_pusher():
                 'losers':  fno_sorted_asc[:5]
             }
 
+            # Movers Alert Data
+            movers_data = get_movers()
+
             # The frontend (App.js) handles updates per index. 
             # We broadcast one message per index to ensure state is updated correctly.
             for idx in ["nifty100", "midcap100"]:
@@ -904,6 +948,7 @@ async def market_pusher():
                     'gainers':    summary[idx]["gainers"],
                     'losers':     summary[idx]["losers"],
                     'fno_movers': fno_movers,
+                    'movers':     movers_data,
                     'total':      summary.get('total_tokens_tracked', 200)
                 })
 

@@ -866,6 +866,14 @@ async def trading_day_check(
     }
 
 
+# ── Movers Alert Endpoint ───────────────────────────────────────────────────
+from backend.streamer import get_movers
+
+@app.get("/api/movers")
+async def get_movers_alert():
+    """Returns sorted lists of stocks crossing the ±3% threshold."""
+    return get_movers()
+
 # ── Heatmap Endpoints ─────────────────────────────────────────────────────
 
 from fastapi.responses import StreamingResponse
