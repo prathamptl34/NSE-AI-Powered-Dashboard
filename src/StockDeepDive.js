@@ -60,7 +60,9 @@ export function useStockExplain() {
 export function StockDeepDiveModal({ stock, explanation, multiAgentData, loading, loadingMA, onClose }) {
   if (!stock) return null;
 
-  const isUp = stock.change_pct >= 0;
+  const rawPct = stock.change_pct;
+  const changePct = (rawPct === null || rawPct === undefined || isNaN(Number(rawPct))) ? 0 : Number(rawPct);
+  const isUp = changePct >= 0;
   const accent = isUp ? 'var(--green)' : 'var(--red)';
   const dim    = isUp ? 'var(--green-dim)' : 'var(--red-dim)';
 
@@ -110,7 +112,7 @@ export function StockDeepDiveModal({ stock, explanation, multiAgentData, loading
            <div>
              <div className="sdm-symbol stock-modal-title">{stock.symbol}</div>
              <span style={{ fontSize: '14px', fontWeight: '800', color: accent }}>
-               {isUp ? '▲' : '▼'} {Math.abs(stock.change_pct).toFixed(2)}%
+               {isUp ? '▲' : '▼'} {Math.abs(changePct).toFixed(2)}%
              </span>
            </div>
            <div>
@@ -156,7 +158,7 @@ export function StockDeepDiveModal({ stock, explanation, multiAgentData, loading
 }
 
 function formatINR(num) {
-  if (!num) return "—";
+  if (num === null || num === undefined || isNaN(num)) return "—";
   return Number(num).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

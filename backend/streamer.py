@@ -457,6 +457,7 @@ def _update_tick(token: str, ltp: float, volume: int = 0, close_price: float = 0
             "prev_close": prev,
             "change_pct": change_pct,
             "volume":     volume,
+            "avg_volume": meta.get("avg_volume", 0),
             "prev_close_confirmed": meta.get("prev_close_confirmed", False),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
@@ -844,7 +845,12 @@ def process_symbol_data(df, symbol, price):
                 recent_close = float(recent_day['close'])
                 meta['prev_close'] = recent_close
                 meta['prev_close_confirmed'] = True
-                logger.debug(f"[Historical] Set {symbol} prev_close={meta['prev_close']} from {recent_day['timestamp'][:10]}")
+                
+                # Calculate average volume (last 5-7 days depending on fetch)
+                if 'volume' in hist_df.columns:
+                    meta['avg_volume'] = float(hist_df['volume'].mean())
+                
+                logger.debug(f"[Historical] Set {symbol} prev_close={meta['prev_close']} avg_vol={meta.get('avg_volume', 0)}")
         except Exception as e:
             logger.error(f"[Historical] Fallback error for {symbol}: {e}")
 

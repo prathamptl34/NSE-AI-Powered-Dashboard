@@ -332,10 +332,22 @@ async def get_ai_insight():
 async def get_fno_movers():
     try:
         from backend.streamer import _fno_tick_store
-        sorted_stocks = sorted(
-            [v for v in _fno_tick_store.values() if v and v.get("change_pct") is not None],
-            key=lambda x: x["change_pct"], reverse=True
-        )
+        
+        def _process_fno_tick(v):
+            if not v: return None
+            vol = v.get("volume", 0)
+            av = v.get("avg_volume", 0)
+            v["vol_ratio"] = round(vol / av, 2) if av > 10000 else 1.0
+            return v
+
+        all_fno = [
+            _process_fno_tick(v.copy()) 
+            for v in _fno_tick_store.values() 
+            if v and v.get("change_pct") is not None
+        ]
+        
+        sorted_stocks = sorted(all_fno, key=lambda x: x["change_pct"], reverse=True)
+        
         return {
             "gainers": sorted_stocks[:5],
             "losers": sorted_stocks[-5:][::-1],

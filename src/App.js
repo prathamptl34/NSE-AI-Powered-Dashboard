@@ -231,21 +231,11 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
     
     // Briefly clear the flash direction to restart the animation if needed
     setFlashDir(null);
-    
-    // Use requestAnimationFrame to ensure the DOM updates before reapplying the class
-    const req = requestAnimationFrame(() => {
-      setFlashDir(dir);
-    });
-
-    const t = setTimeout(() => setFlashDir(null), 800);
-    return () => {
-      cancelAnimationFrame(req);
-      clearTimeout(t);
-    };
+    setTimeout(() => setFlashDir(dir), 50);
   }, [stock.ltp]);
 
   return (
-    <StockCardInner
+    <StockCardInner 
       stock={stock}
       rank={rank}
       accent={accent}
@@ -257,50 +247,11 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
   );
 });
 
-function Panel({ title, accent, data, type, lastUpdated, onStockClick, viewMode, historyMap }) {
-  // Clamp to 5 to prevent glitches when WS sends extra items mid-update
-  const items = data ? data.slice(0, 5) : [];
-  return (
-    <section className={`panel panel-${accent}`}>
-      <div className="panel-header">
-        <span className="panel-icon">{type === 'gainer' ? '▲' : '▼'}</span>
-        <h2 className="panel-title">{title}</h2>
-        <span className="panel-count">{items.length} stocks</span>
-      </div>
-      <div className="panel-body">
-        <div className="stock-table-header">
-          <span className="th-rank">#</span>
-          <span className="th-symbol">SYMBOL</span>
-          <span className="th-price">PRICE</span>
-          <span className="th-change">CHANGE</span>
-        </div>
-        {items.length === 0
-          ? <SkeletonList count={5} />
-          : items.map((s, i) => (
-              <StockCard 
-                key={s.symbol} 
-                stock={s} 
-                rank={i+1} 
-                accent={accent} 
-                onClick={onStockClick} 
-                viewMode={viewMode}
-                history={historyMap[s.symbol] || []}
-              />
-            ))
-        }
-      </div>
-      <div className="panel-footer">
-        <span className="last-updated">Updated {lastUpdated || "—"}</span>
-      </div>
-    </section>
-  );
-}
-
 // ── App Component ─────────────────────────────────────────────────────────────
 
 export default function App() {
-  const { activeStock, explanation, multiAgentData, loading, loadingMA, openExplain, closeExplain } = useStockExplain();
-  const [currentPage, setCurrentPage] = useState('home');
+  const { activeStock, explanation, loading, openExplain, closeExplain } = useStockExplain();
+  const [activeSection, setActiveSection] = useState('market-analyst');
   const [niftyData, setNiftyData] = useState({ gainers: [], losers: [] });
   const [midcapData, setMidcapData] = useState({ gainers: [], losers: [] });
   const [fnoMovers, setFnoMovers] = useState({ gainers: [], losers: [] });
@@ -314,6 +265,74 @@ export default function App() {
   const fetchedIntradayRef = useRef(new Set());
   const wsRef = useRef(null);
 
+  const navItems = [
+    { key: 'analyst', label: 'Market Analyst', icon: '✨' },
+    { key: 'scanner', label: 'Signal Scanner', icon: '◉' },
+    { key: 'heatmap', label: 'Heatmap', icon: '🔥' },
+    { key: 'movers',  label: 'Movers Alert', icon: '⚡' },
+  ];
+
+  const Sidebar = ({ activeSection, setActiveSection, wsStatus }) => (
+    <div className="sidebar">
+      <div className="sidebar-header">
+        <div className="sidebar-brand">
+          <div className="sidebar-logo">MP</div>
+          <div className="sidebar-wordmark">Market Pulse</div>
+        </div>
+        <div className="sidebar-badge">NSE LIVE</div>
+        <div className="sidebar-status">
+          <ConnectionDot status={wsStatus} />
+          <div className="sidebar-clock"><MarketClock /></div>
+        </div>
+      </div>
+      <div className="sidebar-nav">
+        {navItems.map(item => (
+          <div 
+            key={item.key}
+            className={`nav-item ${activeSection === item.key ? 'active' : ''}`}
+            onClick={() => setActiveSection(item.key)}
+          >
+            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-label">{item.label}</span>
+          </div>
+        ))}
+      </div>
+      <div className="sidebar-footer">
+        <span className="sidebar-version">v2.0</span>
+      </div>
+    </div>
+  );
+
+  const MobileHeader = ({ activeSection, wsStatus }) => (
+    <div className="mobile-header">
+      <div className="mobile-header-left">
+        <div className="logo-mark">MP</div>
+      </div>
+      <div className="mobile-header-center">
+        {navItems.find(i => i.key === activeSection)?.label || 'Dashboard'}
+      </div>
+      <div className="mobile-header-right">
+        <div className={`conn-dot conn-${wsStatus}`} style={{ padding: 0 }}><span className="dot-inner" /></div>
+        <div className="sidebar-clock" style={{ fontSize: '10px' }}><MarketClock /></div>
+      </div>
+    </div>
+  );
+
+  const BottomTabs = ({ activeSection, setActiveSection }) => (
+    <div className="bottom-tabs">
+      {navItems.map(item => (
+        <div 
+          key={item.key}
+          className={`tab-item ${activeSection === item.key ? 'active' : ''}`}
+          onClick={() => setActiveSection(item.key)}
+        >
+          <span className="tab-icon">{item.icon}</span>
+          <span className="tab-label">{item.key === 'movers' ? 'Movers' : item.label.split(' ')[1] || item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   const fetchData = useCallback(async () => {
     const fetchWithFallback = async (path) => {
       try {
@@ -322,7 +341,7 @@ export default function App() {
           res = await fetch(path);
         } catch (e) {
           // Dev fallback
-          res = await fetch(`http://127.0.0.1:8000${path}`);
+          res = await fetch(`http://127.0.0.1:8001${path}`);
         }
         
         if (!res.ok) return null;
@@ -382,7 +401,7 @@ export default function App() {
       try {
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const isDev = window.location.port === '3000';
-        const backendHost = isDev ? '127.0.0.1:8000' : window.location.host;
+        const backendHost = isDev ? '127.0.0.1:8001' : window.location.host;
         const ws = new WebSocket(`${proto}//${backendHost}/ws/stream`);
         wsRef.current = ws;
 
@@ -571,100 +590,87 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {showBanner && (
-        <div className="offline-notice">
-          <span>⚠️ Connection Lost. Reconnecting to Market Stream...</span>
-          <button className="retry-btn" onClick={handleManualRetry}>Retry Now</button>
-        </div>
-      )}
+      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} wsStatus={wsStatus} />
+      <MobileHeader activeSection={activeSection} wsStatus={wsStatus} />
+      
+      <main className="main-content">
+        {showBanner && (
+          <div className="offline-notice">
+            <span>⚠️ Connection Lost. Reconnecting to Market Stream...</span>
+            <button className="retry-btn" onClick={handleManualRetry}>Retry Now</button>
+          </div>
+        )}
 
-      {currentPage === 'home' ? (
-        <div className="dashboard-plane">
-          <header className="header app-header">
-            <div className="header-left header-brand">
-              <div className="logo-mark">MP</div>
-              <div className="header-title">
-                <span className="title-main">Market Pulse</span>
-                <span className="title-separator">•</span>
-                <span className="title-sub">NSE Live Dashboard</span>
+        {/* SECTION 1: MARKET ANALYST (AI + CORE DASHBOARD) */}
+        {activeSection === 'analyst' && (
+          <div id="section-analyst" className="content-fade-in">
+            <InsightsPage onBack={() => {}} wsStatus={wsStatus} standalone={true} />
+            
+            <div className="section-divider-premium">
+              <span className="divider-label">LIVE MARKET SNAPSHOT</span>
+            </div>
+
+            <div className="section-header-compact">
+              <div className="section-title">
+                <div className="section-line" style={{ background: 'var(--blue)' }} />
+                NIFTY 100 SEGMENT
               </div>
             </div>
-
-            <div className="header-right header-nav">
-              <button 
-                className="ai-insights-btn premium-btn"
-                onClick={() => setCurrentPage('insights')}
-              >
-                ✨ Market Analyst
-              </button>
-              <button 
-                className="scanner-nav-btn premium-btn-blue"
-                onClick={() => setCurrentPage('scanner')}
-              >
-                ◉ Signal Scanner
-              </button>
-              <button
-                className="heatmap-nav-btn premium-btn-orange"
-                onClick={() => setCurrentPage('heatmap')}
-              >
-                🔥 Heatmap
-              </button>
+            <div className="panels-wrapper">
+              <Panel title="Top Gainers" accent="green" data={niftyData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
+              <Panel title="Top Losers" accent="red" data={niftyData.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
             </div>
 
-            <div className="header-bottom-row">
-              <div className="header-status">
-                <ConnectionDot status={wsStatus} />
-              </div>
-              <div className="header-clock">
-                <MarketClock />
+            <div className="section-header-compact">
+              <div className="section-title">
+                <div className="section-line" style={{ background: '#a855f7' }} />
+                NIFTY MIDCAP 100
               </div>
             </div>
-          </header>
+            <div className="panels-wrapper">
+              <Panel title="Top Gainers" accent="green" data={midcapData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
+              <Panel title="Top Losers" accent="red" data={midcapData.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
+            </div>
 
-          <div className="section-header">
-            <div className="section-title">
-              <div className="section-line" style={{ background: 'var(--blue)' }} />
-              NIFTY 100 SEGMENT
+            <div className="section-header-compact">
+              <div className="section-title">
+                <div className="section-line" style={{ background: '#f97316' }} />
+                EQUITY F&O SEGMENT
+              </div>
+            </div>
+            <div className="panels-wrapper fno-bottom-panel">
+              <FnoMoversTable 
+                gainers={fnoMovers.gainers} 
+                losers={fnoMovers.losers} 
+                onStockClick={openExplain} 
+              />
             </div>
           </div>
-          <main className="panels-wrapper">
-            <Panel title="Top Gainers" accent="green" data={niftyData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
-            <Panel title="Top Losers" accent="red" data={niftyData.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
-          </main>
+        )}
 
-          <div className="section-header">
-            <h2 className="section-title">Nifty Midcap 100</h2>
-            <div className="section-line" style={{ background: '#a855f7' }} />
+        {/* SECTION 2: SIGNAL SCANNER */}
+        {activeSection === 'scanner' && (
+          <div id="section-scanner" className="content-fade-in">
+            <SignalScanner standalone={true} />
           </div>
-          <main className="panels-wrapper">
-            <Panel title="Top Gainers" accent="green" data={midcapData.gainers} type="gainer" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
-            <Panel title="Top Losers" accent="red" data={midcapData.losers} type="loser" lastUpdated={lastUpdated} onStockClick={openExplain} viewMode={viewMode} historyMap={historyMap} />
-          </main>
+        )}
 
-          <div className="section-header">
-            <h2 className="section-title">Equity F&O Segment</h2>
-            <div className="section-line" style={{ background: '#f97316' }} />
+        {/* SECTION 3: HEATMAP */}
+        {activeSection === 'heatmap' && (
+          <div id="section-heatmap" className="content-fade-in">
+            <HeatmapPage wsStatus={wsStatus} standalone={true} />
           </div>
-          <main className="panels-wrapper" style={{ marginBottom: '40px', display: 'block' }}>
-            <FnoMoversTable 
-              gainers={fnoMovers.gainers} 
-              losers={fnoMovers.losers} 
-              onStockClick={openExplain} 
-            />
-        </main>
+        )}
 
-        </div>
-      ) : currentPage === 'insights' ? (
-        <InsightsPage onBack={() => setCurrentPage('home')} wsStatus={wsStatus} />
-      ) : currentPage === 'scanner' ? (
-        <SignalScanner onBack={() => setCurrentPage('home')} />
-      ) : (
-        <div className="unified-heatmap-view">
-          <HeatmapPage onBack={() => setCurrentPage('home')} wsStatus={wsStatus} />
-          <MoversSection moversData={moversData} />
-          <SignalScanner onBack={() => setCurrentPage('home')} />
-        </div>
-      )}
+        {/* SECTION 4: MOVERS ALERT */}
+        {activeSection === 'movers' && (
+          <div id="section-movers" className="content-fade-in">
+            <MoversSection moversData={moversData} standalone={true} />
+          </div>
+        )}
+      </main>
+
+      <BottomTabs activeSection={activeSection} setActiveSection={setActiveSection} />
 
       <StockDeepDiveModal
         stock={activeStock}
@@ -673,5 +679,44 @@ export default function App() {
         onClose={closeExplain}
       />
     </div>
+  );
+}
+
+// Move Panel outside App to avoid recreation
+function Panel({ title, accent, data, type, lastUpdated, onStockClick, viewMode, historyMap }) {
+  const items = data ? data.slice(0, 5) : [];
+  return (
+    <section className={`panel panel-${accent}`}>
+      <div className="panel-header">
+        <span className="panel-icon">{type === 'gainer' ? '▲' : '▼'}</span>
+        <h2 className="panel-title">{title}</h2>
+        <span className="panel-count">{items.length} stocks</span>
+      </div>
+      <div className="panel-body">
+        <div className="stock-table-header">
+          <span className="th-rank">#</span>
+          <span className="th-symbol">SYMBOL</span>
+          <span className="th-price">PRICE</span>
+          <span className="th-change">CHANGE</span>
+        </div>
+        {items.length === 0
+          ? <SkeletonList count={5} />
+          : items.map((s, i) => (
+              <StockCard 
+                key={s.symbol} 
+                stock={s} 
+                rank={i+1} 
+                accent={accent} 
+                onClick={onStockClick} 
+                viewMode={viewMode}
+                history={historyMap[s.symbol] || []}
+              />
+            ))
+        }
+      </div>
+      <div className="panel-footer">
+        <span className="last-updated">Updated {lastUpdated || "—"}</span>
+      </div>
+    </section>
   );
 }

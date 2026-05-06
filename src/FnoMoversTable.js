@@ -8,6 +8,14 @@ function formatINR(num) {
   });
 }
 
+function formatVolume(vol) {
+  if (!vol || vol === 0) return "—";
+  if (vol >= 10000000) return (vol / 10000000).toFixed(1) + "Cr";
+  if (vol >= 100000) return (vol / 100000).toFixed(1) + "L";
+  if (vol >= 1000) return (vol / 1000).toFixed(1) + "K";
+  return Math.floor(vol).toString();
+}
+
 function FnoRow({ stock, index, type, onStockClick }) {
   const isUp = stock.change_pct > 0;
   const accentColor = isUp ? 'var(--green)' : 'var(--red)';
@@ -31,7 +39,7 @@ function FnoRow({ stock, index, type, onStockClick }) {
             {stock.vol_ratio && stock.vol_ratio >= 1.2 ? (
               <span className="fno-fire">🔥 {stock.vol_ratio.toFixed(1)}x Vol</span>
             ) : (
-              <span className="fno-vol-normal">Avg Vol</span>
+              <span className="fno-vol-normal">Avg Vol: {formatVolume(stock.avg_volume)}</span>
             )}
           </div>
         </div>
