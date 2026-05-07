@@ -641,7 +641,7 @@ export default function InsightsPage({ onBack, wsStatus, standalone = false }) {
                 <div className="thinking-dots"><span /><span /><span /></div>
                 <span className="thinking-step">Running Mixtral-8x7b analysis...</span>
               </div>
-            ) : error ? (
+            ) : error || (data?.insight && data.insight.toLowerCase().includes('unavailable')) ? (
               <AIErrorState onRetry={fetchInsight} />
             ) : data?.insight ? (
               <p style={{ fontSize: '14px', lineHeight: 1.7, color: 'var(--text-secondary)', margin: 0 }}>
@@ -690,7 +690,11 @@ export default function InsightsPage({ onBack, wsStatus, standalone = false }) {
       
       <div className="ai-main-card">
          <div className="ai-card-label">NARRATIVE INTELLIGENCE</div>
-         {loading ? <ThinkingState /> : <StructuredInsight text={data?.insight} gainers={data?.gainers} losers={data?.losers} />}
+         {loading ? <ThinkingState /> :
+          (data?.insight && data.insight.toLowerCase().includes('unavailable'))
+            ? <AIErrorState onRetry={fetchInsight} />
+            : <StructuredInsight text={data?.insight} gainers={data?.gainers} losers={data?.losers} />
+         }
       </div>
 
       {data && !loading && (
