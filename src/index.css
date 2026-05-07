@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
   /* Dynamic Backgrounds */
@@ -2689,7 +2689,7 @@ body {
     display: flex;
     flex-direction: column;
     z-index: 1000;
-    transition: width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     overflow: hidden;
     position: fixed;
   }
@@ -2701,27 +2701,27 @@ body {
   /* Toggle button */
   .sidebar-toggle {
     position: absolute;
-    bottom: 20px;
+    bottom: 24px;
     right: -14px;
     width: 28px;
     height: 28px;
     border-radius: 50%;
     background: hsl(217, 91%, 60%);
-    color: #fff;
-    border: none;
-    cursor: pointer;
+    border: 2px solid hsla(222, 47%, 4%, 1);
+    color: white;
     font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
-    transition: transform 0.2s, box-shadow 0.2s;
-    z-index: 1001;
-    flex-shrink: 0;
+    box-shadow: 0 4px 12px hsla(217, 91%, 60%, 0.4);
+    z-index: 100;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .sidebar-toggle:hover {
     transform: scale(1.15);
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 6px 16px hsla(217, 91%, 60%, 0.6);
   }
 
   .sidebar-header {
@@ -2767,6 +2767,8 @@ body {
     color: #fff;
     letter-spacing: -0.5px;
     white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease 0.1s;
   }
 
   .sidebar-badge {
@@ -2780,6 +2782,8 @@ body {
     letter-spacing: 0.5px;
     width: fit-content;
     white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease 0.1s;
   }
 
   .sidebar-status {
@@ -2795,6 +2799,8 @@ body {
     font-size: 12px;
     color: hsla(0, 0%, 100%, 0.4);
     white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease 0.1s;
   }
 
   .sidebar-nav {
@@ -2834,11 +2840,28 @@ body {
     width: 48px;
   }
 
+  .nav-label {
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease 0.1s;
+  }
+
+  /* Collapsed label fading */
+  .sidebar.sidebar-collapsed .sidebar-wordmark,
+  .sidebar.sidebar-collapsed .sidebar-badge,
+  .sidebar.sidebar-collapsed .sidebar-clock,
+  .sidebar.sidebar-collapsed .sidebar-version,
+  .sidebar.sidebar-collapsed .nav-label {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    pointer-events: none;
+  }
+
   /* CSS Tooltip for collapsed sidebar */
   .nav-item.nav-item-collapsed::after {
     content: attr(data-tooltip);
     position: absolute;
-    left: calc(100% + 12px);
+    left: 72px;
     top: 50%;
     transform: translateY(-50%);
     background: hsla(222, 47%, 12%, 0.97);
@@ -2852,7 +2875,7 @@ body {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s;
-    z-index: 2000;
+    z-index: 1000;
   }
   .nav-item.nav-item-collapsed:hover::after {
     opacity: 1;
@@ -2886,6 +2909,23 @@ body {
     border-radius: 0 4px 4px 0;
   }
 
+  .nav-item.nav-item-collapsed.active {
+    background: transparent;
+  }
+  .nav-item.nav-item-collapsed.active::before {
+    display: none;
+  }
+  .nav-item.nav-item-collapsed.active .nav-icon {
+    color: hsl(217, 91%, 60%);
+    background: hsla(217, 91%, 60%, 0.15);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .nav-icon {
     font-size: 18px;
     flex-shrink: 0;
@@ -2906,6 +2946,8 @@ body {
     font-weight: 700;
     letter-spacing: 1px;
     white-space: nowrap;
+    opacity: 1;
+    transition: opacity 0.2s ease 0.1s;
   }
 
   .main-content {
@@ -2914,7 +2956,7 @@ body {
     min-height: 100vh;
     padding: 2rem;
     box-sizing: border-box;
-    transition: margin-left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   /* Mobile components hidden on desktop */

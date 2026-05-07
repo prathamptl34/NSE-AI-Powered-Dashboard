@@ -216,7 +216,7 @@ export default function App() {
   const { activeStock, explanation, loading, openExplain, closeExplain } = useStockExplain();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem('sidebar_collapsed') === 'true'; }
+    try { return localStorage.getItem('mp_sidebar_collapsed') === 'true'; }
     catch { return false; }
   });
   const [niftyData, setNiftyData] = useState({ gainers: [], losers: [] });
@@ -234,7 +234,7 @@ export default function App() {
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed(prev => {
       const next = !prev;
-      try { localStorage.setItem('sidebar_collapsed', String(next)); } catch {}
+      try { localStorage.setItem('mp_sidebar_collapsed', String(next)); } catch {}
       return next;
     });
   }, []);
@@ -253,12 +253,12 @@ export default function App() {
       <div className="sidebar-header">
         <div className="sidebar-brand">
           <div className="sidebar-logo">MP</div>
-          {!collapsed && <div className="sidebar-wordmark">Market Pulse</div>}
+          <div className="sidebar-wordmark">Market Pulse</div>
         </div>
-        {!collapsed && <div className="sidebar-badge">NSE LIVE</div>}
+        <div className="sidebar-badge">NSE LIVE</div>
         <div className="sidebar-status">
           <ConnectionDot status={wsStatus} />
-          {!collapsed && <div className="sidebar-clock"><MarketClock /></div>}
+          <div className="sidebar-clock"><MarketClock /></div>
         </div>
       </div>
 
@@ -271,13 +271,13 @@ export default function App() {
             data-tooltip={item.label}
           >
             <span className="nav-icon">{item.icon}</span>
-            {!collapsed && <span className="nav-label">{item.label}</span>}
+            <span className="nav-label">{item.label}</span>
           </div>
         ))}
       </div>
 
       <div className="sidebar-footer">
-        {!collapsed && <span className="sidebar-version">v2.0</span>}
+        <span className="sidebar-version">v2.0</span>
       </div>
 
       {/* Toggle button */}
