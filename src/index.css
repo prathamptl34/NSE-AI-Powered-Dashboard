@@ -3431,3 +3431,158 @@ body {
 .stock-card:hover::after {
   color: hsla(0,0%,100%,0.3);
 }
+
+/* FIX 1 — F&O SEGMENT: MOMENTUM GAINERS + PRESSURE LOSERS MUST BE SIDE BY SIDE */
+/* Desktop — side by side */
+@media (min-width: 769px) {
+  .fno-highlights-grid,
+  .fno-sector-grid,
+  .fno-movers-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    align-items: start;
+  }
+}
+
+/* Mobile — stack vertically */
+@media (max-width: 768px) {
+  .fno-highlights-grid,
+  .fno-sector-grid,
+  .fno-movers-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+/* FIX 2 — SIDEBAR TOGGLE BUTTON: WRONG POSITION */
+@media (min-width: 769px) {
+  /* Step 1: Sidebar outer container MUST allow overflow */
+  .sidebar,
+  .left-sidebar,
+  nav.sidebar {
+    overflow: visible !important;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    z-index: 100;
+  }
+
+  /* Step 2: Toggle button — anchored to middle-right of sidebar */
+  .sidebar-toggle-btn {
+    position: absolute;
+    top: 50%;                    /* Vertically centered on sidebar */
+    transform: translateY(-50%);
+    right: -14px;                /* Half outside the right edge */
+    bottom: auto;                /* Remove bottom positioning */
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: hsl(217, 91%, 60%);
+    border: 2.5px solid hsl(222, 47%, 6%);
+    color: white;
+    font-size: 10px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    box-shadow: 
+      0 0 0 1px hsla(217, 91%, 60%, 0.35),
+      0 4px 16px hsla(217, 91%, 60%, 0.55),
+      0 2px 8px rgba(0, 0, 0, 0.5);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    clip-path: none;
+  }
+
+  /* Hover — keep translateY(-50%) and add scale */
+  .sidebar-toggle-btn:hover {
+    transform: translateY(-50%) scale(1.18);
+    box-shadow: 
+      0 0 0 3px hsla(217, 91%, 60%, 0.3),
+      0 6px 20px hsla(217, 91%, 60%, 0.65);
+  }
+
+  /* Hide on mobile */  
+  .sidebar-toggle-btn {
+    display: none;
+  }
+  @media (min-width: 769px) {
+    .sidebar-toggle-btn {
+      display: flex;
+    }
+  }
+}
+
+/* FIX 3 — HEATMAP: BREADTH COUNTER TOP-RIGHT ALIGNMENT + LAST TILE OVERFLOW */
+@media (min-width: 769px) {
+  .heatmap-breadth-counter,
+  .market-breadth,
+  .breadth-stats {
+    position: absolute;
+    top: 1rem;
+    right: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+    z-index: 10;
+    background: hsla(222, 47%, 6%, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid hsla(0, 0%, 100%, 0.08);
+    border-radius: 10px;
+    padding: 8px 14px;
+  }
+
+  .breadth-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Heatmap header wrapper needs position: relative */
+  .heatmap-header,
+  .heatmap-page-header {
+    position: relative;
+  }
+}
+
+@media (max-width: 768px) {
+  .heatmap-breadth-counter,
+  .market-breadth,
+  .breadth-stats {
+    position: static;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 0;
+    background: transparent;
+    border: none;
+    backdrop-filter: none;
+  }
+
+  .breadth-row {
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+}
+
+.hm-index-tile .tile-sector-name,
+.heatmap-tile .sector-name,
+.hm-index-tile h3 {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}

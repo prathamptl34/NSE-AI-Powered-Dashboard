@@ -118,11 +118,6 @@ export default function FnoMoversTable({ gainers, losers, onStockClick }) {
           height: 1px;
           background: linear-gradient(90deg, var(--glass-border) 0%, transparent 100%);
         }
-        .fno-movers-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); 
-          gap: 32px; 
-        }
 
         /* Panel Styling */
         .fno-panel {
@@ -302,7 +297,7 @@ export default function FnoMoversTable({ gainers, losers, onStockClick }) {
         }
       `}</style>
       <h2 className="fno-main-title">F&O SECTOR HIGHLIGHTS</h2>
-      <div className="fno-movers-grid">
+      <div className="fno-highlights-grid">
         <FnoTable title="Momentum Gainers" data={gainers} type="gainer" onStockClick={onStockClick} />
         <FnoTable title="Pressure Losers" data={losers} type="loser" onStockClick={onStockClick} />
       </div>
