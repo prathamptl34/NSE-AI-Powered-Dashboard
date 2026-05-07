@@ -2704,10 +2704,9 @@ body {
     border-right: 1px solid hsla(0, 0%, 100%, 0.06);
     display: flex;
     flex-direction: column;
-    z-index: 1000;
+    z-index: 100;
     transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-    position: fixed;
+    overflow: visible;
   }
 
   .sidebar.sidebar-collapsed {
@@ -2723,7 +2722,7 @@ body {
     height: 28px;
     border-radius: 50%;
     background: hsl(217, 91%, 60%);
-    border: 2px solid hsla(222, 47%, 4%, 1);
+    border: 2px solid hsl(222, 47%, 8%);
     color: white;
     font-size: 11px;
     font-weight: 700;
@@ -2731,13 +2730,13 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px hsla(217, 91%, 60%, 0.4);
-    z-index: 100;
+    box-shadow: 0 0 0 1px hsla(217, 91%, 60%, 0.3), 0 4px 12px hsla(217, 91%, 60%, 0.5);
+    z-index: 200;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .sidebar-toggle:hover {
-    transform: scale(1.15);
-    box-shadow: 0 6px 16px hsla(217, 91%, 60%, 0.6);
+    transform: scale(1.2);
+    box-shadow: 0 0 0 3px hsla(217, 91%, 60%, 0.25), 0 6px 16px hsla(217, 91%, 60%, 0.6);
   }
 
   .sidebar-header {
