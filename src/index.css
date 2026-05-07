@@ -2241,6 +2241,12 @@ body {
 .pill-loss { color: #ef4444; }
 .pill-loss.active { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
 
+.heatmap-wrapper {
+  overflow-y: auto;
+  padding-bottom: 2rem;
+  height: auto;
+}
+
 .hm-terminal-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -2252,14 +2258,15 @@ body {
 
 /* ── Heatmap Tile ── */
 .index-tile {
-  min-height: 245px !important; 
+  min-height: 200px !important; 
+  height: auto;
   background: rgba(18, 18, 18, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
   padding: 0;
-  overflow: visible;
+  overflow: visible !important;
   transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
   position: relative;
 }
@@ -2706,7 +2713,7 @@ body {
     flex-direction: column;
     z-index: 100;
     transition: width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: visible;
+    overflow: visible !important;
   }
 
   .sidebar.sidebar-collapsed {
@@ -2716,27 +2723,36 @@ body {
   /* Toggle button */
   .sidebar-toggle {
     position: absolute;
-    bottom: 24px;
-    right: -14px;
+    bottom: 28px;
+    right: -14px;        /* Half outside sidebar right edge */
     width: 28px;
     height: 28px;
     border-radius: 50%;
     background: hsl(217, 91%, 60%);
-    border: 2px solid hsl(222, 47%, 8%);
+    border: 2px solid hsl(222, 47%, 6%);
     color: white;
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 10px;
+    font-weight: 800;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 0 0 1px hsla(217, 91%, 60%, 0.3), 0 4px 12px hsla(217, 91%, 60%, 0.5);
-    z-index: 200;
+    z-index: 300;        /* Above everything */
+    box-shadow: 
+      0 0 0 1px hsla(217, 91%, 60%, 0.4),
+      0 4px 16px hsla(217, 91%, 60%, 0.5),
+      0 2px 6px rgba(0,0,0,0.4);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    /* Ensure it's never clipped */
+    clip-path: none;
+    overflow: visible;
   }
+
   .sidebar-toggle:hover {
-    transform: scale(1.2);
-    box-shadow: 0 0 0 3px hsla(217, 91%, 60%, 0.25), 0 6px 16px hsla(217, 91%, 60%, 0.6);
+    transform: scale(1.18);
+    box-shadow: 
+      0 0 0 3px hsla(217, 91%, 60%, 0.3),
+      0 6px 20px hsla(217, 91%, 60%, 0.65);
   }
 
   .sidebar-header {
