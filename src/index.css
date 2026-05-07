@@ -2454,6 +2454,22 @@ body {
 @media (max-width: 1536px) { .hm-terminal-grid { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 1024px) { .hm-terminal-grid { grid-template-columns: repeat(3, 1fr); padding: 16px; } }
 
+/* Orphaned last tile: stay at natural width, left-aligned */
+.hm-terminal-grid > *:last-child:nth-child(4n + 1) {
+  max-width: calc(25% - 9px);
+  justify-self: start;
+}
+@media (max-width: 1536px) {
+  .hm-terminal-grid > *:last-child:nth-child(4n + 1) {
+    max-width: calc(25% - 9px);
+  }
+}
+@media (max-width: 1024px) {
+  .hm-terminal-grid > *:last-child:nth-child(3n + 1) {
+    max-width: calc(33.33% - 8px);
+  }
+}
+
 /* End of Mobile Design System */
 
 
@@ -3078,7 +3094,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 0 1.25rem 0;
+  padding-bottom: 1.25rem;
+  margin-bottom: 1.75rem;
+  border-bottom: 1px solid hsla(0,0%,100%,0.06);
 }
 
 .section-page-title {
@@ -3088,22 +3106,23 @@ body {
 }
 
 .section-page-icon {
-  font-size: 2rem;
+  font-size: 1.8rem;
   line-height: 1;
 }
 
 .section-page-name {
-  font-size: 1.4rem;
+  font-size: 1.5rem;
   font-weight: 800;
   color: white;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.02em;
 }
 
 .section-page-sub {
-  font-size: 0.8rem;
-  color: hsla(0, 0%, 100%, 0.45);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsla(0, 0%, 100%, 0.4);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   margin-top: 2px;
 }
 
@@ -3111,6 +3130,7 @@ body {
   height: 1px;
   background: hsla(0, 0%, 100%, 0.06);
   margin-bottom: 1.5rem;
+  margin-top: 0.5rem;
 }
 
 /* ========== ANALYST 2-COL LAYOUT ========== */
@@ -3160,7 +3180,7 @@ body {
   border-left: 4px solid hsl(217, 91%, 60%);
   border-radius: var(--radius-lg);
   padding: 24px;
-  min-height: 280px;
+  min-height: 0;
   box-shadow: var(--shadow-premium);
   position: relative;
 }
@@ -3312,4 +3332,87 @@ body {
 /* Compact section header within dashboard */
 .section-header-compact {
   padding: 0 0 8px;
+  margin-top: 0.5rem;
+}
+
+/* ========== GLOBAL TYPOGRAPHY & TRADER RULES ========== */
+
+/* Financial numbers: tabular-nums prevents jitter during live updates */
+.stock-price,
+.mover-price,
+.stock-ai-price,
+.hm-row-2,
+.change-pct,
+.mover-badge {
+  font-variant-numeric: tabular-nums;
+}
+
+.stock-price {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+/* Change badge sizing — traders need to read at a glance */
+.change-badge {
+  min-width: 72px;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+/* Card section titles (e.g. "Top Gainers", "SURGING +3%", "SECTOR HEATMAP") */
+.panel-title,
+.col-label,
+.sector-heatmap-label,
+.signal-history-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* Signal History timestamp — truncate */
+.sh-time {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Confidence pills — active state per sentiment */
+.conf-pill {
+  background: hsla(0,0%,100%,0.05);
+  border: 1px solid hsla(0,0%,100%,0.1);
+  color: hsla(0,0%,100%,0.5);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  cursor: default;
+  transition: all 0.2s;
+}
+
+/* Global scrollbar (Firefox) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsla(217, 91%, 60%, 0.3) transparent;
+}
+
+/* Stock row hover indicator */
+.stock-card {
+  position: relative;
+}
+.stock-card::after {
+  content: '\u203a';
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  color: hsla(0,0%,100%,0);
+  transition: color 0.2s;
+}
+.stock-card:hover::after {
+  color: hsla(0,0%,100%,0.3);
 }

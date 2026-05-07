@@ -344,6 +344,12 @@ function StockAICard({ type, symbol, price, changePct, aiReason, delay = 0 }) {
   const accent   = isGainer ? 'var(--ai-green)' : 'var(--ai-red)';
   const glow     = isGainer ? 'var(--ai-glow-green)' : 'var(--ai-glow-red)';
 
+  const displaySymbol = symbol || 'Loading...';
+  const displayPrice = (price != null && !isNaN(price))
+    ? `₹${Number(price).toLocaleString('en-IN')}` : '—';
+  const displayChange = (changePct != null && !isNaN(changePct))
+    ? `${isGainer ? '+' : ''}${changePct.toFixed(2)}%` : '—';
+
   return (
     <div
       className="stock-ai-card"
@@ -358,18 +364,53 @@ function StockAICard({ type, symbol, price, changePct, aiReason, delay = 0 }) {
           <div className="stock-ai-label">
             {isGainer ? '▲ TOP GAINER' : '▼ TOP LOSER'}
           </div>
-          <div className="stock-ai-symbol">{symbol}</div>
+          <div className="stock-ai-symbol">{displaySymbol}</div>
         </div>
         <div className="stock-ai-stats">
-          <span className="stock-ai-price">₹{price?.toLocaleString('en-IN') || '—'}</span>
+          <span className="stock-ai-price">{displayPrice}</span>
           <span className="stock-ai-change" style={{ color: accent }}>
-            {isGainer ? '+' : ''}{changePct?.toFixed(2)}%
+            {displayChange}
           </span>
         </div>
       </div>
       <div className="stock-ai-divider" />
       <div className="stock-ai-reason-label">AI ANALYSIS</div>
       <p className="stock-ai-reason">{aiReason || '—'}</p>
+    </div>
+  );
+}
+
+function AIErrorState({ onRetry }) {
+  return (
+    <div style={{
+      background: 'hsla(40, 100%, 50%, 0.06)',
+      border: '1px solid hsla(40, 100%, 50%, 0.15)',
+      borderLeft: '4px solid hsl(40, 100%, 50%)',
+      borderRadius: '12px',
+      padding: '20px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '16px',
+    }}>
+      <span style={{ fontSize: '24px' }}>⚠️</span>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 700, color: 'hsl(40, 100%, 65%)', fontSize: '14px', marginBottom: '4px' }}>
+          AI engine warming up...
+        </div>
+        <div style={{ fontSize: '11px', color: 'hsla(0,0%,100%,0.4)', letterSpacing: '0.5px' }}>
+          Groq · Auto-retrying in 30s
+        </div>
+      </div>
+      <button onClick={onRetry} style={{
+        background: 'hsla(40, 100%, 50%, 0.15)',
+        border: '1px solid hsla(40, 100%, 50%, 0.3)',
+        color: 'hsl(40, 100%, 65%)',
+        padding: '6px 14px',
+        borderRadius: '8px',
+        fontWeight: 700,
+        fontSize: '12px',
+        cursor: 'pointer',
+      }}>↻ Retry</button>
     </div>
   );
 }
@@ -555,6 +596,13 @@ export default function InsightsPage({ onBack, wsStatus, standalone = false }) {
     }
   };
 
+  // Auto-retry on error every 30s
+  useEffect(() => {
+    if (!error) return;
+    const retryTimer = setTimeout(() => fetchInsight(), 30000);
+    return () => clearTimeout(retryTimer);
+  }, [error]);
+
   return (
     <div className="insights-view">
 
@@ -593,6 +641,8 @@ export default function InsightsPage({ onBack, wsStatus, standalone = false }) {
                 <div className="thinking-dots"><span /><span /><span /></div>
                 <span className="thinking-step">Running Mixtral-8x7b analysis...</span>
               </div>
+            ) : error ? (
+              <AIErrorState onRetry={fetchInsight} />
             ) : data?.insight ? (
               <p style={{ fontSize: '14px', lineHeight: 1.7, color: 'var(--text-secondary)', margin: 0 }}>
                 {data.insight.substring(0, 400)}{data.insight.length > 400 ? '...' : ''}
@@ -656,6 +706,9 @@ export default function InsightsPage({ onBack, wsStatus, standalone = false }) {
           )}
           {data.losers?.[0] && (
             <StockAICard 
+              type="loser"
+              symbol={data.losers[0].symbol}
+              price={data.losers[0].ltp}
               changePct={data.losers[0].change_pct}
               aiReason={data.loser_insight}
               delay={300}

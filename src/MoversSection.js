@@ -18,29 +18,32 @@ const MoverRow = ({ stock, rank, type }) => {
     }
   }, [stock.ltp]);
 
-  const isUp = type === 'up';
-  const rowBg     = isUp ? 'hsla(160, 84%, 39%, 0.08)' : 'hsla(343, 90%, 60%, 0.08)';
-  const rowBorder = isUp ? '1px solid hsla(160, 84%, 39%, 0.15)' : '1px solid hsla(343, 90%, 60%, 0.15)';
-  const accentColor = isUp ? 'hsl(160, 84%, 39%)' : 'hsl(343, 90%, 60%)';
-  const badgeClass = isUp ? 'pill-stock-up' : 'pill-stock-down';
+  // CRITICAL: type="up" means SURGING = GREEN, type="down" means FALLING = RED
+  const isGainer = type === 'up';
+  const rowBg     = isGainer ? 'hsla(160, 84%, 39%, 0.10)' : 'hsla(343, 90%, 60%, 0.10)';
+  const rowBorder = isGainer ? '1px solid hsla(160, 84%, 39%, 0.20)' : '1px solid hsla(343, 90%, 60%, 0.20)';
+  const accentColor = isGainer ? 'hsl(160, 84%, 39%)' : 'hsl(343, 90%, 60%)';
+  const badgeBg   = isGainer ? 'hsl(160, 84%, 39%)' : 'hsl(343, 90%, 60%)';
+
+  const sectorText = stock.sector ? stock.sector.replace(/_/g, ' ') : '';
 
   return (
     <div
       className="mover-row"
       ref={rowRef}
-      style={{ background: rowBg, border: rowBorder }}
+      style={{ background: rowBg, border: rowBorder, borderRadius: '10px', padding: '12px 16px', marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'filter 0.2s, transform 0.2s' }}
     >
-      <div className="mover-info">
-        <span className="mover-rank" style={{ color: accentColor }}>#{String(rank).padStart(2, '0')}</span>
-        <div className="mover-symbol-box">
-          <span className="mover-symbol">{stock.symbol}</span>
-          <span className="mover-sector">{stock.sector.replace('_', ' ')}</span>
+      <div className="mover-info" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span className="mover-rank" style={{ color: accentColor, fontWeight: 800, fontSize: '0.82rem', fontVariantNumeric: 'tabular-nums', minWidth: '28px' }}>#{String(rank).padStart(2, '0')}</span>
+        <div className="mover-symbol-box" style={{ display: 'flex', flexDirection: 'column' }}>
+          <span className="mover-symbol" style={{ color: '#fff', fontWeight: 700, fontSize: '0.9rem' }}>{stock.symbol}</span>
+          <span className="mover-sector" style={{ fontSize: '0.7rem', color: 'hsla(0,0%,100%,0.4)' }}>{sectorText}</span>
         </div>
       </div>
-      <div className="mover-data">
-        <span className="mover-price">₹{Number(stock.ltp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-        <span className={`mover-badge ${badgeClass}`}>
-          {isUp ? '+' : ''}{stock.change_pct.toFixed(2)}%
+      <div className="mover-data" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span className="mover-price" style={{ color: 'hsla(0,0%,100%,0.7)', fontWeight: 700, fontSize: '0.88rem', fontVariantNumeric: 'tabular-nums' }}>₹{Number(stock.ltp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+        <span className="mover-badge" style={{ background: badgeBg, color: '#fff', padding: '4px 10px', borderRadius: '6px', fontWeight: 800, fontSize: '0.78rem', minWidth: '64px', textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+          {isGainer ? '+' : ''}{stock.change_pct.toFixed(2)}%
         </span>
       </div>
     </div>
@@ -92,12 +95,12 @@ const MoversSection = ({ moversData }) => {
             )}
             {/* Equal height placeholder when losers < gainers */}
             {losers.length > 0 && losers.length < gainers.length && (
-              <div className="movers-empty-placeholder" style={{
+              <div style={{
                 border: '1px dashed hsla(0,0%,100%,0.08)',
                 borderRadius: '8px',
                 padding: '20px',
                 textAlign: 'center',
-                color: 'var(--text-muted)',
+                color: 'hsla(0,0%,100%,0.25)',
                 fontSize: '11px',
                 marginTop: '4px'
               }}>
