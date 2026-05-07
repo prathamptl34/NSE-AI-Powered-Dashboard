@@ -3,7 +3,7 @@ import { StockDeepDiveModal } from './StockDeepDive';
 
 const FILTERS = ["ALL", "BULLISH", "BEARISH", "NEUTRAL", "STRONG", "F&O"];
 
-export default function SignalScanner({ onBack }) {
+export default function SignalScanner({ onBack, standalone = false }) {
   const [signals,   setSignals]   = useState([]);
   const [stats,     setStats]     = useState(null);
   const [narrative, setNarrative] = useState("");
@@ -278,21 +278,36 @@ export default function SignalScanner({ onBack }) {
         .level-price { font-size: 14px; font-weight: 800; color: #fff; }
       `}</style>
 
-      {/* Header */}
-      <div className="scanner-header">
-        <button className="ai-back-btn" onClick={onBack}>← Dashboard</button>
-        <div className="scanner-title-block">
-          <span className="scanner-title">AI SIGNAL SCANNER</span>
-          <span className="scanner-badge">200 STOCKS</span>
+      {/* Header — hidden when embedded in standalone section */}
+      {!standalone && (
+        <div className="scanner-header">
+          <button className="ai-back-btn" onClick={onBack}>← Dashboard</button>
+          <div className="scanner-title-block">
+            <span className="scanner-title">AI SIGNAL SCANNER</span>
+            <span className="scanner-badge">200 STOCKS</span>
+          </div>
+          <button
+            className={`scan-btn ${loading ? "scan-btn-loading" : ""}`}
+            onClick={handleScan}
+            disabled={loading}
+          >
+            {loading ? "SCANNING..." : hasScanned ? '↻ RESCAN' : '▶ SCAN NOW'}
+          </button>
         </div>
-        <button
-          className={`scan-btn ${loading ? "scan-btn-loading" : ""}`}
-          onClick={handleScan}
-          disabled={loading}
-        >
-          {loading ? "SCANNING..." : hasScanned ? '↻ RESCAN' : '▶ SCAN NOW'}
-        </button>
-      </div>
+      )}
+
+      {/* Standalone rescan button row */}
+      {standalone && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+          <button
+            className={`scan-btn ${loading ? "scan-btn-loading" : ""}`}
+            onClick={handleScan}
+            disabled={loading}
+          >
+            {loading ? "SCANNING..." : hasScanned ? '↻ RESCAN' : '▶ SCAN NOW'}
+          </button>
+        </div>
+      )}
 
       {/* Narrative + Timestamp */}
       {narrative && (
@@ -302,9 +317,9 @@ export default function SignalScanner({ onBack }) {
         </div>
       )}
 
-      {/* Summary Strip */}
+      {/* Summary Strip — 3-col grid with color tints */}
       {stats && (
-        <div className="scanner-summary-strip" style={{ padding: '0 32px', marginBottom: '24px', display: 'flex', gap: '10px' }}>
+        <div className="scanner-stats-grid">
           <SummaryPill label="BULLISH" count={stats.bullish_count} color="emerald" />
           <SummaryPill label="BEARISH" count={stats.bearish_count} color="rose"   />
           <SummaryPill label="STRONG"  count={stats.strong_count}  color="blue"  />
@@ -464,10 +479,28 @@ function SectorBiasStrip({ biases }) {
 }
 
 function SummaryPill({ label, count, color }) {
+  const colorMap = {
+    emerald: {
+      bg:     'hsla(160, 84%, 39%, 0.1)',
+      border: '1px solid hsla(160, 84%, 39%, 0.3)',
+      text:   'hsl(160, 84%, 39%)',
+    },
+    rose: {
+      bg:     'hsla(343, 90%, 60%, 0.1)',
+      border: '1px solid hsla(343, 90%, 60%, 0.3)',
+      text:   'hsl(343, 90%, 60%)',
+    },
+    blue: {
+      bg:     'hsla(217, 91%, 60%, 0.1)',
+      border: '1px solid hsla(217, 91%, 60%, 0.3)',
+      text:   'hsl(217, 91%, 60%)',
+    },
+  };
+  const c = colorMap[color] || colorMap.blue;
   return (
-    <div style={{ flex: 1, padding: '16px', borderRadius: '14px', background: `var(--${color}-dim)`, border: `1px solid hsla(var(--accent-${color}), 0.2)` }}>
-       <div style={{ fontSize: '24px', fontWeight: '800', color: `var(--${color})` }}>{count}</div>
-       <div style={{ fontSize: '10px', fontWeight: '700', color: `var(--${color})`, letterSpacing: '1px' }}>{label}</div>
+    <div style={{ flex: 1, padding: '16px', borderRadius: '14px', background: c.bg, border: c.border }}>
+       <div style={{ fontSize: '28px', fontWeight: '800', color: c.text, lineHeight: 1 }}>{count ?? '--'}</div>
+       <div style={{ fontSize: '10px', fontWeight: '700', color: c.text, letterSpacing: '1px', marginTop: '4px', opacity: 0.8 }}>{label}</div>
     </div>
   );
 }

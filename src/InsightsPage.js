@@ -111,25 +111,33 @@ function SectorHeatmap({ allStocks }) {
 
   // Build lookup: symbol -> change_pct
   const stockMap = {};
-  allStocks.forEach(s => { stockMap[s.symbol] = s.change_pct || 0; });
+  allStocks.forEach(s => { stockMap[s.symbol] = s.change_pct; });
 
   // Calculate avg change per sector
   const sectors = Object.entries(SECTOR_MAP).map(([name, symbols]) => {
-    const changes  = symbols.map(sym => stockMap[sym] || 0);
-    const validChg = changes.filter(c => c !== 0);
-    const avg      = validChg.length > 0
-      ? validChg.reduce((a, b) => a + b, 0) / validChg.length
-      : 0;
-    return { name, avg: parseFloat(avg.toFixed(2)) };
+    const validChg = symbols
+      .map(sym => stockMap[sym])
+      .filter(c => c != null && !isNaN(c) && c !== 0);
+    const hasData = validChg.length > 0;
+    const avg = hasData
+      ? parseFloat((validChg.reduce((a, b) => a + b, 0) / validChg.length).toFixed(2))
+      : null;
+    return { name, avg, hasData };
   });
 
   const getColor = (avg) => {
+    if (avg == null) return { bg: 'hsla(0,0%,100%,0.04)', text: 'hsla(0,0%,100%,0.3)' };
     if (avg >=  2.0) return { bg: '#166534', text: '#ffffff' };
     if (avg >=  0.5) return { bg: '#16a34a', text: '#ffffff' };
     if (avg >=  0.0) return { bg: '#bbf7d0', text: '#166534' };
     if (avg >= -0.5) return { bg: '#fee2e2', text: '#991b1b' };
     if (avg >= -2.0) return { bg: '#dc2626', text: '#ffffff' };
     return                  { bg: '#7f1d1d', text: '#ffffff' };
+  };
+
+  const fmtPct = (avg) => {
+    if (avg == null) return '--';
+    return `${avg > 0 ? '+' : ''}${avg}%`;
   };
 
   return (
@@ -143,12 +151,10 @@ function SectorHeatmap({ allStocks }) {
               key={name}
               className="sector-box"
               style={{ background: bg, color: text }}
-              title={`${name}: ${avg > 0 ? '+' : ''}${avg}%`}
+              title={`${name}: ${fmtPct(avg)}`}
             >
               <span className="sector-box-name">{name}</span>
-              <span className="sector-box-pct">
-                {avg > 0 ? '+' : ''}{avg}%
-              </span>
+              <span className="sector-box-pct">{fmtPct(avg)}</span>
             </div>
           );
         })}
@@ -468,7 +474,7 @@ function VolumeBreakoutTable({ breakouts }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────
 
-export default function InsightsPage({ onBack, wsStatus }) {
+export default function InsightsPage({ onBack, wsStatus, standalone = false }) {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [breakouts, setBreakouts] = useState([]);
@@ -551,112 +557,57 @@ export default function InsightsPage({ onBack, wsStatus }) {
 
   return (
     <div className="insights-view">
-      <style jsx>{`
-        .insights-view {
-          min-height: 100vh;
-          background: var(--bg);
-          color: var(--text-primary);
-          padding-bottom: 80px;
-        }
-        .ai-page-header {
-           display: flex;
-           align-items: center;
-           justify-content: space-between;
-           padding: 20px 32px;
-           background: hsla(var(--bg-hsl), 0.8);
-           backdrop-filter: blur(20px);
-           position: sticky; top: 0; z-index: 100;
-           border-bottom: 1px solid var(--glass-border);
-        }
-        .ai-back-btn {
-          background: hsla(0,0%,100%,0.05);
-          border: 1px solid var(--glass-border);
-          color: var(--text-secondary);
-          padding: 8px 16px;
-          border-radius: var(--radius-sm);
-          font-weight: 600;
-          cursor: pointer;
-        }
-        .ai-page-title { text-align: center; flex: 1; }
-        .ai-title-text { font-size: 18px; font-weight: 800; display: block; border-bottom: none; }
-        .ai-model-badge { font-size: 10px; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
 
-        .fg-wrapper {
-          margin: 40px auto;
-          max-width: 400px;
-          padding: 32px;
-          background: var(--bg-card);
-          border-radius: var(--radius-lg);
-          border: 1px solid var(--glass-border);
-          text-align: center;
-          box-shadow: var(--shadow-premium);
-        }
-        .fg-label { font-size: 24px; font-weight: 800; margin-top: 16px; }
-        .fg-sublabel { font-size: 10px; font-weight: 700; color: var(--text-muted); letter-spacing: 1px; }
-
-        .sector-heatmap { margin: 0 32px 40px; }
-        .sector-heatmap-label { font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px; letter-spacing: 1px; }
-        .sector-heatmap-grid { 
-          display: grid; 
-          grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); 
-          gap: 12px; 
-        }
-        .sector-box {
-           padding: 16px; border-radius: 12px; display: flex; flex-direction: column; 
-           align-items: center; gap: 4px; transition: transform 0.2s;
-        }
-        .sector-box:hover { transform: scale(1.05); }
-        .sector-box-name { font-size: 11px; font-weight: 700; }
-        .sector-box-pct { font-size: 14px; font-weight: 800; }
-
-        .ai-main-card {
-           margin: 0 32px 32px;
-           background: var(--bg-card);
-           border: 1px solid var(--glass-border);
-           border-radius: var(--radius-lg);
-           padding: 40px;
-           position: relative;
-        }
-        .ai-main-card::before {
-          content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%;
-          background: var(--blue);
-        }
-        .ai-card-label { font-size: 11px; font-weight: 700; color: var(--blue); letter-spacing: 1px; margin-bottom: 24px; }
-        
-        .insight-section { margin-bottom: 32px; }
-        .insight-section-label { font-size: 11px; font-weight: 800; color: var(--text-muted); margin-bottom: 12px; display: block; }
-        .insight-section-text { font-size: 16px; line-height: 1.7; color: var(--text-secondary); }
-
-        .stock-ai-card {
-           background: var(--bg-card);
-           border: 1px solid var(--glass-border);
-           border-radius: var(--radius-md);
-           padding: 24px;
-           animation: card-entry 0.6s ease-out forwards;
-           opacity: 0;
-        }
-        @keyframes card-entry {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
-      
-      {/* HEADER */}
-      <div className="ai-page-header">
-        <button className="ai-back-btn" onClick={onBack}>← Back</button>
-        <div className="ai-page-title">
-          <span className="ai-title-text">AI MARKET ANALYST</span>
-          <span className="ai-model-badge">Mixtral-8x7b · Groq Neural Engine</span>
+      {/* HEADER — only shown when NOT standalone (standalone uses App.js section header) */}
+      {!standalone && (
+        <div className="ai-page-header">
+          <button className="ai-back-btn" onClick={onBack}>← Back</button>
+          <div className="ai-page-title">
+            <span className="ai-title-text">AI MARKET ANALYST</span>
+            <span className="ai-model-badge">Mixtral-8x7b · Groq Neural Engine</span>
+          </div>
+          <button className="ai-refresh-btn" style={{
+            background: 'var(--blue)', color: '#fff', border: 'none', padding: '8px 20px',
+            borderRadius: '8px', fontWeight: '700', cursor: 'pointer', boxShadow: 'var(--blue-glow)'
+          }} onClick={fetchInsight}>
+            {loading ? 'Analyzing...' : 'Refresh'}
+          </button>
         </div>
-        <button className="ai-refresh-btn" style={{ 
-          background: 'var(--blue)', color: '#fff', border: 'none', padding: '8px 20px', 
-          borderRadius: '8px', fontWeight: '700', cursor: 'pointer', boxShadow: 'var(--blue-glow)'
-        }} onClick={fetchInsight}>
-          {loading ? 'Analyzing...' : 'Refresh'}
-        </button>
+      )}
+
+      {/* Row 1: Gauge (left 40%) + Refresh/Summary header (right 60%) */}
+      <div className="analyst-top-row">
+        <div className="analyst-gauge-col">
+          <FearGreedGauge score={moodScore} />
+        </div>
+        <div className="analyst-summary-col">
+          <div className="analyst-summary-header">
+            <span className="analyst-summary-label">AI MARKET INSIGHT</span>
+            <button className="ai-refresh-btn-inline" onClick={fetchInsight}>
+              {loading ? '⏳ Analyzing...' : '↻ Refresh'}
+            </button>
+          </div>
+          <div className="analyst-summary-body">
+            {loading ? (
+              <div className="thinking-state" style={{ justifyContent: 'flex-start', padding: '16px 0' }}>
+                <div className="thinking-dots"><span /><span /><span /></div>
+                <span className="thinking-step">Running Mixtral-8x7b analysis...</span>
+              </div>
+            ) : data?.insight ? (
+              <p style={{ fontSize: '14px', lineHeight: 1.7, color: 'var(--text-secondary)', margin: 0 }}>
+                {data.insight.substring(0, 400)}{data.insight.length > 400 ? '...' : ''}
+              </p>
+            ) : (
+              <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                Click Refresh to generate AI market analysis.
+              </p>
+            )}
+          </div>
+          <ConfidencePills signal={data?.signal} />
+        </div>
       </div>
 
-      <FearGreedGauge score={moodScore} />
+      {/* Row 2: Sector Heatmap */}
       {data && <SectorHeatmap allStocks={[...(data.gainers || []), ...(data.losers || [])]} />}
       
       {flags && flags.length > 0 && (

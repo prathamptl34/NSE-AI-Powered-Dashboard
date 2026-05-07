@@ -56,30 +56,6 @@ function ConnectionDot({ status }) {
   );
 }
 
-function MarketPulseBanner({ insight, signal }) {
-  const isLoading = !insight;
-  return (
-    <div className="market-pulse-banner">
-      <div className="pulse-signal-box">
-        <span className="pulse-label">Pulse</span>
-        <div className={`signal-pill signal-${(signal || 'neutral').toLowerCase()}`}>
-          {signal || 'Detecting...'}
-        </div>
-      </div>
-      <div className="pulse-narrative">
-        {isLoading ? (
-          <div className="pulse-narrative-placeholder">
-            <div className="pulse-loading-dot" />
-            AI is analyzing current market momentum...
-          </div>
-        ) : (
-          insight
-        )}
-      </div>
-    </div>
-  );
-}
-
 function SkeletonList({ count = 10 }) {
   return Array.from({ length: count }).map((_, i) => (
     <div className="skeleton-card" key={i} style={{ animationDelay: `${i * 0.05}s` }} />
@@ -105,7 +81,6 @@ const Sparkline = React.memo(({ data, accent }) => {
   const getX = (i) => (i / (data.length - 1)) * width;
   const getY = (val) => height - paddingY - ((val - min) / range) * (height - 2 * paddingY);
 
-  // Generate straight line path for accurate financial look
   let pathD = `M ${getX(0)},${getY(data[0])}`;
   for (let i = 1; i < data.length; i++) {
     pathD += ` L ${getX(i)},${getY(data[i])}`;
@@ -122,8 +97,8 @@ const Sparkline = React.memo(({ data, accent }) => {
   };
 
   return (
-    <div 
-      className="sparkline-container" 
+    <div
+      className="sparkline-container"
       style={{ position: 'relative', width: '100%', height: '50px', marginLeft: '10px' }}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => setHoverIdx(null)}
@@ -142,14 +117,8 @@ const Sparkline = React.memo(({ data, accent }) => {
             </feMerge>
           </filter>
         </defs>
-        
-        {/* Soft Area Fill */}
         <path d={areaD} fill={`url(#grad-${accent})`} />
-        
-        {/* Sharp Financial Line */}
         <path d={pathD} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" filter="url(#glow)" />
-
-        {/* Interactive Hover Crosshair & Dot */}
         {hoverIdx !== null && (
           <g>
             <line x1={getX(hoverIdx)} y1="0" x2={getX(hoverIdx)} y2={height} stroke="var(--text-muted)" strokeDasharray="3,3" opacity="0.6" strokeWidth="1" />
@@ -157,8 +126,6 @@ const Sparkline = React.memo(({ data, accent }) => {
           </g>
         )}
       </svg>
-
-      {/* Modern Tooltip Label */}
       {hoverIdx !== null && (
         <div style={{
           position: 'absolute',
@@ -182,7 +149,6 @@ const Sparkline = React.memo(({ data, accent }) => {
   );
 });
 
-// Pure display — receives flashDir as prop, re-keyed by parent to restart CSS animation
 function StockCardInner({ stock, rank, accent, onClick, viewMode, history, flashDir }) {
   return (
     <div
@@ -219,7 +185,6 @@ function StockCardInner({ stock, rank, accent, onClick, viewMode, history, flash
   );
 }
 
-// Wrapper — tracks price changes, manages flash animations without remounting
 const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, viewMode, history }) {
   const [flashDir, setFlashDir] = useState(null);
   const prevPrice = useRef(stock.ltp);
@@ -228,14 +193,12 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
     if (stock.ltp === prevPrice.current) return;
     const dir = stock.ltp > prevPrice.current ? 'up' : 'down';
     prevPrice.current = stock.ltp;
-    
-    // Briefly clear the flash direction to restart the animation if needed
     setFlashDir(null);
     setTimeout(() => setFlashDir(dir), 50);
   }, [stock.ltp]);
 
   return (
-    <StockCardInner 
+    <StockCardInner
       stock={stock}
       rank={rank}
       accent={accent}
@@ -251,7 +214,11 @@ const StockCard = React.memo(function StockCard({ stock, rank, accent, onClick, 
 
 export default function App() {
   const { activeStock, explanation, loading, openExplain, closeExplain } = useStockExplain();
-  const [activeSection, setActiveSection] = useState('market-analyst');
+  const [activeSection, setActiveSection] = useState('dashboard');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar_collapsed') === 'true'; }
+    catch { return false; }
+  });
   const [niftyData, setNiftyData] = useState({ gainers: [], losers: [] });
   const [midcapData, setMidcapData] = useState({ gainers: [], losers: [] });
   const [fnoMovers, setFnoMovers] = useState({ gainers: [], losers: [] });
@@ -260,74 +227,98 @@ export default function App() {
   const [aiInsight, setAiInsight] = useState(null);
   const [aiSignal, setAiSignal] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [viewMode, setViewMode] = useState('normal'); 
-  const [historyMap, setHistoryMap] = useState({});
-  const fetchedIntradayRef = useRef(new Set());
+  const [viewMode] = useState('normal');
+  const [historyMap] = useState({});
   const wsRef = useRef(null);
 
+  const toggleSidebar = useCallback(() => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('sidebar_collapsed', String(next)); } catch {}
+      return next;
+    });
+  }, []);
+
   const navItems = [
-    { key: 'analyst', label: 'Market Analyst', icon: '✨' },
-    { key: 'scanner', label: 'Signal Scanner', icon: '◉' },
-    { key: 'heatmap', label: 'Heatmap', icon: '🔥' },
-    { key: 'movers',  label: 'Movers Alert', icon: '⚡' },
+    { key: 'dashboard', label: 'Dashboard',      icon: '📊' },
+    { key: 'analyst',   label: 'Market Analyst', icon: '✨' },
+    { key: 'scanner',   label: 'Signal Scanner', icon: '◉' },
+    { key: 'heatmap',   label: 'Heatmap',        icon: '🔥' },
+    { key: 'movers',    label: 'Movers Alert',   icon: '⚡' },
   ];
 
-  const Sidebar = ({ activeSection, setActiveSection, wsStatus }) => (
-    <div className="sidebar">
+  // ── Sidebar ────────────────────────────────────────────────────────────────
+  const Sidebar = ({ activeSection, setActiveSection, wsStatus, collapsed, onToggle }) => (
+    <div className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-header">
         <div className="sidebar-brand">
           <div className="sidebar-logo">MP</div>
-          <div className="sidebar-wordmark">Market Pulse</div>
+          {!collapsed && <div className="sidebar-wordmark">Market Pulse</div>}
         </div>
-        <div className="sidebar-badge">NSE LIVE</div>
+        {!collapsed && <div className="sidebar-badge">NSE LIVE</div>}
         <div className="sidebar-status">
           <ConnectionDot status={wsStatus} />
-          <div className="sidebar-clock"><MarketClock /></div>
+          {!collapsed && <div className="sidebar-clock"><MarketClock /></div>}
         </div>
       </div>
+
       <div className="sidebar-nav">
         {navItems.map(item => (
-          <div 
+          <div
             key={item.key}
-            className={`nav-item ${activeSection === item.key ? 'active' : ''}`}
+            className={`nav-item ${activeSection === item.key ? 'active' : ''} ${collapsed ? 'nav-item-collapsed' : ''}`}
             onClick={() => setActiveSection(item.key)}
+            data-tooltip={item.label}
           >
             <span className="nav-icon">{item.icon}</span>
-            <span className="nav-label">{item.label}</span>
+            {!collapsed && <span className="nav-label">{item.label}</span>}
           </div>
         ))}
       </div>
+
       <div className="sidebar-footer">
-        <span className="sidebar-version">v2.0</span>
+        {!collapsed && <span className="sidebar-version">v2.0</span>}
       </div>
+
+      {/* Toggle button */}
+      <button className="sidebar-toggle" onClick={onToggle} aria-label="Toggle sidebar">
+        {collapsed ? '▶' : '◀'}
+      </button>
     </div>
   );
 
-  const MobileHeader = ({ activeSection, wsStatus }) => (
-    <div className="mobile-header">
-      <div className="mobile-header-left">
-        <div className="logo-mark">MP</div>
+  const MobileHeader = ({ activeSection, wsStatus }) => {
+    const currentNav = navItems.find(i => i.key === activeSection);
+    return (
+      <div className="mobile-header">
+        <div className="mobile-header-left">
+          <div className="logo-mark">MP</div>
+        </div>
+        <div className="mobile-header-center">
+          {currentNav ? `${currentNav.icon} ${currentNav.label}` : 'Dashboard'}
+        </div>
+        <div className="mobile-header-right">
+          <div className={`conn-dot conn-${wsStatus}`} style={{ padding: 0 }}><span className="dot-inner" /></div>
+          <div className="sidebar-clock" style={{ fontSize: '10px' }}><MarketClock /></div>
+        </div>
       </div>
-      <div className="mobile-header-center">
-        {navItems.find(i => i.key === activeSection)?.label || 'Dashboard'}
-      </div>
-      <div className="mobile-header-right">
-        <div className={`conn-dot conn-${wsStatus}`} style={{ padding: 0 }}><span className="dot-inner" /></div>
-        <div className="sidebar-clock" style={{ fontSize: '10px' }}><MarketClock /></div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const BottomTabs = ({ activeSection, setActiveSection }) => (
     <div className="bottom-tabs">
       {navItems.map(item => (
-        <div 
+        <div
           key={item.key}
           className={`tab-item ${activeSection === item.key ? 'active' : ''}`}
           onClick={() => setActiveSection(item.key)}
         >
           <span className="tab-icon">{item.icon}</span>
-          <span className="tab-label">{item.key === 'movers' ? 'Movers' : item.label.split(' ')[1] || item.label}</span>
+          <span className="tab-label">
+            {item.key === 'dashboard' ? 'Home' :
+             item.key === 'movers'    ? 'Movers' :
+             item.label.split(' ')[1] || item.label}
+          </span>
         </div>
       ))}
     </div>
@@ -337,27 +328,15 @@ export default function App() {
     const fetchWithFallback = async (path) => {
       try {
         let res;
-        try {
-          res = await fetch(path);
-        } catch (e) {
-          // Dev fallback
-          res = await fetch(`http://127.0.0.1:8001${path}`);
-        }
-        
+        try { res = await fetch(path); }
+        catch (e) { res = await fetch(`http://127.0.0.1:8001${path}`); }
         if (!res.ok) return null;
         const contentType = res.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-           console.warn(`[API] ${path} returned non-JSON:`, contentType);
-           return null;
-        }
+        if (!contentType || !contentType.includes("application/json")) return null;
         return await res.json();
-      } catch (e) {
-        console.warn(`[API] ${path} error:`, e);
-        return null;
-      }
+      } catch (e) { return null; }
     };
 
-    // 1. Market Summary
     const summary = await fetchWithFallback("/api/market-summary");
     if (summary) {
       setNiftyData(summary.nifty100 || { gainers: [], losers: [] });
@@ -365,39 +344,29 @@ export default function App() {
       setLastUpdated(formatIST());
     }
 
-    // 2. F&O Movers
     const fno = await fetchWithFallback("/api/fno-movers");
-    if (fno) {
-      setFnoMovers({ gainers: fno.gainers || [], losers: fno.losers || [] });
-    }
+    if (fno) setFnoMovers({ gainers: fno.gainers || [], losers: fno.losers || [] });
 
-    // 3. AI Insight Narrative
     const ai = await fetchWithFallback("/api/ai-insight");
     if (ai) {
       if (ai.insight) setAiInsight(ai.insight);
       if (ai.signal) setAiSignal(ai.signal);
     }
 
-    // 4. Movers Alert
     const movers = await fetchWithFallback("/api/movers");
-    if (movers) {
-      setMoversData(movers);
-    }
+    if (movers) setMoversData(movers);
   }, []);
 
   const [showBanner, setShowBanner] = useState(false);
   const bannerTimerRef = useRef(null);
   const reconnectTimerRef = useRef(null);
 
-  // Polling & WebSocket Manager
   useEffect(() => {
     fetchData();
     const pollId = setInterval(fetchData, wsStatus === 'live' ? 10000 : 5000);
 
     const connectWS = () => {
-      // If already connecting or connected, do nothing
       if (wsRef.current && (wsRef.current.readyState === 0 || wsRef.current.readyState === 1)) return;
-      
       try {
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const isDev = window.location.port === '3000';
@@ -406,7 +375,6 @@ export default function App() {
         wsRef.current = ws;
 
         ws.onopen = () => {
-          console.log("[WS] Connected");
           setWsStatus('live');
           setShowBanner(false);
           if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
@@ -416,19 +384,11 @@ export default function App() {
           try {
             const msg = JSON.parse(e.data);
             if (msg.type === 'ping') return;
-
             if (msg.type === 'full_update' || msg.type === 'partial_update') {
-              if (msg.index === 'nifty100') {
-                setNiftyData({ gainers: msg.gainers || [], losers: msg.losers || [] });
-              } else if (msg.index === 'midcap100') {
-                setMidcapData({ gainers: msg.gainers || [], losers: msg.losers || [] });
-              }
-              if (msg.fno_movers) {
-                setFnoMovers({ gainers: msg.fno_movers.gainers || [], losers: msg.fno_movers.losers || [] });
-              }
-              if (msg.movers) {
-                setMoversData(msg.movers);
-              }
+              if (msg.index === 'nifty100') setNiftyData({ gainers: msg.gainers || [], losers: msg.losers || [] });
+              else if (msg.index === 'midcap100') setMidcapData({ gainers: msg.gainers || [], losers: msg.losers || [] });
+              if (msg.fno_movers) setFnoMovers({ gainers: msg.fno_movers.gainers || [], losers: msg.fno_movers.losers || [] });
+              if (msg.movers) setMoversData(msg.movers);
               setLastUpdated(formatIST());
               setWsStatus('live');
               setShowBanner(false);
@@ -438,24 +398,15 @@ export default function App() {
         };
 
         ws.onclose = () => {
-          console.log("[WS] Disconnected. Silent retry...");
           setWsStatus('offline');
           wsRef.current = null;
-          
-          // Only show banner after 7s of continuous disconnection
           if (!bannerTimerRef.current) {
-            bannerTimerRef.current = setTimeout(() => {
-              setShowBanner(true);
-            }, 7000);
+            bannerTimerRef.current = setTimeout(() => setShowBanner(true), 7000);
           }
-          
           reconnectTimerRef.current = setTimeout(connectWS, 3000);
         };
 
-        ws.onerror = (e) => {
-          setWsStatus('offline');
-          ws.close();
-        };
+        ws.onerror = () => { setWsStatus('offline'); ws.close(); };
       } catch (e) {
         reconnectTimerRef.current = setTimeout(connectWS, 5000);
       }
@@ -467,133 +418,32 @@ export default function App() {
       clearInterval(pollId);
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
-      if (wsRef.current) {
-        wsRef.current.onclose = null;
-        wsRef.current.close();
-      }
+      if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.close(); }
     };
   }, [fetchData]);
 
   const handleManualRetry = () => {
     fetchData();
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-    // Force immediate reconnection attempt
-    const connectWS = () => {
-      if (wsRef.current && (wsRef.current.readyState === 0 || wsRef.current.readyState === 1)) return;
-      try {
-        const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const isDev = window.location.port === '3000';
-        const backendHost = isDev ? '127.0.0.1:8000' : window.location.host;
-        const ws = new WebSocket(`${proto}//${backendHost}/ws/stream`);
-        wsRef.current = ws;
-        ws.onopen = () => { setWsStatus('live'); setShowBanner(false); };
-        ws.onclose = () => { setWsStatus('offline'); reconnectTimerRef.current = setTimeout(connectWS, 3000); };
-      } catch(e){}
-    };
-    connectWS();
   };
 
-  // Intraday Sparkline Fetcher
-  const lastFetchTimeRef = useRef(0);
-  useEffect(() => {
-    if (viewMode !== 'chart') return;
-    
-    // Throttle: Don't check for missing symbols more than once every 30s
-    const now = Date.now();
-    if (now - lastFetchTimeRef.current < 30000) return;
-    
-    const all = [
-      ...niftyData.gainers, ...niftyData.losers, 
-      ...midcapData.gainers, ...midcapData.losers,
-      ...fnoMovers.gainers, ...fnoMovers.losers
-    ];
-    
-    // Deduplicate symbols
-    const uniqueSymbols = Array.from(new Set(all.map(s => s.symbol)));
-    
-    const missingSymbols = uniqueSymbols.filter(sym => 
-      !fetchedIntradayRef.current.has(sym) && 
-      (!historyMap[sym] || historyMap[sym].length <= 2)
-    );
-      
-    if (missingSymbols.length === 0) return;
-    
-    // Mark as pending immediately
-    missingSymbols.forEach(sym => fetchedIntradayRef.current.add(sym));
-    lastFetchTimeRef.current = now;
-    
-    const fetchIntraday = async () => {
-      try {
-        console.log(`[Charts] Fetching sparklines for ${missingSymbols.length} stocks...`);
-        const res = await fetch(`/api/intraday-sparklines?symbols=${missingSymbols.join(',')}`);
-        if (!res.ok) {
-          // Allow retry after cooldown if failed
-          missingSymbols.forEach(sym => fetchedIntradayRef.current.delete(sym));
-          return;
-        }
-        const data = await res.json();
-        
-        setHistoryMap(prev => {
-          const next = { ...prev };
-          Object.keys(data).forEach(sym => {
-            if (data[sym] && data[sym].length > 2) {
-              next[sym] = data[sym].slice(-50); 
-            }
-          });
-          return next;
-        });
-      } catch (e) {
-        missingSymbols.forEach(sym => fetchedIntradayRef.current.delete(sym));
-      }
-    };
-    
-    fetchIntraday();
-  }, [viewMode, niftyData, midcapData, fnoMovers, historyMap]);
-
-  const [selectedDate, setSelectedDate] = useState("");
-  const [historicalData, setHistoricalData] = useState(null);
-  const [histLoading, setHistLoading] = useState(false);
-  const [histError, setHistError] = useState(null);
-  const [histIndex, setHistIndex] = useState("nifty100");
-  const [dateValidation, setDateValidation] = useState(null);
-
-  const validateDate = useCallback(async (dateStr) => {
-    if (!dateStr) { setDateValidation(null); return; }
-    try {
-      const res = await fetch(`/api/trading-day-check?date=${dateStr}`);
-      const json = await res.json();
-      setDateValidation(json);
-    } catch {
-      setDateValidation({ is_valid: false, message: "Could not validate date." });
-    }
-  }, []);
-
-  const fetchHistorical = useCallback(async () => {
-    if (!selectedDate || !dateValidation?.is_valid) return;
-    setHistLoading(true);
-    setHistError(null);
-    setHistoricalData(null);
-    try {
-      const res = await fetch(`/api/historical-summary?date=${selectedDate}&index=${histIndex}&top_n=5`);
-      const json = await res.json();
-      if (!res.ok) {
-        setHistError(json.detail?.message || "Failed to fetch historical data.");
-      } else {
-        setHistoricalData(json);
-      }
-    } catch {
-      setHistError("Network error. Please check your connection.");
-    } finally {
-      setHistLoading(false);
-    }
-  }, [selectedDate, histIndex, dateValidation]);
+  const sidebarWidth = sidebarCollapsed ? 64 : 220;
 
   return (
     <div className="app-shell">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} wsStatus={wsStatus} />
+      <Sidebar
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        wsStatus={wsStatus}
+        collapsed={sidebarCollapsed}
+        onToggle={toggleSidebar}
+      />
       <MobileHeader activeSection={activeSection} wsStatus={wsStatus} />
-      
-      <main className="main-content">
+
+      <main
+        className="main-content"
+        style={{ '--sidebar-w': `${sidebarWidth}px` }}
+      >
         {showBanner && (
           <div className="offline-notice">
             <span>⚠️ Connection Lost. Reconnecting to Market Stream...</span>
@@ -601,14 +451,19 @@ export default function App() {
           </div>
         )}
 
-        {/* SECTION 1: MARKET ANALYST (AI + CORE DASHBOARD) */}
-        {activeSection === 'analyst' && (
-          <div id="section-analyst" className="content-fade-in">
-            <InsightsPage onBack={() => {}} wsStatus={wsStatus} standalone={true} />
-            
-            <div className="section-divider-premium">
-              <span className="divider-label">LIVE MARKET SNAPSHOT</span>
+        {/* SECTION 0: DASHBOARD (DEFAULT) */}
+        {activeSection === 'dashboard' && (
+          <div id="section-dashboard" className="content-fade-in section-content">
+            <div className="section-page-header">
+              <div className="section-page-title">
+                <span className="section-page-icon">📊</span>
+                <div>
+                  <div className="section-page-name">Dashboard</div>
+                  <div className="section-page-sub">NSE LIVE · TOP MOVERS</div>
+                </div>
+              </div>
             </div>
+            <div className="section-divider-line" />
 
             <div className="section-header-compact">
               <div className="section-title">
@@ -639,18 +494,41 @@ export default function App() {
               </div>
             </div>
             <div className="panels-wrapper fno-bottom-panel">
-              <FnoMoversTable 
-                gainers={fnoMovers.gainers} 
-                losers={fnoMovers.losers} 
-                onStockClick={openExplain} 
-              />
+              <FnoMoversTable gainers={fnoMovers.gainers} losers={fnoMovers.losers} onStockClick={openExplain} />
             </div>
+          </div>
+        )}
+
+        {/* SECTION 1: MARKET ANALYST */}
+        {activeSection === 'analyst' && (
+          <div id="section-analyst" className="content-fade-in section-content">
+            <div className="section-page-header">
+              <div className="section-page-title">
+                <span className="section-page-icon">✨</span>
+                <div>
+                  <div className="section-page-name">Market Analyst</div>
+                  <div className="section-page-sub">AI-POWERED · MIXTRAL-8X7B · GROQ</div>
+                </div>
+              </div>
+            </div>
+            <div className="section-divider-line" />
+            <InsightsPage onBack={() => setActiveSection('dashboard')} wsStatus={wsStatus} standalone={true} />
           </div>
         )}
 
         {/* SECTION 2: SIGNAL SCANNER */}
         {activeSection === 'scanner' && (
-          <div id="section-scanner" className="content-fade-in">
+          <div id="section-scanner" className="content-fade-in section-content">
+            <div className="section-page-header">
+              <div className="section-page-title">
+                <span className="section-page-icon">◉</span>
+                <div>
+                  <div className="section-page-name">Signal Scanner</div>
+                  <div className="section-page-sub">200 STOCKS · AI SIGNALS</div>
+                </div>
+              </div>
+            </div>
+            <div className="section-divider-line" />
             <SignalScanner standalone={true} />
           </div>
         )}
@@ -664,7 +542,17 @@ export default function App() {
 
         {/* SECTION 4: MOVERS ALERT */}
         {activeSection === 'movers' && (
-          <div id="section-movers" className="content-fade-in">
+          <div id="section-movers" className="content-fade-in section-content">
+            <div className="section-page-header">
+              <div className="section-page-title">
+                <span className="section-page-icon">⚡</span>
+                <div>
+                  <div className="section-page-name">Movers Alert</div>
+                  <div className="section-page-sub">STOCKS MOVING ±3%</div>
+                </div>
+              </div>
+            </div>
+            <div className="section-divider-line" />
             <MoversSection moversData={moversData} standalone={true} />
           </div>
         )}
@@ -702,12 +590,12 @@ function Panel({ title, accent, data, type, lastUpdated, onStockClick, viewMode,
         {items.length === 0
           ? <SkeletonList count={5} />
           : items.map((s, i) => (
-              <StockCard 
-                key={s.symbol} 
-                stock={s} 
-                rank={i+1} 
-                accent={accent} 
-                onClick={onStockClick} 
+              <StockCard
+                key={s.symbol}
+                stock={s}
+                rank={i+1}
+                accent={accent}
+                onClick={onStockClick}
                 viewMode={viewMode}
                 history={historyMap[s.symbol] || []}
               />
