@@ -5,18 +5,53 @@
   grid-column: unset !important;
 }
 
-/* Breadth Counter Sticky Bar */
-.breadth-sticky-bar {
+/* Terminal Header */
+.hm-terminal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
   position: sticky;
   top: 0;
   z-index: 10;
-  margin: 0 -1rem;
-  padding: 8px 1rem;
+  background: rgba(10,12,15,0.95);
   backdrop-filter: blur(12px);
-  background: rgba(255, 255, 255, 0.05);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.hm-header-left {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 12px;
+}
+.hm-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.hm-header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.breadth-counter {
+  display: flex;
+  gap: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.bc-up   { color: #4ade80; transition: opacity 0.2s; }
+.bc-flat { color: rgba(255,255,255,0.45); transition: opacity 0.2s; }
+.bc-down { color: #f87171; transition: opacity 0.2s; }
+.bc-up:hover, .bc-flat:hover, .bc-down:hover { opacity: 0.8; }
+.bc-up.active, .bc-flat.active, .bc-down.active { filter: brightness(1.2); border-bottom: 1px solid currentColor; padding-bottom: 1px; }
+.breadth-counter strong { font-weight: 700; margin-left: 4px; }
+.hm-timestamp {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.5);
 }
 
 /* Hover State */

@@ -15,16 +15,21 @@ function getISTTime() {
   return `${day} ${month} ${year}  ${h}:${m}:${s} IST`;
 }
 
-function getTileStyle(pct) {
-  if (pct >= 3.0) return { background: '#1a7a38', boxShadow: '0 0 18px rgba(34,197,94,0.35)' };
-  if (pct >= 1.5) return { background: '#145c2e' };
-  if (pct >= 0.5) return { background: '#0f3d22' };
-  if (pct >= 0) return { background: '#0d2b1a' };
-  if (pct > -0.5) return { background: '#2b0d0d' };
-  if (pct > -1.5) return { background: '#3d1212' };
-  if (pct > -3.0) return { background: '#5c1818' };
-  return { background: '#7a1e1e', boxShadow: '0 0 18px rgba(239,68,68,0.35)' };
-}
+const getTileStyle = (changePct) => {
+  const v = parseFloat(changePct) || 0;
+  if (v > 0) {
+    if (v >= 3)   return { backgroundColor: '#0d2010', boxShadow: '0 0 12px rgba(34,197,94,0.15)' };
+    if (v >= 1.5) return { backgroundColor: '#0b1a0e', boxShadow: 'none' };
+    if (v >= 0.5) return { backgroundColor: '#091509', boxShadow: 'none' };
+                  return { backgroundColor: '#07120a', boxShadow: 'none' };
+  } else if (v < 0) {
+    if (v <= -3)  return { backgroundColor: '#1f0808', boxShadow: '0 0 12px rgba(239,68,68,0.15)' };
+    if (v <= -1.5)return { backgroundColor: '#190707', boxShadow: 'none' };
+    if (v <= -0.5)return { backgroundColor: '#130606', boxShadow: 'none' };
+                  return { backgroundColor: '#0f0505', boxShadow: 'none' };
+  }
+  return { backgroundColor: '#0d0d0f', boxShadow: 'none' }; // flat/neutral
+};
 
 // ─── Skeleton Tile ────────────────────────────────────────────────────────────
 
@@ -319,42 +324,29 @@ export default function HeatmapPage({ onBack, wsStatus }) {
       {/* Scoped CSS moved to index.css */}
 
       {/* ── Terminal Header ── */}
-      <header className="hm-terminal-header">
-        <div className="hm-header-row1">
+      <div className="hm-terminal-header">
+        <div className="hm-header-left">
           {onBack && (
             <button className="hm-back-btn" onClick={onBack}>
               ← Back
             </button>
           )}
-          <span className="hm-header-title">Market Heatmap</span>
-          <span className="hm-live-dot">
-            {streaming ? '● LIVE' : '● OFF'}
-          </span>
+          <h2 className="hm-title">Market Heatmap</h2>
+          <span className="hm-live-dot">{streaming ? '● LIVE' : '● OFF'}</span>
         </div>
-
-        <div className="hm-header-row2">
-          <span className="hm-header-time">{timeStr}</span>
-        </div>
-      </header>
-
-      {/* ── Sticky Breadth Counter ── */}
-      <div className="breadth-sticky-bar">
-        <div className="breadth-counter">
-          <div className={`breadth-row breadth-up ${activeFilter === "gainers" ? "active" : ""}`} onClick={() => toggleFilter("gainers")}>
-            <span className="breadth-arrow">▲</span>
-            <span className="breadth-label">&gt;1%</span>
-            <span className="breadth-count">{stats.g ?? 0}</span>
+        <div className="hm-header-right">
+          <div className="breadth-counter">
+            <span className={`bc-up ${activeFilter === "gainers" ? "active" : ""}`} onClick={() => toggleFilter("gainers")} style={{cursor: 'pointer'}}>
+              ▲ &gt;1% <strong>{stats.g ?? 0}</strong>
+            </span>
+            <span className={`bc-flat ${activeFilter === "flat" ? "active" : ""}`} onClick={() => toggleFilter("flat")} style={{cursor: 'pointer'}}>
+              ● Flat <strong>{stats.f ?? 0}</strong>
+            </span>
+            <span className={`bc-down ${activeFilter === "losers" ? "active" : ""}`} onClick={() => toggleFilter("losers")} style={{cursor: 'pointer'}}>
+              ▼ &lt;-1% <strong>{stats.l ?? 0}</strong>
+            </span>
           </div>
-          <div className={`breadth-row breadth-flat ${activeFilter === "flat" ? "active" : ""}`} onClick={() => toggleFilter("flat")}>
-            <span className="breadth-dot">●</span>
-            <span className="breadth-label">Flat</span>
-            <span className="breadth-count">{stats.f ?? 0}</span>
-          </div>
-          <div className={`breadth-row breadth-down ${activeFilter === "losers" ? "active" : ""}`} onClick={() => toggleFilter("losers")}>
-            <span className="breadth-arrow">▼</span>
-            <span className="breadth-label">&lt;-1%</span>
-            <span className="breadth-count">{stats.l ?? 0}</span>
-          </div>
+          <span className="hm-timestamp">{timeStr}</span>
         </div>
       </div>
 
