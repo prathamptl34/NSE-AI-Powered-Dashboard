@@ -1,0 +1,9 @@
+@media (max-width: 768px) {
+  .insights-page, #section-analyst {
+    padding-bottom: 80px !important;
+    box-sizing: border-box !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+}

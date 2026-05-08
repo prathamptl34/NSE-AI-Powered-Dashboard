@@ -3754,3 +3754,19 @@ body {
   .breadth-flat { color: hsla(0, 0%, 100%, 0.5); }
   .breadth-down { color: hsl(343, 90%, 60%); }
 }
+
+@media (max-width: 768px) {
+  .dashboard-page, .movers-page, .heatmap-page, .scanner-page, .insights-page, .app-shell .section-content, #section-dashboard, #section-analyst, #section-scanner, #section-heatmap, #section-movers {
+    padding-bottom: 80px !important;
+    box-sizing: border-box !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+  }
+}
+
+@media (max-width: 768px) {
+  #section-movers .section-page-header {
+    display: none !important;
+  }
+}

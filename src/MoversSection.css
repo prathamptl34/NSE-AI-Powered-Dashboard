@@ -1,21 +1,94 @@
 @media (max-width: 768px) {
+  /* Main panel container */
   .movers-panel,
   .movers-column,
-  .movers-section-header {
+  .movers-content,
+  .movers-section {
     overflow: visible !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
-  .movers-count-badge {
-    position: relative !important;
-    right: 0 !important;
-    flex-shrink: 0 !important;
-    margin-right: 4px !important;
-    z-index: 5 !important;
-  }
-  .movers-panel-title-row {
-    display: flex !important;
+
+  /* Each stock row */
+  .mover-row,
+  .mover-item {
+    display: grid !important;
+    grid-template-columns: 32px minmax(0, 1fr) auto auto !important;
+    /* rank | name+index | price | badge */
     align-items: center !important;
-    justify-content: space-between !important;
-    padding-right: 8px !important;
+    gap: 6px !important;
+    padding: 10px 12px 10px 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
     overflow: visible !important;
+  }
+
+  /* Unwrap the inner divs so grid works */
+  .mover-info,
+  .mover-data {
+    display: contents !important;
+  }
+
+  /* Rank number */
+  .mover-rank {
+    font-size: 0.7rem !important;
+    min-width: 28px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Stock name + index label column */
+  .mover-name-col,
+  .mover-symbol-box {
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  .mover-name,
+  .mover-symbol {
+    font-size: 0.8rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+  }
+  .mover-index-label,
+  .mover-sector {
+    font-size: 0.65rem !important;
+    white-space: nowrap !important;
+  }
+
+  /* Price */
+  .mover-price {
+    font-size: 0.78rem !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    text-align: right !important;
+  }
+
+  /* % Badge — NEVER clip this */
+  .mover-badge,
+  .mover-change-badge,
+  .pill-up,
+  .pill-down {
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    padding: 3px 7px !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    min-width: 58px !important;
+    text-align: center !important;
+    overflow: visible !important;
+  }
+
+  /* Fix 2: Tab Bar Padding */
+  .movers-page,
+  .movers-container,
+  .movers-scroll-area {
+    padding-bottom: 80px !important; /* 64px tab bar + 16px breathing room */
+    box-sizing: border-box !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
   }
 }

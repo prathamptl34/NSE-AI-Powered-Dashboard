@@ -1,0 +1,76 @@
+@media (max-width: 768px) {
+  /* F&O stock card row */
+  .fno-row {
+    display: grid !important;
+    grid-template-columns: 28px minmax(0,1fr) auto !important;
+    /* rank | name+badge | price+% stacked */
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  /* Unwrap the inner left div so grid works */
+  .fno-row-left {
+    display: contents !important;
+  }
+
+  /* Name + F&O tag column — allow shrink */
+  .fno-meta {
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  .fno-symbol {
+    font-size: 0.82rem !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  .fno-badge {
+    font-size: 0.6rem !important;
+    padding: 1px 5px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Price + % — stack vertically in last column */
+  .fno-row-right {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-end !important;
+    gap: 3px !important;
+    flex-shrink: 0 !important;
+    min-width: unset !important; /* override the 110px min-width */
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+  }
+  .fno-price-group {
+    display: contents !important;
+  }
+  .fno-price {
+    font-size: 0.8rem !important;
+    white-space: nowrap !important;
+    font-variant-numeric: tabular-nums !important;
+  }
+  .fno-change-pill {
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    padding: 2px 7px !important;
+    border-radius: 5px !important;
+    white-space: nowrap !important;
+  }
+
+  /* F&O section card must not clip children */
+  .fno-panel {
+    overflow: visible !important;
+    padding: 12px 10px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+  }
+
+  .fno-movers-section {
+    padding: 0 10px 20px !important;
+  }
+}
