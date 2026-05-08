@@ -322,24 +322,21 @@ export default function HeatmapPage({ onBack, wsStatus }) {
 
         <div className="hm-header-row2">
           <span className="hm-header-time">{timeStr}</span>
-          <div className="hm-filter-pills">
-            <div
-              className={`hm-pill pill-gain ${activeFilter === "gainers" ? "active" : ""}`}
-              onClick={() => toggleFilter("gainers")}
-            >
-              ▲ &gt;1% {stats.g}
+          <div className="breadth-counter">
+            <div className={`breadth-row breadth-up ${activeFilter === "gainers" ? "active" : ""}`} onClick={() => toggleFilter("gainers")}>
+              <span className="breadth-arrow">▲</span>
+              <span className="breadth-label">&gt;1%</span>
+              <span className="breadth-count">{stats.g ?? 0}</span>
             </div>
-            <div
-              className={`hm-pill pill-flat ${activeFilter === "flat" ? "active" : ""}`}
-              onClick={() => toggleFilter("flat")}
-            >
-              ● Flat {stats.f}
+            <div className={`breadth-row breadth-flat ${activeFilter === "flat" ? "active" : ""}`} onClick={() => toggleFilter("flat")}>
+              <span className="breadth-dot">●</span>
+              <span className="breadth-label">Flat</span>
+              <span className="breadth-count">{stats.f ?? 0}</span>
             </div>
-            <div
-              className={`hm-pill pill-loss ${activeFilter === "losers" ? "active" : ""}`}
-              onClick={() => toggleFilter("losers")}
-            >
-              ▼ &lt;-1% {stats.l}
+            <div className={`breadth-row breadth-down ${activeFilter === "losers" ? "active" : ""}`} onClick={() => toggleFilter("losers")}>
+              <span className="breadth-arrow">▼</span>
+              <span className="breadth-label">&lt;-1%</span>
+              <span className="breadth-count">{stats.l ?? 0}</span>
             </div>
           </div>
         </div>

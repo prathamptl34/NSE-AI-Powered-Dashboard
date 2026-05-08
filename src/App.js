@@ -281,8 +281,8 @@ export default function App() {
       </div>
 
       {/* Toggle button */}
-      <button className="sidebar-toggle" onClick={onToggle} aria-label="Toggle sidebar">
-        {collapsed ? '▶' : '◀'}
+      <button className={`sidebar-toggle-btn ${collapsed ? 'is-collapsed' : ''}`} onClick={onToggle} aria-label="Toggle sidebar">
+        <span className="toggle-icon">◀</span>
       </button>
     </div>
   );

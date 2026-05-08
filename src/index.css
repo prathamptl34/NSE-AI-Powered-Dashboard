@@ -1473,32 +1473,7 @@ body {
   }
 
 
-  /* Fix orphaned tile - Desktop (4 cols) */
-  .hm-terminal-grid > *:last-child:nth-child(4n - 3) {
-    grid-column: span 4;
-  }
 
-  @media (max-width: 1024px) {
-    .hm-terminal-grid {
-      grid-template-columns: repeat(3, 1fr);
-      padding: 16px;
-    }
-    /* Fix orphaned tile - Tablet (3 cols) */
-    .hm-terminal-grid > *:last-child:nth-child(3n - 2) {
-      grid-column: span 3;
-    }
-  }
-
-  @media (max-width: 768px) {
-    .hm-terminal-grid {
-      grid-template-columns: repeat(2, 1fr);
-      padding: 12px;
-    }
-    /* Fix orphaned tile - Mobile (2 cols) */
-    .hm-terminal-grid > *:last-child:nth-child(2n - 1) {
-      grid-column: span 2;
-    }
-  }
 
   /* ── Heatmap Tile ── */
   .index-tile {
@@ -2461,21 +2436,7 @@ body {
 @media (max-width: 1536px) { .hm-terminal-grid { grid-template-columns: repeat(4, 1fr); } }
 @media (max-width: 1024px) { .hm-terminal-grid { grid-template-columns: repeat(3, 1fr); padding: 16px; } }
 
-/* Orphaned last tile: stay at natural width, left-aligned */
-.hm-terminal-grid > *:last-child:nth-child(4n + 1) {
-  max-width: calc(25% - 9px);
-  justify-self: start;
-}
-@media (max-width: 1536px) {
-  .hm-terminal-grid > *:last-child:nth-child(4n + 1) {
-    max-width: calc(25% - 9px);
-  }
-}
-@media (max-width: 1024px) {
-  .hm-terminal-grid > *:last-child:nth-child(3n + 1) {
-    max-width: calc(33.33% - 8px);
-  }
-}
+
 
 /* End of Mobile Design System */
 
@@ -3575,14 +3536,219 @@ body {
   }
 }
 
-.hm-index-tile .tile-sector-name,
-.heatmap-tile .sector-name,
-.hm-index-tile h3 {
+/* Fix 1 — NIFTY CAPITAL MARKETS LAST TILE IS COMPLETELY BROKEN */
+@media (min-width: 1024px) {
+  .hm-terminal-grid, .heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.75rem;
+    align-items: start;
+  }
+  .hm-terminal-grid > *:last-child, .heatmap-grid > *:last-child {
+    grid-column: unset !important;
+    grid-column-end: unset !important;
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1023px) {
+  .hm-terminal-grid, .heatmap-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .hm-terminal-grid > *:last-child, .heatmap-grid > *:last-child {
+    grid-column: unset !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .hm-terminal-grid, .heatmap-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .hm-terminal-grid > *:last-child, .heatmap-grid > *:last-child {
+    grid-column: unset !important;
+  }
+}
+
+/* Every tile — consistent sizing */
+.hm-index-tile, .index-tile {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 200px;
+  height: auto;
+  padding: 1rem;
+  overflow: hidden;
+}
+
+/* Sector name — NEVER wrap, truncate with ellipsis */
+.hm-index-tile .index-name,
+.hm-index-tile .sector-name,
+.hm-index-tile h3,
+.hm-index-tile [class*="name"],
+.hm-index-tile [class*="title"],
+.index-tile [class*="name"],
+.index-tile [class*="title"] {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  display: block !important;
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.04em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+}
+
+/* Tile header row — icon and name on same line always */
+.hm-index-tile .tile-header,
+.hm-index-tile [class*="header"],
+.index-tile [class*="header"],
+.index-tile .hm-row-1 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 4px !important;
+  width: 100% !important;
+  overflow: hidden !important;
+  flex-wrap: nowrap !important;
+}
+
+/* TOP GAINER / TOP LOSER label — never wrap */
+.hm-index-tile [class*="label"],
+.hm-index-tile [class*="gainer-label"],
+.hm-index-tile [class*="loser-label"],
+.index-tile [class*="label"] {
+  white-space: nowrap !important;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsla(0, 0%, 100%, 0.45);
+}
+
+/* Stock symbol in tile — never wrap */
+.hm-index-tile [class*="symbol"],
+.hm-index-tile [class*="stock-name"],
+.hm-index-tile [class*="mover-name"],
+.index-tile [class*="symbol"],
+.index-tile [class*="stock-name"],
+.index-tile [class*="mover-name"] {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: white;
+}
+
+/* Mover row — name and badge on same line */
+.hm-index-tile [class*="mover-row"],
+.hm-index-tile [class*="gainer-row"],
+.hm-index-tile [class*="loser-row"],
+.index-tile [class*="mover-row"],
+.index-tile [class*="gainer-row"],
+.index-tile [class*="loser-row"],
+.index-tile [class*="stock-line"],
+.index-tile .hm-stock-line {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
+}
+
+/* Toggle Button Icon Class */
+.sidebar-toggle-btn .toggle-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+.sidebar-toggle-btn.is-collapsed .toggle-icon {
+  transform: scaleX(-1);
+}
+
+/* Fix 2 — BREADTH COUNTER MISSING ROW + ALIGNMENT */
+@media (min-width: 769px) {
+  .hm-header-row1,
+  .heatmap-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid hsla(0, 0%, 100%, 0.06);
+    margin-bottom: 1rem;
+    position: relative;
+  }
+
+  .hm-header-title,
+  .heatmap-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: white;
+    white-space: nowrap;
+  }
+
+  .breadth-counter {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    background: hsla(222, 47%, 8%, 0.9);
+    border: 1px solid hsla(0, 0%, 100%, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    min-width: 100px;
+    flex-shrink: 0;
+  }
+
+  .breadth-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .breadth-up { color: hsl(160, 84%, 45%); }
+  .breadth-flat { color: hsla(0, 0%, 100%, 0.5); }
+  .breadth-down { color: hsl(343, 90%, 60%); }
+
+  .breadth-count {
+    min-width: 18px;
+    text-align: right;
+  }
+}
+
+@media (max-width: 768px) {
+  .hm-header-row1,
+  .heatmap-header-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 0.75rem 1rem;
+  }
+
+  .breadth-counter {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
+
+  .breadth-row {
+    font-size: 0.65rem;
+    font-weight: 700;
+    gap: 3px;
+    cursor: pointer;
+  }
+  
+  .breadth-up { color: hsl(160, 84%, 45%); }
+  .breadth-flat { color: hsla(0, 0%, 100%, 0.5); }
+  .breadth-down { color: hsl(343, 90%, 60%); }
 }
