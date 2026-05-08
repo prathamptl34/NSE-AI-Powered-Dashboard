@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import './Heatmap.css';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -14,17 +15,15 @@ function getISTTime() {
   return `${day} ${month} ${year}  ${h}:${m}:${s} IST`;
 }
 
-function getIntensityClass(pct) {
-  if (pct >= 4.0) return "intensity-g5";
-  if (pct >= 3.0) return "intensity-g4";
-  if (pct >= 2.0) return "intensity-g3";
-  if (pct >= 1.0) return "intensity-g2";
-  if (pct >= 0) return "intensity-g1";
-  if (pct > -1.0) return "intensity-r1";
-  if (pct > -2.0) return "intensity-r2";
-  if (pct > -3.0) return "intensity-r3";
-  if (pct > -4.0) return "intensity-r4";
-  return "intensity-r5";
+function getTileStyle(pct) {
+  if (pct >= 3.0) return { background: '#1a7a38', boxShadow: '0 0 18px rgba(34,197,94,0.35)' };
+  if (pct >= 1.5) return { background: '#145c2e' };
+  if (pct >= 0.5) return { background: '#0f3d22' };
+  if (pct >= 0) return { background: '#0d2b1a' };
+  if (pct > -0.5) return { background: '#2b0d0d' };
+  if (pct > -1.5) return { background: '#3d1212' };
+  if (pct > -3.0) return { background: '#5c1818' };
+  return { background: '#7a1e1e', boxShadow: '0 0 18px rgba(239,68,68,0.35)' };
 }
 
 // ─── Skeleton Tile ────────────────────────────────────────────────────────────
@@ -40,7 +39,7 @@ function SkeletonTile() {
 
 // ─── Index Tile ───────────────────────────────────────────────────────────────
 
-const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, onClick }) => {
+const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, onClick, maxAbsPct }) => {
   const tileRef = useRef(null);
   const prevPct = useRef(null);
 
@@ -58,7 +57,10 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, onClick }) => {
     }
   }, [tile.change_pct]);
 
-  const intensityClass = getIntensityClass(tile.change_pct);
+  const tileStyle = getTileStyle(tile.change_pct);
+  const perfBarWidth = maxAbsPct ? Math.min(100, (Math.abs(tile.change_pct) / maxAbsPct) * 100) : 0;
+  const perfBarColor = tile.change_pct >= 0 ? '#4ade80' : '#f87171';
+
   const extremeClass = isBest ? "best-gainer" : isWorst ? "worst-loser" : "";
 
   const fmt = (n) =>
@@ -69,10 +71,10 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, onClick }) => {
 
   return (
     <div
-      className={`index-tile ${intensityClass} ${extremeClass} ${isDimmed ? "tile-dimmed" : ""}`}
+      className={`index-tile ${extremeClass} ${isDimmed ? "tile-dimmed" : ""}`}
       ref={tileRef}
       onClick={onClick}
-      style={{ cursor: "pointer" }}
+      style={{ cursor: "pointer", ...tileStyle }}
     >
       <div className="hm-row-1">
         <span className="hm-index-name">{tile.sector}</span>
@@ -83,6 +85,9 @@ const IndexTile = React.memo(({ tile, isBest, isWorst, isDimmed, onClick }) => {
 
       <div className={`hm-row-2 ${tile.change_pct > 0 ? "hm-pct-pos" : tile.change_pct < 0 ? "hm-pct-neg" : "hm-pct-zero"}`}>
         {pct(tile.change_pct)}
+        <div className="hm-perf-bar-container">
+          <div className="hm-perf-bar-fill" style={{ width: `${perfBarWidth}%`, backgroundColor: perfBarColor }} />
+        </div>
       </div>
 
       <div className="hm-divider" />
@@ -279,6 +284,13 @@ export default function HeatmapPage({ onBack, wsStatus }) {
     return { best: bestIdx.sector, worst: worstIdx.sector };
   }, [indices]);
 
+  // Derived max absolute pct for performance bar
+  const maxAbsPct = useMemo(() => {
+    if (!indices.length) return 0;
+    const rawMax = Math.max(...indices.map(idx => Math.abs(idx.change_pct)));
+    return Math.min(rawMax, 3.0);
+  }, [indices]);
+
   // Stats for pills
   const stats = useMemo(() => {
     let g = 0, f = 0, l = 0;
@@ -322,25 +334,29 @@ export default function HeatmapPage({ onBack, wsStatus }) {
 
         <div className="hm-header-row2">
           <span className="hm-header-time">{timeStr}</span>
-          <div className="breadth-counter">
-            <div className={`breadth-row breadth-up ${activeFilter === "gainers" ? "active" : ""}`} onClick={() => toggleFilter("gainers")}>
-              <span className="breadth-arrow">▲</span>
-              <span className="breadth-label">&gt;1%</span>
-              <span className="breadth-count">{stats.g ?? 0}</span>
-            </div>
-            <div className={`breadth-row breadth-flat ${activeFilter === "flat" ? "active" : ""}`} onClick={() => toggleFilter("flat")}>
-              <span className="breadth-dot">●</span>
-              <span className="breadth-label">Flat</span>
-              <span className="breadth-count">{stats.f ?? 0}</span>
-            </div>
-            <div className={`breadth-row breadth-down ${activeFilter === "losers" ? "active" : ""}`} onClick={() => toggleFilter("losers")}>
-              <span className="breadth-arrow">▼</span>
-              <span className="breadth-label">&lt;-1%</span>
-              <span className="breadth-count">{stats.l ?? 0}</span>
-            </div>
-          </div>
         </div>
       </header>
+
+      {/* ── Sticky Breadth Counter ── */}
+      <div className="breadth-sticky-bar">
+        <div className="breadth-counter">
+          <div className={`breadth-row breadth-up ${activeFilter === "gainers" ? "active" : ""}`} onClick={() => toggleFilter("gainers")}>
+            <span className="breadth-arrow">▲</span>
+            <span className="breadth-label">&gt;1%</span>
+            <span className="breadth-count">{stats.g ?? 0}</span>
+          </div>
+          <div className={`breadth-row breadth-flat ${activeFilter === "flat" ? "active" : ""}`} onClick={() => toggleFilter("flat")}>
+            <span className="breadth-dot">●</span>
+            <span className="breadth-label">Flat</span>
+            <span className="breadth-count">{stats.f ?? 0}</span>
+          </div>
+          <div className={`breadth-row breadth-down ${activeFilter === "losers" ? "active" : ""}`} onClick={() => toggleFilter("losers")}>
+            <span className="breadth-arrow">▼</span>
+            <span className="breadth-label">&lt;-1%</span>
+            <span className="breadth-count">{stats.l ?? 0}</span>
+          </div>
+        </div>
+      </div>
 
       {/* ── Grid ── */}
       <div className="hm-terminal-grid">
@@ -353,6 +369,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
                 isWorst={idx.sector === extremes.worst}
                 isDimmed={getIsDimmed(idx)}
                 onClick={() => setExpandedSector(idx)}
+                maxAbsPct={maxAbsPct}
               />
             ))
           : Array.from({ length: 21 }).map((_, i) => (
