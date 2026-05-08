@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import './MoversSection.css';
 
 const MoverRow = ({ stock, rank, type }) => {
   const prevPrice = useRef(stock.ltp);
@@ -54,14 +55,14 @@ const MoversSection = ({ moversData }) => {
   const { gainers = [], losers = [] } = moversData || {};
 
   return (
-    <div className="movers-section">
+    <div className="movers-section movers-panel">
       <div className="movers-columns" style={{ alignItems: 'start' }}>
         {/* Gainers Column */}
-        <div className="movers-col">
-          <div className="col-header col-up">
+        <div className="movers-col movers-column">
+          <div className="col-header col-up movers-section-header movers-panel-title-row">
             <span className="col-icon">🚀</span>
             <span className="col-label">SURGING +3%</span>
-            <span className="col-count col-count-badge">{gainers.length}</span>
+            <span className="col-count col-count-badge movers-count-badge">{gainers.length}</span>
           </div>
           <div className="movers-list">
             {gainers.length === 0 ? (
@@ -77,11 +78,11 @@ const MoversSection = ({ moversData }) => {
         </div>
 
         {/* Losers Column */}
-        <div className="movers-col">
-          <div className="col-header col-down">
+        <div className="movers-col movers-column">
+          <div className="col-header col-down movers-section-header movers-panel-title-row">
             <span className="col-icon">🔻</span>
             <span className="col-label">FALLING -3%</span>
-            <span className="col-count col-count-badge">{losers.length}</span>
+            <span className="col-count col-count-badge movers-count-badge">{losers.length}</span>
           </div>
           <div className="movers-list">
             {losers.length === 0 ? (

@@ -1,0 +1,21 @@
+@media (max-width: 768px) {
+  .movers-panel,
+  .movers-column,
+  .movers-section-header {
+    overflow: visible !important;
+  }
+  .movers-count-badge {
+    position: relative !important;
+    right: 0 !important;
+    flex-shrink: 0 !important;
+    margin-right: 4px !important;
+    z-index: 5 !important;
+  }
+  .movers-panel-title-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding-right: 8px !important;
+    overflow: visible !important;
+  }
+}

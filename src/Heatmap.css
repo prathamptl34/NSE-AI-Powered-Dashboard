@@ -133,3 +133,47 @@
   margin-top: 0 !important;
 }
 
+@media (max-width: 768px) {
+  .hm-index-tile {
+    min-height: unset !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 12px;
+  }
+  .hm-tile-inner,
+  .hm-tile-content {
+    overflow: visible !important;
+    height: auto !important;
+  }
+  .hm-gainer-loser-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    overflow: visible !important;
+    flex-wrap: nowrap !important;
+    gap: 4px;
+  }
+  .hm-stock-name {
+    font-size: 0.65rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 55% !important;
+  }
+  .hm-stock-pill,
+  .pill-stock-up,
+  .pill-stock-down {
+    font-size: 0.65rem !important;
+    padding: 2px 5px !important;
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+  }
+  /* Ensure 2-column grid tiles don't overflow */
+  .hm-terminal-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    padding: 8px !important;
+  }
+}
+

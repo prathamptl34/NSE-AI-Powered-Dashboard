@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, memo } from "react";
+import './SignalScanner.css';
 import { StockDeepDiveModal } from './StockDeepDive';
 
 const FILTERS = ["ALL", "BULLISH", "BEARISH", "NEUTRAL", "STRONG", "F&O"];
@@ -331,11 +332,13 @@ export default function SignalScanner({ onBack, standalone = false }) {
 
       {/* Error State */}
       {error && (
-        <div className="scanner-error-container">
-          <span style={{ fontSize: '24px', marginBottom: '12px', display: 'block' }}>⚠️</span>
-          <div style={{ color: 'var(--red)', fontWeight: '700', marginBottom: '8px' }}>Analysis Interrupted</div>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto' }}>{error}</p>
-          <button className="ai-back-btn" style={{ marginTop: '20px' }} onClick={handleScan}>Retry Analysis</button>
+        <div className="scanner-ai-error">
+          <span className="scanner-ai-error-icon">⚠️</span>
+          <p>AI analysis temporarily unavailable</p>
+          <span className="scanner-ai-error-time">{timestamp || new Date().toLocaleTimeString()} IST</span>
+          <button className="scanner-retry-btn" onClick={handleScan}>
+            Retry
+          </button>
         </div>
       )}
 
@@ -412,11 +415,20 @@ const SignalCard = memo(function SignalCard({ stock, onClick }) {
 });
 
 function SignalDetailModal({ stock, onClose }) {
+  const isMobile = window.innerWidth <= 768;
   if (!stock) return null;
   const accent = stock.signal === 'BULLISH' ? 'var(--green)' : stock.signal === 'BEARISH' ? 'var(--red)' : 'var(--blue)';
   return (
     <div className="sdm-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="sdm-modal" style={{ borderTop: `4px solid ${accent}` }}>
+      <div className={`sdm-modal ${isMobile ? 'scanner-detail-mobile-overlay' : ''}`} style={{ borderTop: `4px solid ${accent}` }}>
+        {isMobile && (
+          <button
+            className="scanner-detail-close"
+            onClick={onClose}
+          >
+            ✕ Close
+          </button>
+        )}
         <div className="sdm-header">
            <div>
              <span className="sdm-symbol">{stock.symbol}</span>
