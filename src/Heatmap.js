@@ -334,19 +334,19 @@ export default function HeatmapPage({ onBack, wsStatus }) {
           <h2 className="hm-title">Market Heatmap</h2>
           <span className="hm-live-dot">{streaming ? '● LIVE' : '● OFF'}</span>
         </div>
-        <div className="hm-header-right">
-          <div className="breadth-counter">
-            <span className={`bc-up ${activeFilter === "gainers" ? "active" : ""}`} onClick={() => toggleFilter("gainers")} style={{cursor: 'pointer'}}>
-              ▲ &gt;1% <strong>{stats.g ?? 0}</strong>
-            </span>
-            <span className={`bc-flat ${activeFilter === "flat" ? "active" : ""}`} onClick={() => toggleFilter("flat")} style={{cursor: 'pointer'}}>
-              ● Flat <strong>{stats.f ?? 0}</strong>
-            </span>
-            <span className={`bc-down ${activeFilter === "losers" ? "active" : ""}`} onClick={() => toggleFilter("losers")} style={{cursor: 'pointer'}}>
-              ▼ &lt;-1% <strong>{stats.l ?? 0}</strong>
-            </span>
+        <div className="hm-header-right" style={{display:'flex', alignItems:'center', gap:'12px'}}>
+          <div className="hm-filter-pills" style={{display:'flex', gap:'6px'}}>
+            <button className={`hm-pill hm-pill-green ${activeFilter === "gainers" ? "active" : ""}`} onClick={() => toggleFilter("gainers")}>
+              ▲ &gt;1% {stats.g ?? 0}
+            </button>
+            <button className={`hm-pill hm-pill-grey ${activeFilter === "flat" ? "active" : ""}`} onClick={() => toggleFilter("flat")}>
+              — Flat {stats.f ?? 0}
+            </button>
+            <button className={`hm-pill hm-pill-red ${activeFilter === "losers" ? "active" : ""}`} onClick={() => toggleFilter("losers")}>
+              ▼ &lt;-1% {stats.l ?? 0}
+            </button>
           </div>
-          <span className="hm-timestamp">{timeStr}</span>
+          <span className="hm-header-time">{timeStr}</span>
         </div>
       </div>
 

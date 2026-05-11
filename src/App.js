@@ -362,7 +362,7 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
-    const pollId = setInterval(fetchData, wsStatus === 'live' ? 10000 : 5000);
+    const pollId = setInterval(fetchData, 2000);
 
     const connectWS = () => {
       if (wsRef.current && (wsRef.current.readyState === 0 || wsRef.current.readyState === 1)) return;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import './Dashboard.css';
 
 function formatINR(num) {
   if (!num) return "—";
