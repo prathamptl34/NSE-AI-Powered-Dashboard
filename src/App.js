@@ -6,6 +6,7 @@ import { useStockExplain, StockDeepDiveModal } from './StockDeepDive';
 import FnoMoversTable from "./FnoMoversTable";
 import HeatmapPage from "./Heatmap";
 import MoversSection from "./MoversSection";
+import PreMarketIntelligence from "./PreMarketIntelligence";
 
 // ── Utility functions ─────────────────────────────────────────────────────────
 
@@ -240,11 +241,12 @@ export default function App() {
   }, []);
 
   const navItems = [
-    { key: 'dashboard', label: 'Dashboard',      icon: '📊' },
-    { key: 'analyst',   label: 'Market Analyst', icon: '✨' },
-    { key: 'scanner',   label: 'Signal Scanner', icon: '◉' },
-    { key: 'heatmap',   label: 'Heatmap',        icon: '🔥' },
-    { key: 'movers',    label: 'Movers Alert',   icon: '⚡' },
+    { key: 'dashboard',  label: 'Dashboard',         icon: '📊' },
+    { key: 'analyst',    label: 'Market Analyst',     icon: '✨' },
+    { key: 'scanner',    label: 'Signal Scanner',     icon: '◉' },
+    { key: 'heatmap',    label: 'Heatmap',            icon: '🔥' },
+    { key: 'movers',     label: 'Movers Alert',       icon: '⚡' },
+    { key: 'premarket',  label: 'Pre-Market Intel',   icon: '⚡📡' },
   ];
 
   // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -553,6 +555,23 @@ export default function App() {
             </div>
             <div className="section-divider-line" />
             <MoversSection moversData={moversData} standalone={true} />
+          </div>
+        )}
+
+        {/* SECTION 5: PRE-MARKET INTELLIGENCE */}
+        {activeSection === 'premarket' && (
+          <div id="section-premarket" className="content-fade-in section-content">
+            <div className="section-page-header">
+              <div className="section-page-title">
+                <span className="section-page-icon">📡</span>
+                <div>
+                  <div className="section-page-name">Pre-Market Intel</div>
+                  <div className="section-page-sub">GAPS · VOLUME · SECTOR MOMENTUM</div>
+                </div>
+              </div>
+            </div>
+            <div className="section-divider-line" />
+            <PreMarketIntelligence />
           </div>
         )}
       </main>

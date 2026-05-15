@@ -30,6 +30,7 @@ from backend.tv_mcp_client import (
     start_tv_mcp_server, stop_tv_mcp_server, 
     get_multi_agent_analysis, get_multi_timeframe_alignment, get_volume_breakout_stocks
 )
+from backend.premarket_engine import get_gap_data, get_premarket_volume, get_sector_momentum, get_volume_spikes
 
 # ── Logging Configuration ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -885,6 +886,62 @@ from backend.streamer import get_movers
 async def get_movers_alert():
     """Returns sorted lists of stocks crossing the ±3% threshold."""
     return get_movers()
+
+# ── Pre-Market Intelligence Endpoints ────────────────────────────────────────
+
+@app.get("/api/gaps")
+async def api_get_gaps():
+    """Returns overnight gap scanner data for Nifty 100 + Midcap 100."""
+    try:
+        data = await get_gap_data()
+        return {"gaps": data, "count": len(data), "timestamp": datetime.now(IST).strftime("%I:%M:%S %p IST")}
+    except Exception as e:
+        logger.error(f"Gap data error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "GAP_DATA_ERROR", "message": str(e)})
+
+
+@app.get("/api/premarket-volume")
+async def api_premarket_volume():
+    """Returns pre-market volume surge data (active only 09:00–09:15 IST)."""
+    try:
+        data = await get_premarket_volume()
+        return data
+    except Exception as e:
+        logger.error(f"Pre-market volume error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "PREMARKET_VOL_ERROR", "message": str(e)})
+
+
+@app.get("/api/sector-momentum")
+async def api_sector_momentum():
+    """Returns ranked sector momentum leaderboard (cached 30s)."""
+    try:
+        data = await get_sector_momentum()
+        return {"sectors": data, "count": len(data), "timestamp": datetime.now(IST).strftime("%I:%M:%S %p IST")}
+    except Exception as e:
+        logger.error(f"Sector momentum error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "SECTOR_MOMENTUM_ERROR", "message": str(e)})
+
+
+@app.get("/api/volume-spikes")
+async def api_volume_spikes_stream():
+    """SSE endpoint streaming real-time 5-min candle volume spike events."""
+    async def event_generator():
+        try:
+            async for spike in get_volume_spikes():
+                payload = json.dumps(spike)
+                yield f"data: {payload}\n\n"
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"[SSE VolumeSpikes] error: {e}")
+            yield f"data: {{\"error\": \"{str(e)}\"}}\ n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
 
 # ── Heatmap Endpoints ─────────────────────────────────────────────────────
 
