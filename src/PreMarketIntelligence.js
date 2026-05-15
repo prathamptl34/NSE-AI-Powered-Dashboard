@@ -19,6 +19,34 @@ function isInISTWindow(startH, startM, endH, endM) {
 function isPreMarketActive()  { return isInISTWindow(9,  0,  9, 15); }
 function isMarketHoursActive() { return isInISTWindow(9, 15, 15, 30); }
 
+function useCountdown(targetH, targetM) {
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    const update = () => {
+      const now = getNowIST();
+      const target = new Date(now);
+      target.setHours(targetH, targetM, 0, 0);
+
+      if (now.getTime() > target.getTime()) {
+        target.setDate(target.getDate() + 1);
+      }
+
+      const diff = target.getTime() - now.getTime();
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeLeft(`${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [targetH, targetM]);
+
+  return timeLeft;
+}
+
 // ─── API Base ─────────────────────────────────────────────────────────────────
 
 function getBase() {
@@ -139,7 +167,6 @@ function GapScanner() {
           <div className="pm-widget-title">Gap Scanner</div>
           <div className="pm-widget-sub">Overnight gap analysis · Nifty 100 + Midcap 100</div>
         </div>
-        {lastUpdate && <span className="pm-widget-ts">{lastUpdate}</span>}
       </div>
 
       <div className="pm-filter-bar">
@@ -184,6 +211,9 @@ function GapScanner() {
           </table>
         </div>
       )}
+      <div className="pm-widget-footer">
+        {lastUpdate && <span>Last updated: {lastUpdate}</span>}
+      </div>
     </div>
   );
 }
@@ -195,7 +225,9 @@ function GapScanner() {
 function PremarketVolume() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdate, setLastUpdate] = useState(null);
   const active = isPreMarketActive();
+  const preMarketCountdown = useCountdown(9, 0);
 
   const load = useCallback(async () => {
     if (!active) { setLoading(false); return; }
@@ -204,6 +236,7 @@ function PremarketVolume() {
       if (!res.ok) return;
       const json = await res.json();
       setData(json);
+      setLastUpdate(new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }));
     } catch (e) {
       // silent
     } finally {
@@ -230,9 +263,9 @@ function PremarketVolume() {
 
       {!active ? (
         <div className="market-closed-placeholder">
-          <span className="pm-empty-icon">🕰️</span>
-          <p>Pre-market session inactive</p>
-          <span className="pm-empty-sub">Active daily 09:00–09:15 IST</span>
+          <span className="pm-empty-icon pm-empty-icon-large">🕰️</span>
+          <p>Waiting for pre-market data...</p>
+          <span className="pm-empty-sub countdown-text">Pre-market starts in {preMarketCountdown}</span>
         </div>
       ) : loading ? (
         <div className="pm-loading-state">
@@ -273,6 +306,9 @@ function PremarketVolume() {
           ))}
         </div>
       )}
+      <div className="pm-widget-footer">
+        {lastUpdate && <span>Last updated: {lastUpdate}</span>}
+      </div>
     </div>
   );
 }
@@ -284,7 +320,16 @@ function PremarketVolume() {
 function SectorMomentum() {
   const [sectors, setSectors] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [ts,      setTs]      = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
+  const [secondsAgo, setSecondsAgo] = useState(0);
+
+  useEffect(() => {
+    if (!lastFetchTime) return;
+    const id = setInterval(() => {
+      setSecondsAgo(Math.floor((Date.now() - lastFetchTime) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [lastFetchTime]);
 
   const load = useCallback(async () => {
     try {
@@ -293,7 +338,8 @@ function SectorMomentum() {
       const json = await res.json();
       if (json.sectors) {
         setSectors(json.sectors);
-        setTs(json.timestamp);
+        setLastFetchTime(Date.now());
+        setSecondsAgo(0);
       }
     } catch (e) {
       // silent
@@ -320,7 +366,6 @@ function SectorMomentum() {
           <div className="pm-widget-title">Sector Momentum</div>
           <div className="pm-widget-sub">Live sector leaderboard · refreshes every 30s</div>
         </div>
-        {ts && <span className="pm-widget-ts">{ts}</span>}
       </div>
 
       {loading ? (
@@ -338,9 +383,17 @@ function SectorMomentum() {
           {sectors.map((s, i) => {
             const barWidth = Math.min(100, (Math.abs(s.score) / maxScore) * 100);
             const isPos = s.direction === 'up';
+            const prevPos = i > 0 ? sectors[i-1].direction === 'up' : isPos;
+            const showDivider = isPos !== prevPos;
+            const isTop3 = i < 3;
+            const isBottom3 = i >= sectors.length - 3;
+            const emphasize = isTop3 || isBottom3;
+
             return (
-              <div key={s.sector_name} className="sector-row">
-                <span className="sector-rank">#{i + 1}</span>
+              <React.Fragment key={s.sector_name}>
+                {showDivider && <div className="sector-divider" />}
+                <div className="sector-row">
+                  <span className="sector-rank">#{i + 1}</span>
                 <div className="sector-info">
                   <div className="sector-name-row">
                     <span className="sector-name">{s.sector_name.replace('NIFTY ', '')}</span>
@@ -357,16 +410,20 @@ function SectorMomentum() {
                     />
                   </div>
                 </div>
-                <span className={`sector-score ${isPos ? 'gap-up' : 'gap-down'}`}>
+                <span className={`sector-score ${isPos ? 'gap-up' : 'gap-down'} ${emphasize ? 'sector-score-pill' : ''}`}>
                   {fmtPct(s.score)}
                 </span>
               </div>
-            );
-          })}
-        </div>
-      )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+    )}
+    <div className="pm-widget-footer">
+      {lastFetchTime && <span>Last updated {secondsAgo} seconds ago</span>}
     </div>
-  );
+  </div>
+);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -381,6 +438,7 @@ function VolumeSpikeDetector() {
   const sseRef   = useRef(null);
   const timerRef = useRef(null);
   const active   = isMarketHoursActive();
+  const marketCountdown = useCountdown(9, 15);
 
   // Prune spikes older than 15 minutes
   useEffect(() => {
@@ -452,9 +510,9 @@ function VolumeSpikeDetector() {
 
       {!active ? (
         <div className="market-closed-placeholder">
-          <span className="pm-empty-icon">🔒</span>
+          <span className="pm-empty-icon pm-empty-icon-large">🔒</span>
           <p>Market closed</p>
-          <span className="pm-empty-sub">Active 09:15–15:30 IST</span>
+          <span className="pm-empty-sub countdown-text">Market opens in {marketCountdown}</span>
         </div>
       ) : spikes.length === 0 ? (
         <div className="market-closed-placeholder">
@@ -469,9 +527,9 @@ function VolumeSpikeDetector() {
             const ageMins = Math.floor(ageMs / 60000);
             const isPos = s.price_change_pct >= 0;
             return (
-              <div key={s._id} className="spike-card spike-card-enter">
+              <div key={s._id} className="spike-card spike-card-anim">
                 <div className="spike-header">
-                  <span className="spike-symbol">{s.symbol}</span>
+                  <span className="spike-symbol truncate">{s.symbol}</span>
                   <span className="multiplier-badge">{s.multiplier}×</span>
                   <button className="spike-dismiss" onClick={() => dismiss(s._id)} aria-label="Dismiss">×</button>
                 </div>

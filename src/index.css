@@ -3828,6 +3828,17 @@ body {
   white-space: nowrap;
 }
 
+.pm-widget-footer {
+  padding: 10px 20px;
+  border-top: 1px solid var(--glass-border);
+  background: hsla(0, 0%, 100%, 0.01);
+  font-size: 9px;
+  color: var(--text-muted);
+  text-align: right;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
 /* Live badge */
 .pm-live-badge {
   margin-left: auto;
@@ -3923,7 +3934,8 @@ body {
 .gap-td-num    { font-variant-numeric: tabular-nums; color: var(--text-secondary); text-align: right; }
 .gap-td-pct    { text-align: right; }
 
-.gap-row:hover td { background: rgba(255,255,255,0.025); }
+.gap-row:nth-child(even) td { background: rgba(255,255,255,0.02); }
+.gap-row:hover td { background: rgba(255,255,255,0.04); }
 .gap-row-up  { border-left: 2px solid hsla(160, 84%, 39%, 0.4); }
 .gap-row-down { border-left: 2px solid hsla(343, 90%, 60%, 0.4); }
 
@@ -4026,6 +4038,12 @@ body {
 
 .sector-row:hover { background: rgba(255,255,255,0.025); }
 
+.sector-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 6px 16px;
+}
+
 .sector-rank {
   font-size: 10px;
   font-weight: 700;
@@ -4044,7 +4062,7 @@ body {
 
 .sector-name {
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -4086,6 +4104,14 @@ body {
   text-align: right;
 }
 
+.sector-score-pill {
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  transform: scale(1.05);
+}
+
 /* ── Volume Spike Cards ── */
 .spike-list {
   padding: 12px;
@@ -4116,6 +4142,15 @@ body {
   animation: spike-enter 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
+.spike-card-anim {
+  animation: spike-enter 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) forwards,
+             spike-fade-out 10s ease-in forwards 890s;
+}
+
+@keyframes spike-fade-out {
+  to { opacity: 0; transform: scale(0.95); pointer-events: none; }
+}
+
 .spike-card:hover { border-color: var(--glass-border-bright); }
 
 .spike-header {
@@ -4130,6 +4165,12 @@ body {
   font-weight: 800;
   color: var(--text-primary);
   flex: 1;
+}
+
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .spike-dismiss {
@@ -4177,6 +4218,14 @@ body {
 }
 
 .pm-empty-icon { font-size: 36px; opacity: 0.5; }
+.pm-empty-icon-large { font-size: 48px; opacity: 0.7; margin-bottom: 8px; }
+
+.countdown-text {
+  color: var(--blue);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
 
 .market-closed-placeholder p {
   font-size: 13px;
