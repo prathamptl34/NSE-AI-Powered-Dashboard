@@ -979,6 +979,76 @@ async def heatmap_sse_stream():
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
+# ── Screener Endpoints ────────────────────────────────────────────────────────
+from pydantic import BaseModel
+from backend.screener_engine import run_scan_generator, get_presets, save_preset, get_cached_results
+
+class RunScanRequest(BaseModel):
+    filters: list[dict]
+    universe: str = 'NSE'
+    logic: str = 'AND'
+    index_filter: str = 'ALL'
+    sectors: list[str] | None = None
+
+@app.post("/api/screener/run")
+async def api_screener_run(request: RunScanRequest):
+    """Executes a screener scan and streams progressive results."""
+    async def event_generator():
+        try:
+            async for chunk in run_scan_generator(
+                filters=request.filters,
+                universe=request.universe,
+                logic=request.logic,
+                index_filter=request.index_filter,
+                sectors=request.sectors
+            ):
+                payload = json.dumps(chunk)
+                yield f"data: {payload}\n\n"
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            logger.error(f"[SSE Screener] error: {e}")
+            yield f"data: {{\"error\": \"{str(e)}\"}}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+@app.get("/api/screener/presets")
+async def api_screener_presets():
+    """Returns built-in and user-saved presets."""
+    try:
+        presets = get_presets()
+        return {"presets": presets}
+    except Exception as e:
+        logger.error(f"Screener presets error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class SavePresetRequest(BaseModel):
+    name: str
+    filters: list[dict]
+    logic: str = 'AND'
+
+@app.post("/api/screener/save")
+async def api_screener_save(req: SavePresetRequest):
+    """Saves a custom preset."""
+    try:
+        preset = save_preset(name=req.name, filters=req.filters, logic=req.logic)
+        return {"success": True, "preset": preset}
+    except Exception as e:
+        logger.error(f"Screener save preset error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/screener/results/{scan_id}")
+async def api_screener_cached_results(scan_id: str):
+    """Retrieves a cached scan result by scan_id."""
+    res = get_cached_results(scan_id)
+    if res:
+        return res
+    raise HTTPException(status_code=404, detail="Scan results not found or expired")
+
 # ── Serve React SPA (production build) ───────────────────────────────────────
 BUILD_DIR = os.path.join(os.path.dirname(__file__), "build")
 if os.path.isdir(BUILD_DIR):

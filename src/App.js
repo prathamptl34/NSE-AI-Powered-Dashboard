@@ -7,6 +7,7 @@ import FnoMoversTable from "./FnoMoversTable";
 import HeatmapPage from "./Heatmap";
 import MoversSection from "./MoversSection";
 import PreMarketIntelligence from "./PreMarketIntelligence";
+import ScreenerPage from "./ScreenerPage";
 
 // ── Utility functions ─────────────────────────────────────────────────────────
 
@@ -244,6 +245,7 @@ export default function App() {
     { key: 'dashboard',  label: 'Dashboard',         icon: '📊' },
     { key: 'analyst',    label: 'Market Analyst',     icon: '✨' },
     { key: 'scanner',    label: 'Signal Scanner',     icon: '◉' },
+    { key: 'screener',   label: 'Screener',            icon: '🔍' },
     { key: 'heatmap',    label: 'Heatmap',            icon: '🔥' },
     { key: 'movers',     label: 'Movers Alert',       icon: '⚡' },
     { key: 'premarket',  label: 'Pre-Market Intel',   icon: '⚡📡' },
@@ -572,6 +574,23 @@ export default function App() {
             </div>
             <div className="section-divider-line" />
             <PreMarketIntelligence />
+          </div>
+        )}
+
+        {/* SECTION 6: UNIVERSAL SCREENER */}
+        {activeSection === 'screener' && (
+          <div id="section-screener" className="content-fade-in section-content">
+            <div className="section-page-header">
+              <div className="section-page-title">
+                <span className="section-page-icon">🔍</span>
+                <div>
+                  <div className="section-page-name">Universal Screener</div>
+                  <div className="section-page-sub">5,000+ NSE & BSE STOCKS</div>
+                </div>
+              </div>
+            </div>
+            <div className="section-divider-line" />
+            <ScreenerPage standalone={true} onStockClick={openExplain} />
           </div>
         )}
       </main>
