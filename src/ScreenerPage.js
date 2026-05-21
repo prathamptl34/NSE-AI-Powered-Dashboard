@@ -27,6 +27,15 @@ const FILTER_FIELDS = [
   { key: 'market_cap', label: 'Market Cap (Cr)', type: 'number', category: 'Fundamentals', defaultOp: '>', defaultVal: 1000 },
 ];
 
+const cleanSymbol = (raw) => {
+  if (!raw) return raw;
+  return raw
+    .replace(/NSE$/i, '')
+    .replace(/BSE$/i, '')
+    .replace(/-EQ$/i, '')
+    .trim();
+};
+
 export default function ScreenerPage({ standalone, onStockClick }) {
   const [presets, setPresets] = useState([]);
   const [activePreset, setActivePreset] = useState(null);
@@ -255,6 +264,26 @@ export default function ScreenerPage({ standalone, onStockClick }) {
 
   const progressPct = scanProgress.total > 0 ? Math.min(100, Math.round((scanProgress.current / scanProgress.total) * 100)) : 0;
 
+  const sigClass = (sig) => {
+    if (!sig) return 'sig-neutral';
+    const s = sig.toString().toUpperCase();
+    if (s === 'BUY')  return 'sig-buy';
+    if (s === 'SELL') return 'sig-sell';
+    return 'sig-neutral';
+  };
+
+  const volClass = (ratio) =>
+    parseFloat(ratio) >= 2 ? 'td-volratio high' : 'td-volratio';
+
+  const rsiClass = (rsi) => {
+    const r = parseFloat(rsi);
+    if (r >= 70) return 'td-rsi overbought';
+    if (r <= 30) return 'td-rsi oversold';
+    return 'td-rsi';
+  };
+
+  const showSector = results.some(r => r.sector && r.sector !== '-');
+
   return (
     <div className="screener-page-container">
       
@@ -270,34 +299,31 @@ export default function ScreenerPage({ standalone, onStockClick }) {
       )}
 
       {/* 2. PRESET STRATEGY CARDS */}
-      <div className="screener-presets-scroll-wrapper">
-        <div className="screener-presets-row">
-          {presets.map(p => {
-            // Determine premium tag style based on id/name
-            let tagClass = 'default';
-            let tagText = 'STRATEGY';
-            const id = p.id.toLowerCase();
-            if (id.includes('bullish') || id.includes('bounce') || id.includes('buy')) { tagClass = 'bullish'; tagText = 'BULLISH'; }
-            if (id.includes('bearish') || id.includes('sell')) { tagClass = 'bearish'; tagText = 'BEARISH'; }
-            if (id.includes('momentum') || id.includes('leaders')) { tagClass = 'momentum'; tagText = 'MOMENTUM'; }
-            if (id.includes('breakout')) { tagClass = 'breakout'; tagText = 'BREAKOUT'; }
+      <div className="preset-cards-row">
+        {presets.map(preset => {
+          let tagClass = 'default';
+          let tagText = 'STRATEGY';
+          const id = preset.id.toLowerCase();
+          if (id.includes('bullish') || id.includes('bounce') || id.includes('buy')) { tagClass = 'bullish'; tagText = 'BULLISH'; }
+          if (id.includes('bearish') || id.includes('sell')) { tagClass = 'bearish'; tagText = 'BEARISH'; }
+          if (id.includes('momentum') || id.includes('leaders')) { tagClass = 'momentum'; tagText = 'MOMENTUM'; }
+          if (id.includes('breakout')) { tagClass = 'breakout'; tagText = 'BREAKOUT'; }
 
-            return (
-              <div 
-                key={p.id} 
-                className={`screener-preset-card ${activePreset === p.id ? 'active' : ''}`}
-                onClick={() => loadPreset(p)}
-              >
-                <div className="screener-preset-header">
-                  <div className="screener-preset-icon">{p.icon}</div>
-                  <div className={`screener-preset-tag ${tagClass}`}>{tagText}</div>
-                </div>
-                <h4 className="screener-preset-title">{p.name}</h4>
-                <p className="screener-preset-desc">{p.description}</p>
-              </div>
-            );
-          })}
-        </div>
+          return (
+            <div
+              key={preset.id}
+              className={`preset-card ${activePreset === preset.id ? 'active' : ''}`}
+              onClick={() => loadPreset(preset)}
+            >
+              <span className={`preset-tag ${tagClass}`}>
+                {tagText}
+              </span>
+              <span className="preset-icon">{preset.icon}</span>
+              <div className="preset-title">{preset.name}</div>
+              <div className="preset-desc">{preset.description}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* 3. ERROR BANNER */}
@@ -308,26 +334,25 @@ export default function ScreenerPage({ standalone, onStockClick }) {
       )}
 
       {/* 4. FILTER BUILDER */}
-      <div className="screener-filter-panel">
-        <div className="screener-filter-header">
-          <h3>Build Your Scanner</h3>
+      <div className="scanner-panel">
+        <div className="scanner-panel-header">
+          Build Your Scanner
         </div>
         
-        <div className="screener-filters-list">
+        <div className="filters-row">
           {filters.map((f, index) => {
             const fieldDef = FILTER_FIELDS.find(df => df.key === f.field);
             return (
               <React.Fragment key={f.id}>
                 {index > 0 && (
-                  <div className="screener-logic-badge" onClick={() => setFilterLogic(l => l === 'AND' ? 'OR' : 'AND')}>
+                  <div className="filter-logic-badge" onClick={() => setFilterLogic(l => l === 'AND' ? 'OR' : 'AND')}>
                     {filterLogic}
                   </div>
                 )}
-                <div className="screener-filter-chip">
-                  <span className="screener-filter-name">{fieldDef ? fieldDef.label : f.field}</span>
+                <div className="filter-chip">
+                  <span className="filter-chip-label">{fieldDef ? fieldDef.label : f.field}</span>
                   
                   <select 
-                    className="screener-filter-op" 
                     value={f.operator} 
                     onChange={e => updateFilter(f.id, 'operator', e.target.value)}
                   >
@@ -340,10 +365,8 @@ export default function ScreenerPage({ standalone, onStockClick }) {
 
                   {fieldDef?.type === 'select' ? (
                     <select 
-                      className="screener-filter-val" 
                       value={f.value} 
                       onChange={e => updateFilter(f.id, 'value', e.target.value)}
-                      style={{ width: 'auto' }}
                     >
                       {fieldDef.options.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -351,40 +374,37 @@ export default function ScreenerPage({ standalone, onStockClick }) {
                     </select>
                   ) : fieldDef?.type === 'boolean' ? (
                     <select 
-                      className="screener-filter-val" 
                       value={f.value} 
                       onChange={e => updateFilter(f.id, 'value', e.target.value === 'true')}
-                      style={{ width: 'auto' }}
                     >
                       <option value="true">True</option>
                       <option value="false">False</option>
                     </select>
                   ) : (
                     <input 
-                      className="screener-filter-val" 
                       type="number" 
                       value={f.value} 
                       onChange={e => updateFilter(f.id, 'value', Number(e.target.value))}
                     />
                   )}
                   
-                  <button className="screener-filter-remove" onClick={() => removeFilter(f.id)}>×</button>
+                  <button className="filter-chip-remove" onClick={() => removeFilter(f.id)}>×</button>
                 </div>
               </React.Fragment>
             );
           })}
           
-          <div className="screener-add-container" ref={addFilterRef}>
-            <button className="screener-add-btn" onClick={() => setShowAddFilter(!showAddFilter)}>
+          <div style={{ position: 'relative' }} ref={addFilterRef}>
+            <button className="add-filter-btn" onClick={() => setShowAddFilter(!showAddFilter)}>
               + Add Filter
             </button>
             {showAddFilter && (
-              <div className="screener-dropdown-menu filter-dropdown-panel">
+              <div className="filter-dropdown-panel">
                 {Object.entries(groupedFields).map(([category, fields]) => (
-                  <div key={category} className="screener-dropdown-group">
-                    <div className="screener-dropdown-group-title filter-group-header">{category}</div>
+                  <div key={category}>
+                    <div className="filter-group-header">{category}</div>
                     {fields.map(field => (
-                      <div key={field.key} className="screener-dropdown-item filter-option" onClick={() => addFilter(field.key)}>
+                      <div key={field.key} className="filter-option" onClick={() => addFilter(field.key)}>
                         {field.label}
                       </div>
                     ))}
@@ -396,26 +416,26 @@ export default function ScreenerPage({ standalone, onStockClick }) {
         </div>
 
         {/* CONTROLS ROW */}
-        <div className="screener-controls-row">
-          <div className="screener-exchange-toggle">
-            <button className={`screener-exchange-btn ${selectedUniverse === 'NSE' ? 'active' : ''}`} onClick={() => setSelectedUniverse('NSE')}>NSE Only</button>
-            <button className={`screener-exchange-btn ${selectedUniverse === 'BSE' ? 'active' : ''}`} onClick={() => setSelectedUniverse('BSE')}>BSE Only</button>
-            <button className={`screener-exchange-btn ${selectedUniverse === 'ALL' ? 'active' : ''}`} onClick={() => setSelectedUniverse('ALL')}>NSE + BSE</button>
+        <div className="scan-controls-row">
+          <div className="exchange-group">
+            <button className={`exchange-btn ${selectedUniverse === 'NSE' ? 'active' : ''}`} onClick={() => setSelectedUniverse('NSE')}>NSE Only</button>
+            <button className={`exchange-btn ${selectedUniverse === 'BSE' ? 'active' : ''}`} onClick={() => setSelectedUniverse('BSE')}>BSE Only</button>
+            <button className={`exchange-btn ${selectedUniverse === 'ALL' ? 'active' : ''}`} onClick={() => setSelectedUniverse('ALL')}>NSE + BSE</button>
           </div>
           
-          <div className="screener-run-container">
-            {filters.length > 0 && (
-              <button className="screener-clear-btn" onClick={() => { setFilters([]); setActivePreset(null); setResults([]); setScanMeta(null); }}>Clear All</button>
-            )}
-            
-            <button 
-              className={`run-scan-btn ${isScanning ? 'scanning' : ''}`} 
-              onClick={runScan} 
-              disabled={isScanning || filters.length === 0}
-            >
-              {isScanning ? '⚡ SCANNING...' : '🚀 RUN SCAN'}
-            </button>
-          </div>
+          <div className="controls-spacer"></div>
+          
+          {filters.length > 0 && (
+            <button className="clear-all-btn" onClick={() => { setFilters([]); setActivePreset(null); setResults([]); setScanMeta(null); }}>Clear All</button>
+          )}
+          
+          <button 
+            className={`run-scan-btn ${isScanning ? 'scanning' : ''}`} 
+            onClick={runScan} 
+            disabled={isScanning || filters.length === 0}
+          >
+            {isScanning ? '⚡ SCANNING...' : '🚀 RUN SCAN'}
+          </button>
         </div>
       </div>
 
@@ -438,48 +458,42 @@ export default function ScreenerPage({ standalone, onStockClick }) {
 
       {/* 6. RESULTS TABLE */}
       {(isScanning || scanMeta || results.length > 0) && (
-        <div className="screener-results-container">
-          <div className="screener-table-header">
-            <h4 className="screener-table-title">
-              Scan Complete — <span>{results.length}</span> matches found
-            </h4>
-            <div className="screener-table-actions">
-              <button onClick={exportCSV}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                Export CSV
-              </button>
+        <div className="results-wrapper">
+          <div className="results-top-bar">
+            <div className="results-count-text">
+              Scan Complete — <strong>{results.length}</strong> matches found
             </div>
+            <button className="csv-btn" onClick={exportCSV}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Export CSV
+            </button>
           </div>
           
           {results.length === 0 ? (
-            <div className="screener-empty-state">
-              <div className="screener-empty-icon">🏜️</div>
+            <div className="screener-empty-state" style={{ padding: '60px 0', textAlign: 'center', color: '#fff' }}>
+              <div style={{ fontSize: '3rem', opacity: 0.7 }}>🏜️</div>
               <h3>No Matches Found</h3>
-              <p>No stocks currently meet all your strict criteria. Try loosening the parameters or switching the logic to OR.</p>
+              <p style={{ color: 'rgba(255,255,255,0.5)' }}>No stocks currently meet all your strict criteria. Try loosening the parameters or switching the logic to OR.</p>
             </div>
           ) : (
-            <div className="screener-table-wrapper">
-              <table className="screener-table">
+            <div style={{ overflowX: 'auto' }}>
+              <table className="results-table">
                 <thead>
                   <tr>
                     <th>#</th>
-                    <th onClick={() => handleSort('symbol')}>Symbol {sortConfig.key === 'symbol' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('last_price')}>LTP {sortConfig.key === 'last_price' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('pct_change')}>Change% {sortConfig.key === 'pct_change' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('volume_ratio')}>Vol Ratio {sortConfig.key === 'volume_ratio' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('rsi_14')}>RSI {sortConfig.key === 'rsi_14' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('supertrend')}>Signal {sortConfig.key === 'supertrend' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('sector')}>Sector {sortConfig.key === 'sector' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                    <th onClick={() => handleSort('symbol')} className={sortConfig.key === 'symbol' ? `sorted-${sortConfig.direction}` : ''}>Symbol</th>
+                    <th onClick={() => handleSort('last_price')} className={sortConfig.key === 'last_price' ? `sorted-${sortConfig.direction}` : ''}>LTP</th>
+                    <th onClick={() => handleSort('pct_change')} className={sortConfig.key === 'pct_change' ? `sorted-${sortConfig.direction}` : ''}>Change%</th>
+                    <th onClick={() => handleSort('volume_ratio')} className={sortConfig.key === 'volume_ratio' ? `sorted-${sortConfig.direction}` : ''}>Vol Ratio</th>
+                    <th onClick={() => handleSort('rsi_14')} className={sortConfig.key === 'rsi_14' ? `sorted-${sortConfig.direction}` : ''}>RSI</th>
+                    <th onClick={() => handleSort('supertrend')} className={sortConfig.key === 'supertrend' ? `sorted-${sortConfig.direction}` : ''}>Signal</th>
+                    {showSector && <th onClick={() => handleSort('sector')} className={sortConfig.key === 'sector' ? `sorted-${sortConfig.direction}` : ''}>Sector</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedResults.map((r, i) => {
                     const rank = (page - 1) * perPage + i + 1;
                     const isPositive = r.pct_change > 0;
-                    
-                    let signalBadge = <span className="screener-badge neutral">NEUTRAL</span>;
-                    if (r.supertrend === 'BUY') signalBadge = <span className="screener-badge bullish">BULLISH</span>;
-                    if (r.supertrend === 'SELL') signalBadge = <span className="screener-badge bearish">BEARISH</span>;
                     
                     const exBadge = (r.exchange || 'NSE').toLowerCase();
                     const exLabel = r.exchange || 'NSE';
@@ -493,41 +507,39 @@ export default function ScreenerPage({ standalone, onStockClick }) {
                           change_pct: r.pct_change
                         });
                       }}>
-                        <td style={{ color: 'rgba(255,255,255,0.3)' }}>{rank}</td>
-                        <td>
-                          <div className="screener-table-symbol">
-                            {r.symbol}
-                            <span className={`screener-exchange-badge ${exBadge}`}>{exLabel}</span>
-                          </div>
+                        <td className="td-num">{rank}</td>
+                        <td className="td-sym">
+                          {cleanSymbol(r.symbol)}
+                          <span className={`exch-badge ${exBadge}`}>{exLabel}</span>
                         </td>
-                        <td className="screener-table-price">₹{r.last_price?.toFixed(2)}</td>
-                        <td className={`screener-table-change ${isPositive ? 'positive' : 'negative'}`}>
+                        <td className="td-price">₹{r.last_price?.toFixed(2)}</td>
+                        <td className={isPositive ? 'td-chg-up' : 'td-chg-dn'}>
                           {isPositive ? '▲' : '▼'} {Math.abs(r.pct_change || 0).toFixed(2)}%
                         </td>
-                        <td>{r.volume_ratio ? r.volume_ratio.toFixed(1) + 'x' : '-'}</td>
-                        <td>{r.rsi_14?.toFixed(1) || '-'}</td>
-                        <td>{signalBadge}</td>
-                        <td className="screener-sector">{r.sector || '-'}</td>
+                        <td className={volClass(r.volume_ratio)}>{r.volume_ratio ? r.volume_ratio.toFixed(1) + 'x' : '-'}</td>
+                        <td className={rsiClass(r.rsi_14)}>{r.rsi_14?.toFixed(1) || '-'}</td>
+                        <td><span className={sigClass(r.supertrend)}>{(r.supertrend || 'NEUTRAL').toUpperCase()}</span></td>
+                        {showSector && <td>{r.sector || '-'}</td>}
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
               
-              <div className="screener-pagination" style={{ padding: '16px 24px', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
+              <div className="results-footer">
+                <div className="results-showing">
                   Showing {Math.min(results.length, (page - 1) * perPage + 1)} to {Math.min(results.length, page * perPage)} of {results.length} results
                 </div>
-                <div className="screener-page-nav" style={{ display: 'flex', gap: '8px' }}>
+                <div className="pagination-btns">
                   <button 
+                    className="page-btn"
                     onClick={() => setPage(p => Math.max(1, p - 1))} 
                     disabled={page === 1}
-                    style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', opacity: page === 1 ? 0.3 : 1 }}
                   >Prev</button>
                   <button 
+                    className="page-btn"
                     onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
                     disabled={page === totalPages || totalPages === 0}
-                    style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', padding: '4px 12px', borderRadius: '4px', cursor: 'pointer', opacity: (page === totalPages || totalPages === 0) ? 0.3 : 1 }}
                   >Next</button>
                 </div>
               </div>
@@ -538,10 +550,10 @@ export default function ScreenerPage({ standalone, onStockClick }) {
 
       {/* 7. INITIAL EMPTY STATE */}
       {!isScanning && !scanMeta && results.length === 0 && filters.length === 0 && (
-        <div className="screener-empty-state">
-          <div className="screener-empty-icon">🎯</div>
+        <div className="screener-empty-state" style={{ padding: '60px 0', textAlign: 'center', color: '#fff' }}>
+          <div style={{ fontSize: '3rem', opacity: 0.7 }}>🎯</div>
           <h3>Build Your Scanner</h3>
-          <p>Add filters above to scan the market. Or pick a preset strategy to get started instantly.</p>
+          <p style={{ color: 'rgba(255,255,255,0.5)' }}>Add filters above to scan the market. Or pick a preset strategy to get started instantly.</p>
         </div>
       )}
 
