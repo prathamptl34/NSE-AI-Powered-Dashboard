@@ -219,7 +219,28 @@ async def lifespan(app: FastAPI):
                 await asyncio.sleep(60)
                 
     ai_insight_task = asyncio.create_task(poll_ai_insights())
-    
+
+    # ── Screener Cache Builder (Chartink-style background warmup) ────────────
+    from backend.screener_engine import build_screener_cache
+
+    async def poll_screener_cache():
+        # Build immediately on startup so first scan is instant
+        try:
+            await build_screener_cache()
+        except Exception as e:
+            logger.error(f"[ScreenerCache] Initial build error: {e}")
+        while True:
+            try:
+                await asyncio.sleep(300)  # Refresh every 5 minutes
+                await build_screener_cache()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"[ScreenerCache] Background refresh error: {e}")
+                await asyncio.sleep(60)
+
+    screener_cache_task = asyncio.create_task(poll_screener_cache())
+
     yield
     
     logger.info("Shutting down background tasks...")
@@ -227,6 +248,7 @@ async def lifespan(app: FastAPI):
     save_metadata()
     breakout_task.cancel()
     ai_insight_task.cancel()
+    screener_cache_task.cancel()
     await stop_tv_mcp_server()
     streamer.stop()
     task.cancel()
@@ -992,8 +1014,7 @@ async def heatmap_sse_stream():
 
 # ── Screener Endpoints ────────────────────────────────────────────────────────
 from pydantic import BaseModel
-from backend.screener_engine import run_scan_generator, get_presets, save_preset, get_cached_results
-from backend.historical import _get_smart_connect
+from backend.screener_engine import run_scan_generator, get_presets, save_preset, get_cached_results, get_cache_status
 
 class RunScanRequest(BaseModel):
     filters: list[dict]
@@ -1002,25 +1023,27 @@ class RunScanRequest(BaseModel):
     index_filter: str = 'ALL'
     sectors: list[str] | None = None
 
+
+@app.get("/api/screener/cache-status")
+async def api_screener_cache_status():
+    """Returns screener cache freshness: symbol count, build time, and age."""
+    return get_cache_status()
+
+
 @app.post("/api/screener/run")
 async def api_screener_run(request: RunScanRequest):
-    """Executes a screener scan and streams progressive results."""
+    """Executes a screener scan by reading from the pre-built in-memory cache.
+    No Angel One API calls are made here — results stream in < 3 seconds.
+    """
     async def event_generator():
         try:
-            try:
-                smart = _get_smart_connect()
-            except Exception as e:
-                logger.error(f"Angel One session invalid: {e}")
-                print("[Screener] Angel One session invalid, using demo data")
-                smart = None
-                
             async for chunk in run_scan_generator(
-                smart=smart,
+                smart=None,  # Cache-only scan — smart object never used
                 filters=request.filters,
                 universe=request.universe,
                 logic=request.logic,
                 index_filter=request.index_filter,
-                sectors=request.sectors
+                sectors=request.sectors,
             ):
                 payload = json.dumps(chunk)
                 yield f"data: {payload}\n\n"
