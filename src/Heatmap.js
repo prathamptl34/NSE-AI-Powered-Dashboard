@@ -202,7 +202,6 @@ export default function HeatmapPage({ onBack, wsStatus }) {
   const [indices, setIndices] = useState([]);
   const [streaming, setStreaming] = useState(false);
   const [timeStr, setTimeStr] = useState(getISTTime());
-  const [activeFilter, setActiveFilter] = useState(null);
   // expandedSector holds the full tile data object (or null)
   const [expandedSector, setExpandedSector] = useState(null);
   const sseRef = useRef(null);
@@ -223,10 +222,13 @@ export default function HeatmapPage({ onBack, wsStatus }) {
   // Merge logic
   const mergeIndices = useCallback((incoming) => {
     setIndices((prev) => {
-      if (!prev.length) return incoming;
+      if (!prev.length) {
+        return [...incoming].sort((a, b) => (b.change_pct || 0) - (a.change_pct || 0));
+      }
       const map = {};
       incoming.forEach((idx) => { map[idx.sector] = idx; });
-      return prev.map((idx) => map[idx.sector] || idx);
+      const next = prev.map((idx) => map[idx.sector] || idx);
+      return next.sort((a, b) => (b.change_pct || 0) - (a.change_pct || 0));
     });
   }, []);
 
@@ -300,24 +302,13 @@ export default function HeatmapPage({ onBack, wsStatus }) {
   const stats = useMemo(() => {
     let g = 0, f = 0, l = 0;
     indices.forEach(idx => {
-      if (idx.change_pct > 1) g++;
-      else if (idx.change_pct < -1) l++;
-      else f++;
+      const v = parseFloat(idx.change_pct) || 0;
+      if (v > 0) g++;
+      if (v >= -0.5 && v <= 0.5) f++;
+      if (v < 0) l++;
     });
     return { g, f, l };
   }, [indices]);
-
-  const toggleFilter = (type) => {
-    setActiveFilter(activeFilter === type ? null : type);
-  };
-
-  const getIsDimmed = (idx) => {
-    if (!activeFilter) return false;
-    if (activeFilter === "gainers") return idx.change_pct <= 1;
-    if (activeFilter === "losers")  return idx.change_pct >= -1;
-    if (activeFilter === "flat")    return idx.change_pct > 1 || idx.change_pct < -1;
-    return false;
-  };
 
   return (
     <div className="heatmap-wrapper">
@@ -335,16 +326,19 @@ export default function HeatmapPage({ onBack, wsStatus }) {
           <span className="hm-live-dot">{streaming ? '● LIVE' : '● OFF'}</span>
         </div>
         <div className="hm-header-right" style={{display:'flex', alignItems:'center', gap:'12px'}}>
-          <div className="hm-filter-pills" style={{display:'flex', gap:'6px'}}>
-            <button className={`hm-pill hm-pill-green ${activeFilter === "gainers" ? "active" : ""}`} onClick={() => toggleFilter("gainers")}>
-              ▲ &gt;1% {stats.g ?? 0}
-            </button>
-            <button className={`hm-pill hm-pill-grey ${activeFilter === "flat" ? "active" : ""}`} onClick={() => toggleFilter("flat")}>
-              — Flat {stats.f ?? 0}
-            </button>
-            <button className={`hm-pill hm-pill-red ${activeFilter === "losers" ? "active" : ""}`} onClick={() => toggleFilter("losers")}>
-              ▼ &lt;-1% {stats.l ?? 0}
-            </button>
+          <div className="hm-filter-pills" style={{display:'flex', gap:'10px'}}>
+            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'rgba(34, 197, 94, 0.15)', color: '#4ade80', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', border: '1px solid rgba(34, 197, 94, 0.2)' }}>
+              <span style={{ marginRight: '8px' }}>🟢 Gaining</span>
+              <span style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)', color: '#4ade80', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>{stats.g}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'rgba(156, 163, 175, 0.15)', color: '#9ca3af', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', border: '1px solid rgba(156, 163, 175, 0.2)' }}>
+              <span style={{ marginRight: '8px' }}>⚪ Flat</span>
+              <span style={{ backgroundColor: 'rgba(156, 163, 175, 0.2)', color: '#9ca3af', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>{stats.f}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', backgroundColor: 'rgba(239, 68, 68, 0.15)', color: '#f87171', padding: '6px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
+              <span style={{ marginRight: '8px' }}>🔴 Declining</span>
+              <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171', padding: '2px 8px', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>{stats.l}</span>
+            </div>
           </div>
           <span className="hm-header-time">{timeStr}</span>
         </div>
@@ -359,7 +353,7 @@ export default function HeatmapPage({ onBack, wsStatus }) {
                 tile={idx}
                 isBest={idx.sector === extremes.best}
                 isWorst={idx.sector === extremes.worst}
-                isDimmed={getIsDimmed(idx)}
+                isDimmed={false}
                 onClick={() => setExpandedSector(idx)}
                 maxAbsPct={maxAbsPct}
               />
