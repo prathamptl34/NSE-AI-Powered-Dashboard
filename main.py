@@ -224,15 +224,18 @@ async def lifespan(app: FastAPI):
     from backend.screener_engine import build_screener_cache
 
     async def poll_screener_cache():
-        # Build immediately on startup so first scan is instant
-        try:
-            await build_screener_cache()
-        except Exception as e:
-            logger.error(f"[ScreenerCache] Initial build error: {e}")
+        # Build all 4 timeframes immediately on startup — default (1day) first
+        from backend.screener_engine import VALID_INTERVALS
+        for iv in ["1day", "1hr", "15min", "5min"]:
+            try:
+                await build_screener_cache(iv)
+            except Exception as e:
+                logger.error(f"[ScreenerCache:{iv}] Initial build error: {e}")
         while True:
             try:
                 await asyncio.sleep(300)  # Refresh every 5 minutes
-                await build_screener_cache()
+                for iv in VALID_INTERVALS:
+                    await build_screener_cache(iv)
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -1022,17 +1025,18 @@ class RunScanRequest(BaseModel):
     logic: str = 'AND'
     index_filter: str = 'ALL'
     sectors: list[str] | None = None
+    interval: str = '1day'
 
 
 @app.get("/api/screener/cache-status")
-async def api_screener_cache_status():
-    """Returns screener cache freshness: symbol count, build time, and age."""
-    return get_cache_status()
+async def api_screener_cache_status(interval: str = "1day"):
+    """Returns screener cache freshness: symbol count, build time, age, and interval."""
+    return get_cache_status(interval)
 
 
 @app.post("/api/screener/run")
 async def api_screener_run(request: RunScanRequest):
-    """Executes a screener scan by reading from the pre-built in-memory cache.
+    """Executes a screener scan by reading from the per-interval in-memory cache.
     No Angel One API calls are made here — results stream in < 3 seconds.
     """
     async def event_generator():
@@ -1044,6 +1048,7 @@ async def api_screener_run(request: RunScanRequest):
                 logic=request.logic,
                 index_filter=request.index_filter,
                 sectors=request.sectors,
+                interval=request.interval,
             ):
                 payload = json.dumps(chunk)
                 yield f"data: {payload}\n\n"

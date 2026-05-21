@@ -1,40 +1,60 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import './screener.css';
 
+// ─── Field Definitions (plain-English labels) ────────────────────────────────
 const FILTER_FIELDS = [
-  // Price
-  { key: 'last_price', label: 'Last Price (₹)', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
-  { key: 'pct_change', label: '% Change Today', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 2 },
-  { key: 'pct_from_52h', label: '% From 52W High', type: 'number', category: 'Price', defaultOp: '<', defaultVal: 5 },
-  { key: 'pct_from_52l', label: '% From 52W Low', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 10 },
+  // Price & Returns
+  { key: 'last_price',    label: 'Stock Price (₹)',         category: '📊 Price & Returns',     type: 'number', defaultOp: '>',  defaultVal: 100,   tooltip: 'The current trading price of the stock in Indian Rupees' },
+  { key: 'pct_change',    label: '% Price Change Today',    category: '📊 Price & Returns',     type: 'number', defaultOp: '>',  defaultVal: 2,     tooltip: 'How much the stock price has moved today in percentage' },
+  { key: 'pct_from_52h',  label: 'Distance from 52W High', category: '📊 Price & Returns',     type: 'number', defaultOp: '>',  defaultVal: -5,    tooltip: '0 means at the high. -10 means 10% below its yearly peak' },
+  { key: 'pct_from_52l',  label: 'Distance from 52W Low',  category: '📊 Price & Returns',     type: 'number', defaultOp: '>',  defaultVal: 10,    tooltip: '0 means at the low. 20 means 20% above its yearly trough' },
   // Volume
-  { key: 'volume', label: 'Volume (shares)', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 100000 },
-  { key: 'volume_ratio', label: 'Volume Ratio (x avg)', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 2 },
-  // Technical Indicators
-  { key: 'rsi_14', label: 'RSI (14)', type: 'number', category: 'Technical Indicators', defaultOp: '<', defaultVal: 30 },
-  { key: 'macd_histogram', label: 'MACD Histogram', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 0 },
-  { key: 'adx_14', label: 'ADX (14)', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 25 },
-  { key: 'supertrend', label: 'Supertrend', type: 'select', category: 'Technical Indicators', options: [{value: 'BUY', label: 'BUY'}, {value: 'SELL', label: 'SELL'}], defaultOp: '=', defaultVal: 'BUY' },
-  { key: 'bb_pctb', label: 'Bollinger %B', type: 'number', category: 'Technical Indicators', defaultOp: '<', defaultVal: 0.2 },
-  { key: 'atr_14', label: 'ATR (14)', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 0 },
-  // Moving Averages
-  { key: 'ema_20', label: 'EMA 20', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
-  { key: 'ema_50', label: 'EMA 50', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
-  { key: 'ema_200', label: 'EMA 200', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
-  { key: 'sma_20', label: 'SMA 20', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
-  { key: 'sma_50', label: 'SMA 50', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
+  { key: 'volume_ratio',  label: 'Volume vs Average',       category: '📦 Volume',              type: 'number', defaultOp: '>',  defaultVal: 2,     tooltip: '1.0 = normal buying. 2.0 = double the usual volume. 3+ = very high activity' },
+  { key: 'volume',        label: 'Volume (shares)',          category: '📦 Volume',              type: 'number', defaultOp: '>',  defaultVal: 500000, tooltip: 'Total number of shares traded today' },
+  // Momentum
+  { key: 'rsi_14',        label: 'RSI (Momentum Score)',    category: '📉 Momentum Indicators', type: 'number', defaultOp: '<',  defaultVal: 30,    tooltip: 'Below 30 = oversold (may be cheap). Above 70 = overbought (may be expensive). 50 = neutral' },
+  { key: 'macd_histogram', label: 'MACD Signal Strength',  category: '📉 Momentum Indicators', type: 'number', defaultOp: '>',  defaultVal: 0,     tooltip: 'Positive = bullish momentum building. Negative = selling pressure' },
+  { key: 'adx_14',        label: 'Trend Strength (ADX)',   category: '📉 Momentum Indicators', type: 'number', defaultOp: '>',  defaultVal: 25,    tooltip: 'Above 25 = strong trend. Below 20 = sideways/ranging market' },
+  // Trend
+  { key: 'ema_20',        label: '20-Day Trend Line',       category: '📈 Trend Indicators',    type: 'number', defaultOp: '>',  defaultVal: 0,     tooltip: 'Short-term trend direction. Buy if price is above this line' },
+  { key: 'ema_50',        label: '50-Day Trend Line',       category: '📈 Trend Indicators',    type: 'number', defaultOp: '>',  defaultVal: 0,     tooltip: 'Medium-term trend. A key level that traders watch closely' },
+  { key: 'ema_200',       label: '200-Day Trend Line',      category: '📈 Trend Indicators',    type: 'number', defaultOp: '>',  defaultVal: 0,     tooltip: 'Long-term trend. If price is above this, the stock is in a bull market' },
+  { key: 'supertrend',    label: 'Supertrend Direction',    category: '📈 Trend Indicators',    type: 'select', defaultOp: '=',  defaultVal: 'BUY', tooltip: 'BUY = uptrend signal. SELL = downtrend signal', options: [{value:'BUY',label:'BUY (Uptrend)'},{value:'SELL',label:'SELL (Downtrend)'}] },
   // Fundamentals
-  { key: 'market_cap', label: 'Market Cap (Cr)', type: 'number', category: 'Fundamentals', defaultOp: '>', defaultVal: 1000 },
+  { key: 'market_cap',    label: 'Market Cap (Cr)',         category: '🏢 Fundamentals',        type: 'number', defaultOp: '>',  defaultVal: 5000,  tooltip: 'Company size in Crores. Large cap = 20,000+ Cr. Mid cap = 5,000–20,000 Cr' },
 ];
 
-const cleanSymbol = (raw) => {
-  if (!raw) return raw;
-  return raw
-    .replace(/NSE$/i, '')
-    .replace(/BSE$/i, '')
-    .replace(/-EQ$/i, '')
-    .trim();
-};
+const TIMEFRAMES = [
+  { key: '5min',  label: '5 Min',   tooltip: 'Short-term scalping signals' },
+  { key: '15min', label: '15 Min',  tooltip: 'Intraday swing signals' },
+  { key: '1hr',   label: '1 Hour',  tooltip: 'Positional trade signals' },
+  { key: '1day',  label: '1 Day',   tooltip: 'Best for most traders. Daily trend signals', recommended: true },
+];
+
+// Plain-english summary generator for stock slide-in panel
+function buildStockSummary(stock) {
+  const parts = [];
+  const chg = parseFloat(stock.pct_change || 0);
+  const rsi = parseFloat(stock.rsi_14 || 50);
+  const vr = parseFloat(stock.volume_ratio || 1);
+  const sig = (stock.supertrend || '').toUpperCase();
+
+  if (chg > 2) parts.push('moving up strongly today');
+  else if (chg > 0) parts.push('slightly up today');
+  else if (chg < -2) parts.push('falling significantly today');
+  else parts.push('relatively flat today');
+
+  if (vr > 3) parts.push('with very high buying activity (volume spike)');
+  else if (vr > 1.5) parts.push('with above-average trading volume');
+
+  if (rsi < 30) parts.push('RSI is oversold — could be a good entry point');
+  else if (rsi > 70) parts.push('RSI is overbought — use caution');
+
+  if (sig === 'BUY') parts.push('trend signal is bullish');
+  else if (sig === 'SELL') parts.push('trend signal is bearish');
+
+  return 'This stock is ' + parts.join(', ') + '.';
+}
 
 function formatAge(seconds) {
   if (seconds === null || seconds === undefined) return 'never';
@@ -51,122 +71,219 @@ function formatNextRefresh(ageSeconds) {
   return `${Math.floor(remaining / 60)} min`;
 }
 
+function cleanSymbol(raw) {
+  if (!raw) return raw;
+  return raw.replace(/NSE$/i, '').replace(/BSE$/i, '').replace(/-EQ$/i, '').trim();
+}
+
+// ─── Tooltip Component ────────────────────────────────────────────────────────
+function InfoTooltip({ text }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span
+      className="sc-info-icon"
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      ⓘ
+      {visible && <span className="sc-tooltip-bubble">{text}</span>}
+    </span>
+  );
+}
+
+// ─── Stock Detail Panel ───────────────────────────────────────────────────────
+function StockDetailPanel({ stock, onClose }) {
+  if (!stock) return null;
+  const isUp = stock.pct_change >= 0;
+  const rsi = parseFloat(stock.rsi_14 || 50);
+  const rsiColor = rsi >= 70 ? '#ff4444' : rsi <= 30 ? '#00ff88' : '#aaa';
+  const sig = (stock.supertrend || 'NEUTRAL').toUpperCase();
+
+  return (
+    <div className="sc-detail-overlay" onClick={onClose}>
+      <div className="sc-detail-panel" onClick={e => e.stopPropagation()}>
+        <button className="sc-detail-close" onClick={onClose}>✕</button>
+        <div className="sc-detail-symbol">{cleanSymbol(stock.symbol)}</div>
+        <div className="sc-detail-exch">{stock.exchange || 'NSE'} · {stock.sector || ''}</div>
+
+        <div className="sc-detail-price">
+          <span className="sc-detail-ltp">₹{parseFloat(stock.last_price || 0).toFixed(2)}</span>
+          <span className={`sc-detail-chg ${isUp ? 'up' : 'dn'}`}>
+            {isUp ? '▲' : '▼'} {Math.abs(stock.pct_change || 0).toFixed(2)}%
+          </span>
+        </div>
+
+        <div className="sc-detail-grid">
+          <div className="sc-detail-kv">
+            <span className="sc-kv-label">Volume Activity</span>
+            <span className="sc-kv-val">{parseFloat(stock.volume_ratio || 1).toFixed(1)}x avg</span>
+          </div>
+          <div className="sc-detail-kv">
+            <span className="sc-kv-label">RSI Score</span>
+            <span className="sc-kv-val" style={{ color: rsiColor }}>{rsi.toFixed(1)}</span>
+          </div>
+          <div className="sc-detail-kv">
+            <span className="sc-kv-label">Trend Signal</span>
+            <span className={`sig-badge ${sig === 'BUY' ? 'buy' : sig === 'SELL' ? 'sell' : 'neutral'}`}>{sig}</span>
+          </div>
+          <div className="sc-detail-kv">
+            <span className="sc-kv-label">Trend Strength</span>
+            <span className="sc-kv-val">{parseFloat(stock.adx_14 || 0).toFixed(1)}</span>
+          </div>
+        </div>
+
+        <div className="sc-detail-summary">
+          <span className="sc-detail-summary-label">💡 What does this mean?</span>
+          <p>{buildStockSummary(stock)}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function ScreenerPage({ standalone, onStockClick }) {
   const [presets, setPresets] = useState([]);
   const [activePreset, setActivePreset] = useState(null);
+  const [interval, setInterval_] = useState('1day');
 
   const [filters, setFilters] = useState([]);
   const [filterLogic, setFilterLogic] = useState('AND');
   const [selectedUniverse, setSelectedUniverse] = useState('NSE');
-  const [indexFilter, setIndexFilter] = useState('ALL');
 
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState({ current: 0, total: 100 });
   const [scanError, setScanError] = useState(null);
   const [scanInterrupted, setScanInterrupted] = useState(false);
   const [results, setResults] = useState([]);
-  const [scanMeta, setScanMeta] = useState(null);
   const [scanDone, setScanDone] = useState(false);
+  const [scanTotal, setScanTotal] = useState(0);
 
   const [showAddFilter, setShowAddFilter] = useState(false);
+  const [showLegend, setShowLegend] = useState(false);
+  const [selectedStock, setSelectedStock] = useState(null);
 
-  // Cache status
   const [cacheStatus, setCacheStatus] = useState(null);
+  const [cacheRebuilding, setCacheRebuilding] = useState(false);
 
-  // Pagination & Sorting
+  // Sorting & pagination
   const [page, setPage] = useState(1);
-  const [perPage] = useState(50);
+  const PER_PAGE = 50;
   const [sortConfig, setSortConfig] = useState({ key: 'pct_change', direction: 'desc' });
 
-  // Close dropdown on outside click
   const addFilterRef = useRef(null);
+
+  // Close dropdown on outside click
   useEffect(() => {
-    function handleClickOutside(event) {
-      if (addFilterRef.current && !addFilterRef.current.contains(event.target)) {
+    function handler(e) {
+      if (addFilterRef.current && !addFilterRef.current.contains(e.target)) {
         setShowAddFilter(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Fetch presets on mount
+  // Load presets
   useEffect(() => {
     fetch('/api/screener/presets')
       .then(r => r.json())
-      .then(data => { if (data.presets) setPresets(data.presets); })
-      .catch(err => console.error('Failed to load presets', err));
+      .then(d => { if (d.presets) setPresets(d.presets); })
+      .catch(() => {});
   }, []);
 
-  // Fetch and poll cache status every 60s
-  const fetchCacheStatus = useCallback(async () => {
+  // Fetch cache status for selected interval
+  const fetchCacheStatus = useCallback(async (iv) => {
     try {
-      const res = await fetch('/api/screener/cache-status');
-      if (res.ok) {
-        const data = await res.json();
-        setCacheStatus(data);
-      }
-    } catch (e) {
-      // Silently ignore cache status fetch errors
-    }
-  }, []);
+      const res = await fetch(`/api/screener/cache-status?interval=${iv || interval}`);
+      if (res.ok) setCacheStatus(await res.json());
+    } catch (_) {}
+  }, [interval]);
 
   useEffect(() => {
-    fetchCacheStatus();
-    const id = setInterval(fetchCacheStatus, 60_000);
+    fetchCacheStatus(interval);
+    const id = setInterval(() => fetchCacheStatus(interval), 60_000);
     return () => clearInterval(id);
-  }, [fetchCacheStatus]);
+  }, [interval, fetchCacheStatus]);
+
+  // When timeframe changes: show "rebuilding" briefly and re-fetch status
+  const handleIntervalChange = useCallback((newIv) => {
+    if (newIv === interval) return;
+    setInterval_(newIv);
+    setCacheRebuilding(true);
+    setCacheStatus(null);
+    // Reset results for new timeframe
+    setResults([]);
+    setScanDone(false);
+    setScanInterrupted(false);
+    // Fetch status after a short delay (cache may already exist)
+    setTimeout(() => {
+      fetchCacheStatus(newIv);
+      setCacheRebuilding(false);
+    }, 1500);
+  }, [interval, fetchCacheStatus]);
 
   const loadPreset = (preset) => {
     setActivePreset(preset.id);
-    setFilters(preset.filters.map((f, i) => ({ ...f, id: i })));
+    setFilters(preset.filters.map((f, i) => ({ ...f, _id: Date.now() + i })));
     setFilterLogic(preset.logic || 'AND');
+    setResults([]);
+    setScanDone(false);
+    setScanInterrupted(false);
   };
 
   const addFilter = (fieldKey) => {
-    const fieldDef = FILTER_FIELDS.find(f => f.key === fieldKey);
-    if (!fieldDef) return;
-    setFilters([...filters, {
-      id: Date.now(),
-      field: fieldDef.key,
-      operator: fieldDef.defaultOp,
-      value: fieldDef.defaultVal,
+    const def = FILTER_FIELDS.find(f => f.key === fieldKey);
+    if (!def) return;
+    setFilters(prev => [...prev, {
+      _id: Date.now(),
+      field: def.key,
+      operator: def.defaultOp,
+      value: def.defaultVal,
     }]);
     setShowAddFilter(false);
     setActivePreset(null);
   };
 
   const updateFilter = (id, key, value) => {
-    setFilters(filters.map(f => f.id === id ? { ...f, [key]: value } : f));
+    setFilters(prev => prev.map(f => f._id === id ? { ...f, [key]: value } : f));
     setActivePreset(null);
   };
 
   const removeFilter = (id) => {
-    setFilters(filters.filter(f => f.id !== id));
+    setFilters(prev => prev.filter(f => f._id !== id));
     setActivePreset(null);
+  };
+
+  const clearAll = () => {
+    setFilters([]);
+    setActivePreset(null);
+    setResults([]);
+    setScanDone(false);
+    setScanInterrupted(false);
+    setScanError(null);
   };
 
   const runScan = useCallback(async () => {
     if (filters.length === 0) return;
 
-    // Refresh cache status before scan to show freshest info
-    fetchCacheStatus();
-
+    fetchCacheStatus(interval);
     setIsScanning(true);
     setScanError(null);
     setScanInterrupted(false);
     setResults([]);
-    setScanMeta(null);
     setScanDone(false);
-    setScanProgress({ current: 0, total: cacheStatus?.symbols || 100 });
+    setScanTotal(0);
+    setScanProgress({ current: 0, total: cacheStatus?.symbols || 200 });
     setPage(1);
 
     const body = {
       filters: filters.map(f => ({ field: f.field, operator: f.operator, value: f.value })),
       universe: selectedUniverse,
       logic: filterLogic,
-      index_filter: indexFilter,
+      index_filter: 'ALL',
       sectors: null,
+      interval,
     };
 
     let receivedDone = false;
@@ -178,9 +295,7 @@ export default function ScreenerPage({ standalone, onStockClick }) {
         body: JSON.stringify(body),
       });
 
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`Server returned ${res.status}`);
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder('utf-8');
@@ -190,12 +305,11 @@ export default function ScreenerPage({ standalone, onStockClick }) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        // Correct SSE chunk buffering pattern
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop(); // keep incomplete trailing chunk
+        const parts = buffer.split('\n\n');
+        buffer = parts.pop();
 
-        for (const part of lines) {
+        for (const part of parts) {
           if (!part.startsWith('data: ')) continue;
           try {
             const data = JSON.parse(part.substring(6));
@@ -205,116 +319,106 @@ export default function ScreenerPage({ standalone, onStockClick }) {
               setIsScanning(false);
               return;
             }
-
             if (data.results && data.results.length > 0) {
               setResults(prev => {
                 const seen = new Set(prev.map(p => p.symbol));
-                const newItems = data.results.filter(r => !seen.has(r.symbol));
-                return [...prev, ...newItems];
+                return [...prev, ...data.results.filter(r => !seen.has(r.symbol))];
               });
             }
-
             if (data.progress) {
               setScanProgress(data.progress);
             }
-
             if (data.done) {
               receivedDone = true;
-              setIsScanning(false);
               setScanDone(true);
+              setIsScanning(false);
+              setScanTotal(data.total || 0);
               setScanProgress(p => ({ ...p, current: p.total }));
-              if (data.total !== undefined) {
-                setScanMeta({ total_matched: data.total, timestamp: new Date().toISOString() });
-              }
             }
-
-            if (data.meta) {
-              setScanMeta(data.meta);
-            }
-          } catch (e) {
-            console.error('SSE parse error:', e, 'raw:', part);
-          }
+          } catch (_) {}
         }
       }
 
-      // If stream closed without done: true → interrupted
       if (!receivedDone) {
         setScanInterrupted(true);
         setIsScanning(false);
       }
-
     } catch (err) {
       console.error('Scan error:', err);
-      if (!receivedDone) {
-        setScanInterrupted(true);
-      }
-      setIsScanning(false);
-    } finally {
+      setScanInterrupted(true);
       setIsScanning(false);
     }
-  }, [filters, filterLogic, selectedUniverse, indexFilter, cacheStatus, fetchCacheStatus]);
+  }, [filters, filterLogic, selectedUniverse, interval, cacheStatus, fetchCacheStatus]);
 
   const exportCSV = () => {
-    const headers = ['Rank', 'Symbol', 'Exchange', 'LTP', 'Change%', 'VolRatio', 'RSI', 'MACD', 'Signal', 'Sector'];
-    const rows = results.map((r, i) => [
-      i + 1, r.symbol, r.exchange || 'NSE', r.last_price, r.pct_change, r.volume_ratio,
-      r.rsi_14?.toFixed(1), r.macd_histogram?.toFixed(2), r.supertrend, r.sector,
+    const h = ['#','Symbol','Exchange','Price (₹)','Change Today','Volume Activity','RSI Score','Trend Signal','Sector'];
+    const rows = sortedResults.map((r, i) => [
+      i + 1, r.symbol, r.exchange || 'NSE',
+      r.last_price, r.pct_change, `${r.volume_ratio?.toFixed(1)}x`,
+      r.rsi_14?.toFixed(1), r.supertrend, r.sector,
     ]);
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
+    const csv = [h, ...rows].map(r => r.join(',')).join('\n');
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `screener_results_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `screener_${interval}_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
   };
 
   const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
-    setSortConfig({ key, direction });
+    setSortConfig(s => ({ key, direction: s.key === key && s.direction === 'asc' ? 'desc' : 'asc' }));
   };
 
   const sortedResults = useMemo(() => {
-    let items = [...results];
-    if (sortConfig.key) {
-      items.sort((a, b) => {
-        let va = a[sortConfig.key]; let vb = b[sortConfig.key];
-        if (va == null) va = -999999; if (vb == null) vb = -999999;
-        if (va < vb) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (va > vb) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-    }
+    const items = [...results];
+    if (!sortConfig.key) return items;
+    items.sort((a, b) => {
+      let va = a[sortConfig.key] ?? -999999;
+      let vb = b[sortConfig.key] ?? -999999;
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (va > vb) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
     return items;
   }, [results, sortConfig]);
 
-  const paginatedResults = useMemo(() => {
-    const start = (page - 1) * perPage;
-    return sortedResults.slice(start, start + perPage);
-  }, [sortedResults, page, perPage]);
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PER_PAGE;
+    return sortedResults.slice(start, start + PER_PAGE);
+  }, [sortedResults, page]);
 
-  const totalPages = Math.ceil(sortedResults.length / perPage) || 1;
-
-  const groupedFields = FILTER_FIELDS.reduce((acc, field) => {
-    acc[field.category] = acc[field.category] || [];
-    acc[field.category].push(field);
-    return acc;
-  }, {});
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / PER_PAGE));
 
   const progressPct = scanProgress.total > 0
     ? Math.min(100, Math.round((scanProgress.current / scanProgress.total) * 100))
     : 0;
 
-  const sigClass = (sig) => {
-    if (!sig) return 'sig-neutral';
-    const s = sig.toString().toUpperCase();
-    if (s === 'BUY') return 'sig-buy';
-    if (s === 'SELL') return 'sig-sell';
-    return 'sig-neutral';
+  const cacheAgeDotColor = () => {
+    const s = cacheStatus?.age_seconds;
+    if (s == null) return '#555';
+    if (s < 300) return '#00ff88';
+    if (s < 600) return '#ff9900';
+    return '#ff4444';
   };
 
-  const volClass = (ratio) => parseFloat(ratio) >= 2 ? 'td-volratio high' : 'td-volratio';
+  const groupedFields = FILTER_FIELDS.reduce((acc, f) => {
+    acc[f.category] = acc[f.category] || [];
+    acc[f.category].push(f);
+    return acc;
+  }, {});
+
+  const hasResults = results.length > 0;
+  const isIdle = !isScanning && !scanDone && !hasResults && !scanInterrupted && !scanError;
+  const isCacheNotReady = cacheStatus && !cacheStatus.ready && !cacheRebuilding;
+
+  const volClass = (ratio) => {
+    const r = parseFloat(ratio);
+    if (r >= 2) return 'td-vol high';
+    if (r >= 1) return 'td-vol mid';
+    return 'td-vol';
+  };
+
   const rsiClass = (rsi) => {
     const r = parseFloat(rsi);
     if (r >= 70) return 'td-rsi overbought';
@@ -322,143 +426,136 @@ export default function ScreenerPage({ standalone, onStockClick }) {
     return 'td-rsi';
   };
 
-  const showSector = results.some(r => r.sector && r.sector !== '-' && r.sector !== 'OTHERS');
+  const sortIndicator = (key) =>
+    sortConfig.key === key ? (sortConfig.direction === 'asc' ? ' ▲' : ' ▼') : '';
 
   return (
-    <div className="screener-page-container">
+    <div className="sc-page">
 
-      {/* 1. HEADER */}
-      {!standalone && (
-        <div className="section-header">
-          <div className="section-icon">🔍</div>
-          <div>
-            <h1>Universal Screener</h1>
-            <p className="section-subtitle">5,000+ NSE &amp; BSE STOCKS</p>
-          </div>
+      {/* SECTION 1 — TIMEFRAME SELECTOR */}
+      <div className="sc-tf-bar">
+        <span className="sc-tf-label">TIMEFRAME</span>
+        <div className="sc-tf-tabs">
+          {TIMEFRAMES.map(tf => (
+            <button
+              key={tf.key}
+              className={`sc-tf-tab ${interval === tf.key ? 'active' : ''}`}
+              onClick={() => handleIntervalChange(tf.key)}
+              title={tf.tooltip}
+            >
+              {tf.label}
+              {tf.recommended && interval !== tf.key && <span className="sc-tf-rec">★ recommended</span>}
+              <InfoTooltip text={tf.tooltip} />
+            </button>
+          ))}
         </div>
-      )}
+      </div>
 
-      {/* 2. PRESET STRATEGY CARDS */}
-      <div className="preset-cards-row">
+      {/* SECTION 2 — PRESET CARDS */}
+      <div className="sc-presets-row">
         {presets.map(preset => {
-          let tagClass = 'default'; let tagText = 'STRATEGY';
-          const id = preset.id.toLowerCase();
-          if (id.includes('bullish') || id.includes('bounce') || id.includes('buy')) { tagClass = 'bullish'; tagText = 'BULLISH'; }
-          if (id.includes('bearish') || id.includes('sell')) { tagClass = 'bearish'; tagText = 'BEARISH'; }
-          if (id.includes('momentum') || id.includes('leaders')) { tagClass = 'momentum'; tagText = 'MOMENTUM'; }
-          if (id.includes('breakout')) { tagClass = 'breakout'; tagText = 'BREAKOUT'; }
+          const tag = (preset.tag || 'STRATEGY').toUpperCase();
+          const tagClass = {
+            BULLISH: 'tag-bullish', BEARISH: 'tag-bearish',
+            BREAKOUT: 'tag-breakout', MOMENTUM: 'tag-momentum',
+          }[tag] || 'tag-default';
           return (
-            <div key={preset.id} className={`preset-card ${activePreset === preset.id ? 'active' : ''}`} onClick={() => loadPreset(preset)}>
-              <span className={`preset-tag ${tagClass}`}>{tagText}</span>
-              <span className="preset-icon">{preset.icon}</span>
-              <div className="preset-title">{preset.name}</div>
-              <div className="preset-desc">{preset.description}</div>
+            <div
+              key={preset.id}
+              className={`sc-preset-card ${activePreset === preset.id ? 'active' : ''}`}
+              onClick={() => loadPreset(preset)}
+            >
+              <span className={`sc-preset-tag ${tagClass}`}>{tag}</span>
+              <span className="sc-preset-icon">{preset.icon}</span>
+              <div className="sc-preset-name">{preset.name}</div>
+              <div className="sc-preset-desc">{preset.description}</div>
             </div>
           );
         })}
       </div>
 
-      {/* 3. SCAN INTERRUPTED BANNER (replaces generic "network error") */}
-      {scanInterrupted && !isScanning && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '12px',
-          background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251,191,36,0.25)',
-          borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: '#fbbf24',
-        }}>
-          <span style={{ fontSize: '16px' }}>⚠</span>
-          <span style={{ flex: 1, fontSize: '13px' }}>Scan interrupted — connection closed before completion.</span>
-          <button
-            onClick={runScan}
-            style={{
-              background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)',
-              borderRadius: '6px', color: '#fbbf24', padding: '5px 14px',
-              cursor: 'pointer', fontSize: '12px', fontWeight: '600',
-            }}
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      {/* SECTION 3 — FILTER BUILDER */}
+      <div className="sc-builder-panel">
 
-      {/* 4. FILTER BUILDER */}
-      <div className="scanner-panel">
-        <div className="scanner-panel-header">Build Your Scanner</div>
-
-        {/* Cache info bar — muted, above filters */}
-        {cacheStatus && (
-          <div style={{
-            fontSize: '11px', color: '#666', marginBottom: '10px',
-            fontFamily: 'monospace', letterSpacing: '0.02em',
-          }}>
-            📦 Cache:&nbsp;
-            <span style={{ color: '#888' }}>{cacheStatus.symbols || 0} symbols</span>
-            {cacheStatus.age_seconds != null && (
+        {/* Cache status pill — top right */}
+        <div className="sc-builder-toprow">
+          <span className="sc-builder-heading">Build Your Scanner</span>
+          <div className="sc-cache-pill" title={`Stock data refreshes every 5 minutes. Timeframe: ${interval}`}>
+            {cacheRebuilding ? (
+              <span className="sc-cache-rebuilding">🔄 Rebuilding cache for {TIMEFRAMES.find(t => t.key === interval)?.label}…</span>
+            ) : cacheStatus ? (
               <>
-                &nbsp;·&nbsp;Updated {formatAge(cacheStatus.age_seconds)}
-                &nbsp;·&nbsp;Next refresh in {formatNextRefresh(cacheStatus.age_seconds)}
+                <span className="sc-cache-dot" style={{ background: cacheAgeDotColor() }} />
+                <span>{cacheStatus.symbols || 0} stocks ready</span>
+                {cacheStatus.age_seconds != null && (
+                  <span className="sc-cache-age"> · Updated {formatAge(cacheStatus.age_seconds)}</span>
+                )}
               </>
-            )}
-            {!cacheStatus.ready && (
-              <span style={{ color: '#f87171', marginLeft: '6px' }}>⚠ Cache warming up…</span>
+            ) : (
+              <span style={{ color: '#555', fontSize: '11px' }}>Loading cache info…</span>
             )}
           </div>
-        )}
+        </div>
 
-        <div className="filters-row">
-          {filters.map((f, index) => {
-            const fieldDef = FILTER_FIELDS.find(df => df.key === f.field);
+        {/* Filters row */}
+        <div className="sc-filters-row">
+          {filters.map((f) => {
+            const def = FILTER_FIELDS.find(d => d.key === f.field);
             return (
-              <React.Fragment key={f.id}>
-                {index > 0 && (
-                  <div className="filter-logic-badge" onClick={() => setFilterLogic(l => l === 'AND' ? 'OR' : 'AND')}>
-                    {filterLogic}
-                  </div>
-                )}
-                <div className="filter-chip">
-                  <span className="filter-chip-label">{fieldDef ? fieldDef.label : f.field}</span>
-                  <select value={f.operator} onChange={e => updateFilter(f.id, 'operator', e.target.value)}>
-                    <option value=">">&gt;</option>
-                    <option value="<">&lt;</option>
-                    <option value=">=">&gt;=</option>
-                    <option value="<=">&lt;=</option>
-                    <option value="=">=</option>
+              <div key={f._id} className="sc-filter-chip">
+                <span className="sc-chip-label">
+                  {def ? def.label : f.field}
+                  {def?.tooltip && <InfoTooltip text={def.tooltip} />}
+                </span>
+                <select value={f.operator} onChange={e => updateFilter(f._id, 'operator', e.target.value)}>
+                  <option value=">">&gt;</option>
+                  <option value="<">&lt;</option>
+                  <option value=">=">&gt;=</option>
+                  <option value="<=">&lt;=</option>
+                  <option value="=">=</option>
+                </select>
+                {def?.type === 'select' ? (
+                  <select value={f.value} onChange={e => updateFilter(f._id, 'value', e.target.value)}>
+                    {def.options.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
-                  {fieldDef?.type === 'select' ? (
-                    <select value={f.value} onChange={e => updateFilter(f.id, 'value', e.target.value)}>
-                      {fieldDef.options.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </select>
-                  ) : fieldDef?.type === 'boolean' ? (
-                    <select value={f.value} onChange={e => updateFilter(f.id, 'value', e.target.value === 'true')}>
-                      <option value="true">True</option>
-                      <option value="false">False</option>
-                    </select>
-                  ) : (
-                    <input
-                      type="number"
-                      value={f.value}
-                      onChange={e => updateFilter(f.id, 'value', Number(e.target.value))}
-                    />
-                  )}
-                  <button className="filter-chip-remove" onClick={() => removeFilter(f.id)}>×</button>
-                </div>
-              </React.Fragment>
+                ) : (
+                  <input
+                    type="number"
+                    value={f.value}
+                    onChange={e => updateFilter(f._id, 'value', Number(e.target.value))}
+                  />
+                )}
+                <button className="sc-chip-remove" onClick={() => removeFilter(f._id)}>×</button>
+              </div>
             );
           })}
 
-          <div style={{ position: 'relative' }} ref={addFilterRef}>
-            <button className="add-filter-btn" onClick={() => setShowAddFilter(!showAddFilter)}>
+          {/* AND / OR badge between chips */}
+          {filters.length > 1 && (
+            <button
+              className="sc-logic-badge"
+              onClick={() => setFilterLogic(l => l === 'AND' ? 'OR' : 'AND')}
+              title="Click to toggle AND / OR logic"
+            >
+              {filterLogic}
+            </button>
+          )}
+
+          {/* Add filter dropdown */}
+          <div className="sc-add-wrapper" ref={addFilterRef}>
+            <button className="sc-add-btn" onClick={() => setShowAddFilter(v => !v)}>
               + Add Filter
             </button>
             {showAddFilter && (
-              <div className="filter-dropdown-panel">
-                {Object.entries(groupedFields).map(([category, fields]) => (
-                  <div key={category}>
-                    <div className="filter-group-header">{category}</div>
-                    {fields.map(field => (
-                      <div key={field.key} className="filter-option" onClick={() => addFilter(field.key)}>
-                        {field.label}
+              <div className="sc-filter-dropdown">
+                {Object.entries(groupedFields).map(([cat, fields]) => (
+                  <div key={cat}>
+                    <div className="sc-dd-cat">{cat}</div>
+                    {fields.map(fd => (
+                      <div key={fd.key} className="sc-dd-option" onClick={() => addFilter(fd.key)}>
+                        {fd.label}
                       </div>
                     ))}
                   </div>
@@ -468,151 +565,203 @@ export default function ScreenerPage({ standalone, onStockClick }) {
           </div>
         </div>
 
-        {/* CONTROLS ROW */}
-        <div className="scan-controls-row">
-          <div className="exchange-group">
-            <button className={`exchange-btn ${selectedUniverse === 'NSE' ? 'active' : ''}`} onClick={() => setSelectedUniverse('NSE')}>NSE Only</button>
-            <button className={`exchange-btn ${selectedUniverse === 'BSE' ? 'active' : ''}`} onClick={() => setSelectedUniverse('BSE')}>BSE Only</button>
-            <button className={`exchange-btn ${selectedUniverse === 'ALL' ? 'active' : ''}`} onClick={() => setSelectedUniverse('ALL')}>NSE + BSE</button>
+        {/* Control row */}
+        <div className="sc-controls-row">
+          <div className="sc-universe-group">
+            {['NSE', 'BSE', 'ALL'].map(u => (
+              <button
+                key={u}
+                className={`sc-univ-btn ${selectedUniverse === u ? 'active' : ''}`}
+                onClick={() => setSelectedUniverse(u)}
+              >
+                {u === 'ALL' ? 'NSE + BSE' : `${u} Only`}
+              </button>
+            ))}
           </div>
-          <div className="controls-spacer" />
+          <div style={{ flex: 1 }} />
           {filters.length > 0 && (
-            <button className="clear-all-btn" onClick={() => { setFilters([]); setActivePreset(null); setResults([]); setScanMeta(null); setScanDone(false); setScanInterrupted(false); }}>
-              Clear All
-            </button>
+            <button className="sc-clear-btn" onClick={clearAll}>Clear All</button>
           )}
           <button
-            className={`run-scan-btn ${isScanning ? 'scanning' : ''}`}
+            className={`sc-run-btn ${isScanning ? 'scanning' : ''}`}
             onClick={runScan}
             disabled={isScanning || filters.length === 0}
           >
-            {isScanning ? '⚡ SCANNING...' : '🚀 RUN SCAN'}
+            {isScanning ? '⚡ Scanning…' : '🚀 Run Scan'}
           </button>
         </div>
       </div>
 
-      {/* 5. SCAN STATUS + PROGRESS */}
+      {/* ── STATE BLOCKS ── */}
+
+      {/* Cache not ready */}
+      {isCacheNotReady && !isScanning && (
+        <div className="sc-state-block warning">
+          <span style={{ fontSize: '2rem' }}>⏳</span>
+          <h3>Building stock data…</h3>
+          <p>This takes about 30 seconds on first load. You'll be ready to scan shortly.</p>
+        </div>
+      )}
+
+      {/* Idle / initial */}
+      {isIdle && !isCacheNotReady && (
+        <div className="sc-state-block">
+          <span style={{ fontSize: '3rem' }}>🎯</span>
+          <h3>Ready to find stocks?</h3>
+          <p>Select a preset above or build your own filters, then hit <strong>Run Scan</strong></p>
+        </div>
+      )}
+
+      {/* Scan interrupted */}
+      {scanInterrupted && !isScanning && (
+        <div className="sc-interrupted-bar">
+          <span>⚠️ Scan was interrupted. This can happen due to slow internet. Your filters are saved.</span>
+          <button className="sc-retry-btn" onClick={runScan}>🔄 Try Again</button>
+        </div>
+      )}
+
+      {/* Scan error */}
+      {scanError && !isScanning && (
+        <div className="sc-interrupted-bar error">
+          <span>⚠️ {scanError}</span>
+          <button className="sc-retry-btn" onClick={runScan}>🔄 Try Again</button>
+        </div>
+      )}
+
+      {/* SECTION 4 — SCAN PROGRESS */}
       {isScanning && (
-        <div className="scan-status-panel">
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <div className="radar-container" />
-            <div>
-              <div className="status-line">
-                ⚡ Scanning {selectedUniverse === 'ALL' ? 'NSE & BSE' : selectedUniverse} universe
-                {cacheStatus?.symbols ? ` · ${cacheStatus.symbols} symbols` : ''}
-                {cacheStatus?.age_seconds != null ? ` · Updated ${formatAge(cacheStatus.age_seconds)}` : ''}
-              </div>
-              <div className="status-line">📊 Symbols processed: {scanProgress.current} / {scanProgress.total}</div>
-              <div className="status-line">✅ Matches found: {results.length}</div>
-            </div>
+        <div className="sc-progress-panel">
+          <div className="sc-progress-bar-track">
+            <div
+              className="sc-progress-bar-fill"
+              style={{ width: `${progressPct}%`, transition: 'width 0.3s ease' }}
+            />
           </div>
-          <div className="scan-progress-bar-track">
-            <div className="scan-progress-bar-fill" style={{ width: `${progressPct}%` }} />
+          <div className="sc-progress-label">
+            {progressPct}%
+          </div>
+          <div className="sc-progress-sub">
+            🔍 Scanning {cacheStatus?.symbols || '…'} stocks for your filters…
+          </div>
+          <div className="sc-progress-match">
+            ✅ {results.length} match{results.length !== 1 ? 'es' : ''} found so far
           </div>
         </div>
       )}
 
-      {/* 6. RESULTS TABLE — shows immediately when first results arrive */}
-      {(results.length > 0 || scanMeta || (scanDone && !isScanning)) && (
-        <div className="results-wrapper">
-          <div className="results-top-bar">
-            <div className="results-count-text">
+      {/* SECTION 5 — RESULTS TABLE */}
+      {(hasResults || (scanDone && !isScanning)) && (
+        <div className="sc-results-wrapper">
+          <div className="sc-results-topbar">
+            <div className="sc-results-count">
               {isScanning ? (
-                <span>Scanning… <strong>{results.length}</strong> matches so far</span>
+                <>Scanning… <strong>{results.length}</strong> matches so far</>
               ) : (
-                <span>Scan Complete — <strong>{results.length}</strong> matches found</span>
+                <>✅ Scan complete — <strong>{results.length}</strong> stock{results.length !== 1 ? 's' : ''} match your filters</>
               )}
             </div>
-            <button className="csv-btn" onClick={exportCSV}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
-              </svg>
-              Export CSV
-            </button>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <button
+                className="sc-legend-btn"
+                onClick={() => setShowLegend(v => !v)}
+              >
+                {showLegend ? 'Hide Legend' : '❓ What do columns mean?'}
+              </button>
+              <button className="sc-csv-btn" onClick={exportCSV}>
+                ↓ Export CSV
+              </button>
+            </div>
           </div>
 
+          {/* Column legend */}
+          {showLegend && (
+            <div className="sc-legend-bar">
+              <span><strong>Price:</strong> Current trade price</span>
+              <span><strong>Change Today:</strong> % move since yesterday's close</span>
+              <span><strong>Volume Activity:</strong> 1x = normal, 2x = double average buying</span>
+              <span><strong>RSI Score:</strong> &lt;30 oversold ·&gt;70 overbought · 50 neutral</span>
+              <span><strong>Trend Signal:</strong> BUY = uptrend · SELL = downtrend · NEUTRAL = sideways</span>
+            </div>
+          )}
+
+          {/* Zero results */}
           {results.length === 0 ? (
-            <div className="screener-empty-state" style={{ padding: '60px 0', textAlign: 'center', color: '#fff' }}>
-              <div style={{ fontSize: '3rem', opacity: 0.7 }}>🏜️</div>
-              <h3>No Matches Found</h3>
-              <p style={{ color: 'rgba(255,255,255,0.5)' }}>
-                No stocks meet your criteria. Try loosening the parameters or switching logic to OR.
-              </p>
+            <div className="sc-state-block" style={{ padding: '60px 0' }}>
+              <span style={{ fontSize: '3rem' }}>🌵</span>
+              <h3>No stocks matched your filters</h3>
+              <p>Try relaxing your filters — for example, lower the % Change Today value, or switch logic to OR</p>
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="results-table">
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th onClick={() => handleSort('symbol')} className={sortConfig.key === 'symbol' ? `sorted-${sortConfig.direction}` : ''}>Symbol</th>
-                    <th onClick={() => handleSort('last_price')} className={sortConfig.key === 'last_price' ? `sorted-${sortConfig.direction}` : ''}>LTP</th>
-                    <th onClick={() => handleSort('pct_change')} className={sortConfig.key === 'pct_change' ? `sorted-${sortConfig.direction}` : ''}>Change%</th>
-                    <th onClick={() => handleSort('volume_ratio')} className={sortConfig.key === 'volume_ratio' ? `sorted-${sortConfig.direction}` : ''}>Vol Ratio</th>
-                    <th onClick={() => handleSort('rsi_14')} className={sortConfig.key === 'rsi_14' ? `sorted-${sortConfig.direction}` : ''}>RSI</th>
-                    <th onClick={() => handleSort('supertrend')} className={sortConfig.key === 'supertrend' ? `sorted-${sortConfig.direction}` : ''}>Signal</th>
-                    {showSector && <th onClick={() => handleSort('sector')} className={sortConfig.key === 'sector' ? `sorted-${sortConfig.direction}` : ''}>Sector</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedResults.map((r, i) => {
-                    const rank = (page - 1) * perPage + i + 1;
-                    const isPositive = r.pct_change > 0;
-                    const exBadge = (r.exchange || 'NSE').toLowerCase();
-                    const exLabel = r.exchange || 'NSE';
-                    return (
-                      <tr key={r.symbol} onClick={() => {
-                        if (onStockClick) onStockClick({
-                          symbol: r.symbol,
-                          price: r.last_price,
-                          prev_close: r.last_price / (1 + r.pct_change / 100),
-                          change_pct: r.pct_change,
-                        });
-                      }}>
-                        <td className="td-num">{rank}</td>
-                        <td className="td-sym">
-                          {cleanSymbol(r.symbol)}
-                          <span className={`exch-badge ${exBadge}`}>{exLabel}</span>
-                        </td>
-                        <td className="td-price">₹{r.last_price?.toFixed(2)}</td>
-                        <td className={isPositive ? 'td-chg-up' : 'td-chg-dn'}>
-                          {isPositive ? '▲' : '▼'} {Math.abs(r.pct_change || 0).toFixed(2)}%
-                        </td>
-                        <td className={volClass(r.volume_ratio)}>{r.volume_ratio ? r.volume_ratio.toFixed(1) + 'x' : '-'}</td>
-                        <td className={rsiClass(r.rsi_14)}>{r.rsi_14?.toFixed(1) || '-'}</td>
-                        <td><span className={sigClass(r.supertrend)}>{(r.supertrend || 'NEUTRAL').toUpperCase()}</span></td>
-                        {showSector && <td>{r.sector || '-'}</td>}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="sc-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th onClick={() => handleSort('symbol')}>Stock{sortIndicator('symbol')}</th>
+                      <th onClick={() => handleSort('last_price')}>Price (₹){sortIndicator('last_price')}</th>
+                      <th onClick={() => handleSort('pct_change')}>Change Today{sortIndicator('pct_change')}</th>
+                      <th onClick={() => handleSort('volume_ratio')}>Volume Activity{sortIndicator('volume_ratio')}</th>
+                      <th onClick={() => handleSort('rsi_14')}>RSI Score{sortIndicator('rsi_14')}</th>
+                      <th onClick={() => handleSort('supertrend')}>Trend Signal{sortIndicator('supertrend')}</th>
+                      <th onClick={() => handleSort('sector')}>Sector{sortIndicator('sector')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.map((r, i) => {
+                      const rank = (page - 1) * PER_PAGE + i + 1;
+                      const isUp = r.pct_change >= 0;
+                      const sig = (r.supertrend || 'NEUTRAL').toUpperCase();
+                      const exchCls = (r.exchange || 'NSE').toLowerCase();
+                      return (
+                        <tr key={r.symbol} onClick={() => setSelectedStock(r)}>
+                          <td className="td-rank">{rank}</td>
+                          <td className="td-sym">
+                            {cleanSymbol(r.symbol)}
+                            <span className={`sc-exch-badge ${exchCls}`}>{r.exchange || 'NSE'}</span>
+                          </td>
+                          <td className="td-price">₹{parseFloat(r.last_price || 0).toFixed(2)}</td>
+                          <td className={isUp ? 'td-chg up' : 'td-chg dn'}>
+                            {isUp ? '▲' : '▼'} {Math.abs(r.pct_change || 0).toFixed(2)}%
+                          </td>
+                          <td className={volClass(r.volume_ratio)}>
+                            {parseFloat(r.volume_ratio || 1).toFixed(1)}x avg
+                          </td>
+                          <td className={rsiClass(r.rsi_14)}>
+                            {parseFloat(r.rsi_14 || 50).toFixed(1)}
+                          </td>
+                          <td>
+                            <span className={`sig-badge ${sig === 'BUY' ? 'buy' : sig === 'SELL' ? 'sell' : 'neutral'}`}>
+                              {sig}
+                            </span>
+                          </td>
+                          <td className="td-sector">{r.sector || '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-              <div className="results-footer">
-                <div className="results-showing">
-                  Showing {Math.min(results.length, (page - 1) * perPage + 1)} to {Math.min(results.length, page * perPage)} of {results.length} results
-                </div>
-                <div className="pagination-btns">
-                  <button className="page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</button>
-                  <button className="page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages || totalPages === 0}>Next</button>
+              <div className="sc-results-footer">
+                <span className="sc-results-showing">
+                  Showing {Math.min(results.length, (page - 1) * PER_PAGE + 1)}–{Math.min(results.length, page * PER_PAGE)} of {results.length}
+                </span>
+                <div className="sc-page-btns">
+                  <button className="sc-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>← Prev</button>
+                  <span className="sc-page-num">{page} / {totalPages}</span>
+                  <button className="sc-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next →</button>
                 </div>
               </div>
-            </div>
+            </>
           )}
         </div>
       )}
 
-      {/* 7. INITIAL EMPTY STATE */}
-      {!isScanning && !scanMeta && !scanDone && results.length === 0 && filters.length === 0 && !scanInterrupted && (
-        <div className="screener-empty-state" style={{ padding: '60px 0', textAlign: 'center', color: '#fff' }}>
-          <div style={{ fontSize: '3rem', opacity: 0.7 }}>🎯</div>
-          <h3>Build Your Scanner</h3>
-          <p style={{ color: 'rgba(255,255,255,0.5)' }}>
-            Add filters above to scan the market. Or pick a preset strategy to get started instantly.
-          </p>
-        </div>
+      {/* SECTION 5b — STOCK DETAIL PANEL */}
+      {selectedStock && (
+        <StockDetailPanel stock={selectedStock} onClose={() => setSelectedStock(null)} />
       )}
-
     </div>
   );
 }
