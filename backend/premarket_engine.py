@@ -121,18 +121,18 @@ _premarket_vol_current: dict[str, int] = {}    # latest volume tick
 
 async def get_premarket_volume() -> dict:
     """
-    Active only between 09:00–09:15 IST.
-    Compares today's pre-market accumulated volume vs 5-day historical average.
+    Active during market hours (09:00–16:00 IST).
+    Compares today's volume vs 5-day historical average.
     Returns:
-      { active: bool, stocks: [...], indices: [...] }
+      { active: bool, stocks: [...] }
     """
     now = _now_ist()
-    premarket_start = _ist_time(9, 0)
-    premarket_end   = _ist_time(9, 15)
-    active = premarket_start <= now <= premarket_end
+    market_start = _ist_time(9, 0)
+    market_end   = _ist_time(16, 0)
+    active = market_start <= now <= market_end
 
     if not active:
-        return {"active": False, "stocks": [], "message": "Pre-market session inactive (09:00–09:15 IST only)"}
+        return {"active": False, "stocks": [], "message": "Market session inactive (09:00–16:00 IST)"}
 
     # Try to fetch 5-day historical pre-market averages via Angel One
     # This is a best-effort call; if it fails we just show current volumes
@@ -185,11 +185,13 @@ async def get_premarket_volume() -> dict:
             })
 
     stocks_out.sort(key=lambda x: (x.get("multiplier") or 0), reverse=True)
+
+    # If market is open but no surge stocks found, still return active
     return {
         "active":    True,
         "stocks":    stocks_out,
         "timestamp": now.isoformat(),
-        "message":   f"Pre-market session active. Showing {len(stocks_out)} volume surge stocks.",
+        "message":   f"Volume scan active. Showing {len(stocks_out)} volume surge stocks.",
     }
 
 
@@ -392,3 +394,108 @@ async def get_volume_spikes() -> AsyncGenerator[dict, None]:
                 yield spike_event
 
         await asyncio.sleep(15)  # Check every 15s (candles update every 5min but ticks are continuous)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FUNCTION 5 — Volume Spike Snapshot (JSON polling, not SSE)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_spike_snapshot_cache: dict = {}
+_spike_snapshot_ts: float = 0.0
+_SPIKE_SNAPSHOT_TTL = 60  # seconds
+
+
+async def get_volume_spikes_snapshot() -> dict:
+    """
+    Returns volume spike data as a JSON snapshot (polled every 60s by frontend).
+    Compares current 5-min candle volume vs historical average at same time slot.
+    Spike threshold: current_vol >= 2 * historical_avg_vol.
+    Results are cached for 60 seconds.
+    """
+    global _spike_snapshot_cache, _spike_snapshot_ts
+
+    now_ts = time.monotonic()
+    if _spike_snapshot_cache and (now_ts - _spike_snapshot_ts) < _SPIKE_SNAPSHOT_TTL:
+        # Update next_refresh_in countdown
+        elapsed = int(now_ts - _spike_snapshot_ts)
+        cache_copy = dict(_spike_snapshot_cache)
+        cache_copy["next_refresh_in"] = max(0, _SPIKE_SNAPSHOT_TTL - elapsed)
+        return cache_copy
+
+    now = _now_ist()
+    market_open = _ist_time(9, 15)
+    market_close = _ist_time(15, 30)
+    is_market_active = market_open <= now <= market_close
+
+    if not is_market_active:
+        result = {
+            "active": False,
+            "spikes": [],
+            "last_updated": now.strftime("%H:%M:%S"),
+            "next_refresh_in": _SPIKE_SNAPSHOT_TTL,
+            "message": "Market closed (09:15–15:30 IST)",
+        }
+        _spike_snapshot_cache = result
+        _spike_snapshot_ts = now_ts
+        return result
+
+    # Ensure historical vol data is loaded
+    import asyncio as _asyncio
+    await _asyncio.get_event_loop().run_in_executor(None, _ensure_hist_vol_loaded)
+
+    with _store_lock:
+        candle_snapshot = {sym: list(c) for sym, c in _intraday_candles.items()}
+
+    # Resolve token → symbol map
+    from backend.streamer import ALL_TOKENS
+    token_to_sym = {tok: meta["symbol"] for tok, meta in ALL_TOKENS.items()}
+
+    spikes_out = []
+    for token, candles in candle_snapshot.items():
+        if not candles:
+            continue
+        symbol = token_to_sym.get(token)
+        if not symbol:
+            continue
+
+        current_candle = candles[-1]
+        slot = current_candle.get("time", "")  # "HH:MM"
+        current_vol = current_candle.get("volume", 0)
+
+        # Get historical average for this slot
+        sym_avgs = _hist_vol_avg.get(symbol, {})
+        hist_avg = sym_avgs.get(slot, 0)
+
+        # Spike condition: at least 2x historical avg, minimum abs threshold
+        if hist_avg > 500 and current_vol >= 2 * hist_avg:
+            ratio = round(current_vol / hist_avg, 2)
+            with _store_lock:
+                tick = _tick_store.get(token, {})
+            prev_close = tick.get("prev_close", 0)
+            ltp = tick.get("ltp", 0)
+            change_pct = round(((ltp - prev_close) / prev_close) * 100, 2) if prev_close > 0 else 0
+
+            spikes_out.append({
+                "symbol":      symbol,
+                "exchange":    "NSE",
+                "ratio":       ratio,
+                "current_vol": current_vol,
+                "avg_vol":     int(hist_avg),
+                "change_pct":  change_pct,
+                "time":        slot,
+                "ltp":         round(ltp, 2),
+            })
+
+    # Sort by ratio descending
+    spikes_out.sort(key=lambda x: x["ratio"], reverse=True)
+
+    result = {
+        "active": True,
+        "spikes": spikes_out[:20],  # top 20
+        "last_updated": now.strftime("%H:%M:%S"),
+        "next_refresh_in": _SPIKE_SNAPSHOT_TTL,
+        "total_detected": len(spikes_out),
+    }
+    _spike_snapshot_cache = result
+    _spike_snapshot_ts = now_ts
+    return result

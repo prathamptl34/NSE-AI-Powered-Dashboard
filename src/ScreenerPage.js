@@ -3,43 +3,39 @@ import './screener.css';
 
 const FILTER_FIELDS = [
   // Price
-  { key: 'price', label: 'Last Price', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
+  { key: 'price', label: 'Last Price (₹)', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
   { key: 'change_pct', label: '% Change Today', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 2 },
   { key: 'price_vs_52w_high', label: '% From 52W High', type: 'number', category: 'Price', defaultOp: '<', defaultVal: 5 },
   { key: 'price_vs_52w_low', label: '% From 52W Low', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 10 },
-  { key: 'price_vs_ema_9', label: 'Price vs EMA 9', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
-  { key: 'price_vs_ema_20', label: 'Price vs EMA 20', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
-  { key: 'price_vs_ema_50', label: 'Price vs EMA 50', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
-  { key: 'price_vs_ema_200', label: 'Price vs EMA 200', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
-  { key: 'price_vs_vwap', label: 'Price vs VWAP', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
+  { key: 'price_vs_ema_20', label: 'Price vs EMA20', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
+  { key: 'price_vs_ema_50', label: 'Price vs EMA50', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
+  { key: 'price_vs_ema_200', label: 'Price vs EMA200', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
   // Volume
+  { key: 'volume', label: 'Volume (shares)', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 100000 },
   { key: 'vol_ratio', label: 'Volume Ratio (x avg)', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 2 },
-  { key: 'volume', label: 'Volume (abs)', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 100000 },
-  // Technical
-  { key: 'rsi_14', label: 'RSI (14)', type: 'number', category: 'Technical', defaultOp: '<', defaultVal: 30 },
-  { key: 'macd_histogram', label: 'MACD Histogram', type: 'number', category: 'Technical', defaultOp: '>', defaultVal: 0 },
-  { key: 'adx', label: 'ADX', type: 'number', category: 'Technical', defaultOp: '>', defaultVal: 25 },
-  { key: 'bb_bandwidth', label: 'BB Bandwidth', type: 'number', category: 'Technical', defaultOp: '<', defaultVal: 0.1 },
-  { key: 'supertrend_direction', label: 'Supertrend', type: 'select', category: 'Technical', options: [{value: 1, label: 'Bullish'}, {value: -1, label: 'Bearish'}], defaultOp: '=', defaultVal: 1 },
-  // Patterns
-  { key: 'bullish_engulfing', label: 'Bullish Engulfing', type: 'boolean', category: 'Patterns', defaultOp: '=', defaultVal: true },
-  { key: 'bearish_engulfing', label: 'Bearish Engulfing', type: 'boolean', category: 'Patterns', defaultOp: '=', defaultVal: true },
-  { key: 'doji', label: 'Doji', type: 'boolean', category: 'Patterns', defaultOp: '=', defaultVal: true },
-  { key: 'hammer', label: 'Hammer', type: 'boolean', category: 'Patterns', defaultOp: '=', defaultVal: true },
-  { key: 'morning_star', label: 'Morning Star', type: 'boolean', category: 'Patterns', defaultOp: '=', defaultVal: true },
-  { key: 'evening_star', label: 'Evening Star', type: 'boolean', category: 'Patterns', defaultOp: '=', defaultVal: true },
-  // Fundamental
-  { key: 'sector', label: 'Sector', type: 'select', category: 'Fundamental', options: [
+  { key: 'delivery_pct', label: 'Delivery %', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 40 },
+  // Technical Indicators
+  { key: 'rsi_14', label: 'RSI (14)', type: 'number', category: 'Technical Indicators', defaultOp: '<', defaultVal: 30 },
+  { key: 'macd_histogram', label: 'MACD Histogram', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 0 },
+  { key: 'adx', label: 'ADX (14)', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 25 },
+  { key: 'supertrend_direction', label: 'Supertrend Direction', type: 'select', category: 'Technical Indicators', options: [{value: 1, label: 'BUY'}, {value: -1, label: 'SELL'}], defaultOp: '=', defaultVal: 1 },
+  { key: 'bb_pct_b', label: 'Bollinger %B', type: 'number', category: 'Technical Indicators', defaultOp: '<', defaultVal: 0.2 },
+  { key: 'atr_14', label: 'ATR (14)', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 0 },
+  // Moving Averages
+  { key: 'ema_20', label: 'EMA 20', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
+  { key: 'ema_50', label: 'EMA 50', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
+  { key: 'ema_200', label: 'EMA 200', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
+  { key: 'sma_20', label: 'SMA 20', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
+  { key: 'sma_50', label: 'SMA 50', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
+  // Fundamentals
+  { key: 'market_cap_cr', label: 'Market Cap (Cr)', type: 'number', category: 'Fundamentals', defaultOp: '>', defaultVal: 1000 },
+  { key: 'pe_ratio', label: 'P/E Ratio', type: 'number', category: 'Fundamentals', defaultOp: '<', defaultVal: 30 },
+  { key: 'sector', label: 'Sector', type: 'select', category: 'Fundamentals', options: [
     {value:'IT',label:'IT'},{value:'BANKS',label:'Banks'},{value:'PHARMA',label:'Pharma'},
     {value:'AUTO',label:'Auto'},{value:'FMCG',label:'FMCG'},{value:'METALS',label:'Metals'},
     {value:'ENERGY',label:'Energy'},{value:'FINANCE',label:'Finance'},{value:'INFRA',label:'Infra'},
     {value:'TELECOM',label:'Telecom'},{value:'CONSUMER',label:'Consumer'},{value:'REALTY',label:'Realty'}
   ], defaultOp: '=', defaultVal: 'IT' },
-  { key: 'index_membership', label: 'Index', type: 'select', category: 'Fundamental', options: [
-    {value:'nifty50',label:'Nifty 50'},{value:'nifty100',label:'Nifty 100'},
-    {value:'midcap100',label:'Midcap 100'},{value:'fno',label:'F&O List'}
-  ], defaultOp: '=', defaultVal: 'nifty50' },
-  { key: 'is_fno', label: 'F&O Stock', type: 'boolean', category: 'Fundamental', defaultOp: '=', defaultVal: true },
 ];
 
 export default function ScreenerPage({ standalone, onStockClick }) {
@@ -183,6 +179,13 @@ export default function ScreenerPage({ standalone, onStockClick }) {
               
               if (data.progress) {
                 setScanProgress(data.progress);
+              }
+              
+              if (data.done) {
+                setIsScanning(false);
+                if (data.total !== undefined) {
+                  setScanMeta({ total_matched: data.total, scan_time_ms: 0, timestamp: new Date().toISOString() });
+                }
               }
 
               if (data.meta) {
@@ -387,12 +390,12 @@ export default function ScreenerPage({ standalone, onStockClick }) {
               + Add Filter
             </button>
             {showAddFilter && (
-              <div className="screener-dropdown-menu">
+              <div className="screener-dropdown-menu filter-dropdown-panel">
                 {Object.entries(groupedFields).map(([category, fields]) => (
                   <div key={category} className="screener-dropdown-group">
-                    <div className="screener-dropdown-group-title">{category}</div>
+                    <div className="screener-dropdown-group-title filter-group-header">{category}</div>
                     {fields.map(field => (
-                      <div key={field.key} className="screener-dropdown-item" onClick={() => addFilter(field.key)}>
+                      <div key={field.key} className="screener-dropdown-item filter-option" onClick={() => addFilter(field.key)}>
                         {field.label}
                       </div>
                     ))}
@@ -417,15 +420,11 @@ export default function ScreenerPage({ standalone, onStockClick }) {
             )}
             
             <button 
-              className={`screener-run-btn ${isScanning ? 'scanning' : ''}`} 
+              className={`run-scan-btn ${isScanning ? 'scanning' : ''}`} 
               onClick={runScan} 
               disabled={isScanning || filters.length === 0}
             >
-              {isScanning ? (
-                <>
-                  <span className="spinner">⏳</span> SCANNING...
-                </>
-              ) : 'RUN SCAN'}
+              {isScanning ? '⚡ SCANNING...' : '🚀 RUN SCAN'}
             </button>
           </div>
         </div>
@@ -433,21 +432,23 @@ export default function ScreenerPage({ standalone, onStockClick }) {
 
       {/* 5. LOADING ANIMATION */}
       {isScanning && (
-        <div className="screener-status-panel">
-          <div className="screener-radar-container"></div>
-          <div className="screener-status-text">
-            ⚡ Scanning {selectedUniverse === 'ALL' ? 'NSE & BSE' : selectedUniverse} universe...<br/>
-            📊 Symbols processed: {scanProgress.current} / {scanProgress.total}<br/>
-            ✅ Matches found so far: {results.length}
+        <div className="scan-status-panel">
+          <div style={{display:'flex', alignItems:'center'}}>
+            <div className="radar-container"></div>
+            <div>
+              <div className="status-line">⚡ Scanning {selectedUniverse === 'ALL' ? 'NSE & BSE' : selectedUniverse} universe...</div>
+              <div className="status-line">📊 Symbols processed: {scanProgress.current} / {scanProgress.total}</div>
+              <div className="status-line">✅ Matches found: {results.length}</div>
+            </div>
           </div>
-          <div className="screener-progress-wrapper">
-            <div className="screener-progress-bar" style={{ width: `${progressPct}%` }}></div>
+          <div className="scan-progress-bar-track">
+            <div className="scan-progress-bar-fill" style={{ width: `${progressPct}%` }}></div>
           </div>
         </div>
       )}
 
       {/* 6. RESULTS TABLE */}
-      {!isScanning && (scanMeta || results.length > 0) && (
+      {(isScanning || scanMeta || results.length > 0) && (
         <div className="screener-results-container">
           <div className="screener-table-header">
             <h4 className="screener-table-title">

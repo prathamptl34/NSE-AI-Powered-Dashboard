@@ -4204,6 +4204,64 @@ body {
   text-align: right;
 }
 
+/* ── Spike Alert Rows (Polling-based detector) ── */
+.spike-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  transition: background 0.15s;
+}
+.spike-alert:hover {
+  background: rgba(255,255,255,0.04);
+}
+.spike-alert:last-child {
+  border-bottom: none;
+}
+.spike-alert .spike-symbol {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-primary);
+  min-width: 80px;
+}
+.spike-alert .spike-ratio {
+  font-weight: 700;
+  color: #ff9900;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.spike-alert .spike-vol {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.spike-alert .spike-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+  font-weight: 600;
+}
+
+/* Exchange badges inside spike alerts */
+.spike-alert .screener-exchange-badge {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 800;
+}
+.spike-alert .screener-exchange-badge.nse {
+  background: rgba(68, 136, 255, 0.2);
+  color: #4488ff;
+  border: 1px solid rgba(68, 136, 255, 0.3);
+}
+.spike-alert .screener-exchange-badge.bse {
+  background: rgba(255, 170, 0, 0.2);
+  color: #ffaa00;
+  border: 1px solid rgba(255, 170, 0, 0.3);
+}
+
 /* ── Inactive / closed placeholders ── */
 .market-closed-placeholder {
   flex: 1;

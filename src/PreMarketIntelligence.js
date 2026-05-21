@@ -225,24 +225,24 @@ function GapScanner() {
 function PremarketVolume() {
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
+  const [active,  setActive]  = useState(false);
   const [lastUpdate, setLastUpdate] = useState(null);
-  const active = isPreMarketActive();
   const preMarketCountdown = useCountdown(9, 0);
 
   const load = useCallback(async () => {
-    if (!active) { setLoading(false); return; }
     try {
       const res = await fetch(`${getBase()}/api/premarket-volume`);
       if (!res.ok) return;
       const json = await res.json();
       setData(json);
+      setActive(json.active !== false);
       setLastUpdate(new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' }));
     } catch (e) {
       // silent
     } finally {
       setLoading(false);
     }
-  }, [active]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -256,31 +256,26 @@ function PremarketVolume() {
         <span className="pm-widget-icon">⚡</span>
         <div>
           <div className="pm-widget-title">Pre-Market Volume</div>
-          <div className="pm-widget-sub">Volume surges · 09:00–09:15 IST</div>
+          <div className="pm-widget-sub">Volume surges · Market hours</div>
         </div>
         {active && <span className="pm-live-badge">● LIVE</span>}
       </div>
 
-      {!active ? (
+      {loading ? (
+        <div className="pm-loading-state">
+          <div className="pm-spinner" />
+          <span>Scanning volume data...</span>
+        </div>
+      ) : !active ? (
         <div className="market-closed-placeholder">
           <span className="pm-empty-icon pm-empty-icon-large">🕰️</span>
           <p>Waiting for pre-market data...</p>
           <span className="pm-empty-sub countdown-text">Pre-market starts in {preMarketCountdown}</span>
         </div>
-      ) : loading ? (
-        <div className="pm-loading-state">
-          <div className="pm-spinner" />
-          <span>Scanning pre-market volume...</span>
-        </div>
-      ) : !data || !data.active ? (
-        <div className="market-closed-placeholder">
-          <span className="pm-empty-icon">📭</span>
-          <p>{data?.message || 'No pre-market data available'}</p>
-        </div>
-      ) : data.stocks.length === 0 ? (
+      ) : !data || !data.stocks || data.stocks.length === 0 ? (
         <div className="market-closed-placeholder">
           <span className="pm-empty-icon">🔍</span>
-          <p>No volume surges detected yet</p>
+          <p>{data?.message || 'No volume surges detected yet'}</p>
           <span className="pm-empty-sub">Threshold: today vol ≥ 3× 5-day avg</span>
         </div>
       ) : (
@@ -427,70 +422,61 @@ function SectorMomentum() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WIDGET 4 — Volume Spike Detector (SSE)
+// WIDGET 4 — Volume Spike Detector (Polling)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const MAX_SPIKE_AGE_MS = 15 * 60 * 1000; // 15 minutes
-
 function VolumeSpikeDetector() {
-  const [spikes,    setSpikes]    = useState([]);
-  const [streaming, setStreaming] = useState(false);
-  const sseRef   = useRef(null);
-  const timerRef = useRef(null);
-  const active   = isMarketHoursActive();
-  const marketCountdown = useCountdown(9, 15);
+  const [spikes, setSpikes] = useState([]);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [countdown, setCountdown] = useState(60);
+  const [loading, setLoading] = useState(true);
+  const [isActive, setIsActive] = useState(false);
+  const countdownRef = useRef(null);
+  const isFirstLoadRef = useRef(true);
 
-  // Prune spikes older than 15 minutes
-  useEffect(() => {
-    const prune = setInterval(() => {
-      const cutoff = Date.now() - MAX_SPIKE_AGE_MS;
-      setSpikes(prev => prev.filter(s => s._receivedAt > cutoff));
-    }, 60000);
-    return () => clearInterval(prune);
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch(`${getBase()}/api/premarket/volume-spikes`);
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.spikes && json.spikes.length > 0) {
+        setSpikes(prevSpikes => {
+          if (!isFirstLoadRef.current) {
+            const prevSymbols = new Set(prevSpikes.map(s => s.symbol));
+            const hasNewSpike = json.spikes.some(s => !prevSymbols.has(s.symbol));
+            if (hasNewSpike) {
+              playSpikePing();
+            }
+          }
+          isFirstLoadRef.current = false;
+          return json.spikes;
+        });
+        setIsActive(true);
+      } else if (json.spikes) {
+        setSpikes([]);
+        setIsActive(json.active !== false);
+        isFirstLoadRef.current = false;
+      }
+      if (json.last_updated) setLastUpdated(json.last_updated);
+      setCountdown(json.next_refresh_in || 60);
+    } catch (e) {
+      // silent
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // SSE connection — exact same pattern as Heatmap.js
   useEffect(() => {
-    if (!active) return;
+    load();
+    const id = setInterval(load, 60000);
+    return () => clearInterval(id);
+  }, [load]);
 
-    function connect() {
-      const base = getBase();
-      const es = new EventSource(`${base}/api/volume-spikes`);
-      sseRef.current = es;
-
-      es.onopen = () => setStreaming(true);
-
-      es.onmessage = (e) => {
-        try {
-          const data = JSON.parse(e.data);
-          if (data.type === 'spike') {
-            playSpikePing();
-            setSpikes(prev => [
-              { ...data, _receivedAt: Date.now(), _id: `${data.symbol}-${data.slot}-${Date.now()}` },
-              ...prev.slice(0, 49), // keep last 50
-            ]);
-          }
-        } catch {}
-      };
-
-      es.onerror = () => {
-        setStreaming(false);
-        es.close();
-        timerRef.current = setTimeout(connect, 3000);
-      };
-    }
-
-    connect();
-
-    return () => {
-      clearTimeout(timerRef.current);
-      if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
-      setStreaming(false);
-    };
-  }, [active]);
-
-  const dismiss = useCallback((id) => {
-    setSpikes(prev => prev.filter(s => s._id !== id));
+  useEffect(() => {
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(countdownRef.current);
   }, []);
 
   return (
@@ -499,68 +485,53 @@ function VolumeSpikeDetector() {
         <span className="pm-widget-icon">🔔</span>
         <div>
           <div className="pm-widget-title">Volume Spike Detector</div>
-          <div className="pm-widget-sub">5-min candle volume ≥ 2× historical avg · 09:15–15:30 IST</div>
+          <div className="pm-widget-sub">5-min candle volume ≥ 2× historical avg</div>
         </div>
-        {active && (
-          <span className={`pm-live-badge ${streaming ? '' : 'pm-live-badge-offline'}`}>
-            {streaming ? '● LIVE' : '○ CONNECTING'}
-          </span>
-        )}
+        {isActive && <span className="pm-live-badge">● LIVE</span>}
       </div>
 
-      {!active ? (
-        <div className="market-closed-placeholder">
-          <span className="pm-empty-icon pm-empty-icon-large">🔒</span>
-          <p>Market closed</p>
-          <span className="pm-empty-sub countdown-text">Market opens in {marketCountdown}</span>
+      {loading ? (
+        <div className="pm-loading-state">
+          <div className="pm-spinner" />
+          <span>Scanning for volume spikes...</span>
         </div>
-      ) : spikes.length === 0 ? (
+      ) : !isActive && spikes.length === 0 ? (
         <div className="market-closed-placeholder">
           <span className="pm-empty-icon">👁️</span>
           <p>Monitoring for volume spikes...</p>
           <span className="pm-empty-sub">Spike alerts will appear here in real-time</span>
         </div>
+      ) : spikes.length === 0 ? (
+        <div className="market-closed-placeholder">
+          <span className="pm-empty-icon">🔍</span>
+          <p>No volume spikes detected yet</p>
+          <span className="pm-empty-sub">Checking every 60 seconds</span>
+        </div>
       ) : (
         <div className="spike-list">
-          {spikes.map(s => {
-            const ageMs = Date.now() - s._receivedAt;
-            const ageMins = Math.floor(ageMs / 60000);
-            const isPos = s.price_change_pct >= 0;
+          {spikes.map((s, i) => {
+            const isPos = (s.change_pct || 0) >= 0;
             return (
-              <div key={s._id} className="spike-card spike-card-anim">
-                <div className="spike-header">
-                  <span className="spike-symbol truncate">{s.symbol}</span>
-                  <span className="multiplier-badge">{s.multiplier}×</span>
-                  <button className="spike-dismiss" onClick={() => dismiss(s._id)} aria-label="Dismiss">×</button>
-                </div>
-                <div className="spike-body">
-                  <div className="spike-stat">
-                    <span className="spike-stat-label">Current Vol</span>
-                    <span className="spike-stat-val">{fmtVol(s.current_vol)}</span>
-                  </div>
-                  <div className="spike-stat">
-                    <span className="spike-stat-label">Hist Avg</span>
-                    <span className="spike-stat-val">{fmtVol(s.avg_vol)}</span>
-                  </div>
-                  <div className="spike-stat">
-                    <span className="spike-stat-label">Price</span>
-                    <span className={`spike-stat-val ${isPos ? 'gap-up' : 'gap-down'}`}>
-                      {fmtPct(s.price_change_pct)}
-                    </span>
-                  </div>
-                  <div className="spike-stat">
-                    <span className="spike-stat-label">Slot</span>
-                    <span className="spike-stat-val">{s.slot}</span>
-                  </div>
-                </div>
-                <div className="spike-footer">
-                  {ageMins < 1 ? 'Just now' : `${ageMins}m ago`}
-                </div>
+              <div key={`${s.symbol}-${i}`} className="spike-alert">
+                <span className="spike-symbol">{s.symbol}</span>
+                <span className={`screener-exchange-badge ${(s.exchange || 'NSE').toLowerCase()}`}>{s.exchange || 'NSE'}</span>
+                <span className="spike-ratio">{s.ratio}× vol</span>
+                <span className="spike-vol">{fmtVol(s.current_vol)}</span>
+                <span className={isPos ? 'gap-up' : 'gap-down'}>
+                  {isPos ? '▲' : '▼'} {fmtPct(s.change_pct)}
+                </span>
+                <span className="spike-time">{s.time || ''}</span>
               </div>
             );
           })}
         </div>
       )}
+
+      <div className="pm-widget-footer">
+        {lastUpdated && (
+          <span>● LIVE — Last updated {lastUpdated} · Refreshing in {countdown}s</span>
+        )}
+      </div>
     </div>
   );
 }

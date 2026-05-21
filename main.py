@@ -30,7 +30,7 @@ from backend.tv_mcp_client import (
     start_tv_mcp_server, stop_tv_mcp_server, 
     get_multi_agent_analysis, get_multi_timeframe_alignment, get_volume_breakout_stocks
 )
-from backend.premarket_engine import get_gap_data, get_premarket_volume, get_sector_momentum, get_volume_spikes
+from backend.premarket_engine import get_gap_data, get_premarket_volume, get_sector_momentum, get_volume_spikes, get_volume_spikes_snapshot
 
 # ── Logging Configuration ─────────────────────────────────────────────────────
 logging.basicConfig(
@@ -943,6 +943,17 @@ async def api_volume_spikes_stream():
     )
 
 
+@app.get("/api/premarket/volume-spikes")
+async def api_volume_spikes_json():
+    """Returns volume spike data as JSON (polled, not SSE)."""
+    try:
+        data = await get_volume_spikes_snapshot()
+        return data
+    except Exception as e:
+        logger.error(f"Volume spikes snapshot error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "VOLUME_SPIKES_ERROR", "message": str(e)})
+
+
 # ── Heatmap Endpoints ─────────────────────────────────────────────────────
 
 from fastapi.responses import StreamingResponse
@@ -982,6 +993,7 @@ async def heatmap_sse_stream():
 # ── Screener Endpoints ────────────────────────────────────────────────────────
 from pydantic import BaseModel
 from backend.screener_engine import run_scan_generator, get_presets, save_preset, get_cached_results
+from backend.historical import _get_smart_connect
 
 class RunScanRequest(BaseModel):
     filters: list[dict]
@@ -995,7 +1007,15 @@ async def api_screener_run(request: RunScanRequest):
     """Executes a screener scan and streams progressive results."""
     async def event_generator():
         try:
+            try:
+                smart = _get_smart_connect()
+            except Exception as e:
+                logger.error(f"Angel One session invalid: {e}")
+                print("[Screener] Angel One session invalid, using demo data")
+                smart = None
+                
             async for chunk in run_scan_generator(
+                smart=smart,
                 filters=request.filters,
                 universe=request.universe,
                 logic=request.logic,

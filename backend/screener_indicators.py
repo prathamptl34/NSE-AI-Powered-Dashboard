@@ -167,7 +167,7 @@ def compute_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     if len(df) < 50:
         # Not enough data, return with empty columns
         for c in ['ema_9', 'ema_20', 'ema_50', 'ema_200', 'rsi_14', 'macd', 'macd_signal', 'macd_histogram', 
-                  'bb_upper', 'bb_lower', 'bb_bandwidth', 'adx', 'supertrend', 'supertrend_direction', 'vwap',
+                  'bb_upper', 'bb_lower', 'bb_bandwidth', 'adx', 'atr_14', 'supertrend', 'supertrend_direction', 'vwap',
                   'bullish_engulfing', 'bearish_engulfing', 'doji', 'hammer', 'hanging_man', 'morning_star', 'evening_star']:
             df[c] = np.nan
         return df
@@ -195,6 +195,13 @@ def compute_all_indicators(df: pd.DataFrame) -> pd.DataFrame:
     
     # ADX
     df['adx'] = calc_adx(df['high'], df['low'], df['close'])
+    
+    # ATR (14)
+    tr1 = df['high'] - df['low']
+    tr2 = (df['high'] - df['close'].shift()).abs()
+    tr3 = (df['low'] - df['close'].shift()).abs()
+    tr = pd.DataFrame({'tr1': tr1, 'tr2': tr2, 'tr3': tr3}).max(axis=1)
+    df['atr_14'] = tr.ewm(alpha=1/14, adjust=False).mean()
     
     # Supertrend
     st_res = calc_supertrend(df['high'], df['low'], df['close'])
