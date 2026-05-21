@@ -428,7 +428,7 @@ function SectorMomentum() {
 function VolumeSpikeDetector() {
   const [spikes, setSpikes] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [countdown, setCountdown] = useState(60);
+  const [countdown, setCountdown] = useState(15);
   const [loading, setLoading] = useState(true);
   const [isActive, setIsActive] = useState(false);
   const countdownRef = useRef(null);
@@ -458,7 +458,7 @@ function VolumeSpikeDetector() {
         isFirstLoadRef.current = false;
       }
       if (json.last_updated) setLastUpdated(json.last_updated);
-      setCountdown(json.next_refresh_in || 60);
+      setCountdown(json.next_refresh_in || 15);
     } catch (e) {
       // silent
     } finally {
@@ -468,7 +468,7 @@ function VolumeSpikeDetector() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, 60000);
+    const id = setInterval(load, 15000);
     return () => clearInterval(id);
   }, [load]);
 
@@ -487,7 +487,12 @@ function VolumeSpikeDetector() {
           <div className="pm-widget-title">Volume Spike Detector</div>
           <div className="pm-widget-sub">5-min candle volume ≥ 2× historical avg</div>
         </div>
-        {isActive && <span className="pm-live-badge">● LIVE</span>}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {isActive && <span className="pm-live-badge">● LIVE</span>}
+          <span style={{ fontSize: '12px', color: '#8892b0', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '12px', fontFamily: 'monospace' }}>
+            {countdown}s
+          </span>
+        </div>
       </div>
 
       {loading ? (
@@ -505,7 +510,7 @@ function VolumeSpikeDetector() {
         <div className="market-closed-placeholder">
           <span className="pm-empty-icon">🔍</span>
           <p>No volume spikes detected yet</p>
-          <span className="pm-empty-sub">Checking every 60 seconds</span>
+          <span className="pm-empty-sub">Checking every 15 seconds</span>
         </div>
       ) : (
         <div className="spike-list">

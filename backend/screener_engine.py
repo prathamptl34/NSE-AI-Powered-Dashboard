@@ -83,28 +83,38 @@ BUILTIN_PRESETS = [
     }
 ]
 
-def to_native(val):
-    if isinstance(val, dict):
-        return {k: to_native(v) for k, v in val.items()}
-    elif isinstance(val, list):
-        return [to_native(x) for x in val]
-    elif isinstance(val, (np.integer, int)):
-        return int(val)
-    elif isinstance(val, (np.floating, float)):
-        if np.isnan(val):
-            return None
-        return float(val)
-    elif isinstance(val, np.ndarray):
-        return to_native(val.tolist())
-    elif isinstance(val, (datetime, pd.Timestamp)):
-        return val.isoformat()
-    try:
-        if pd.isna(val):
-            return None
-    except Exception:
-        pass
-    return val
+def sanitize_for_json(obj):
+    """Recursively convert numpy types to native Python types."""
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(i) for i in obj]
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
+        return int(obj)
+    elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        return float(obj)
+    elif isinstance(obj, np.bool_):
+        return bool(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif obj != obj:  # NaN check
+        return None
+    return obj
 
+NIFTY100_FALLBACK = [
+    "RELIANCE","TCS","HDFCBANK","INFY","ICICIBANK",
+    "HINDUNILVR","ITC","SBIN","BHARTIARTL","KOTAKBANK",
+    "LT","AXISBANK","ASIANPAINT","MARUTI","TITAN",
+    "SUNPHARMA","ULTRACEMCO","BAJFINANCE","WIPRO","NESTLEIND",
+    "HCLTECH","TECHM","POWERGRID","NTPC","ONGC",
+    "JSWSTEEL","TATASTEEL","HINDALCO","COALINDIA","GRASIM",
+    "ADANIPORTS","BAJAJFINSV","DIVISLAB","DRREDDY","CIPLA",
+    "EICHERMOT","HEROMOTOCO","BPCL","IOC","BRITANNIA",
+    "SHREECEM","INDUSINDBK","M&M","TATAMOTORS","HDFCLIFE",
+    "SBILIFE","PIDILITIND","HAVELLS","SIEMENS","ABB",
+    "BEL","CGPOWER","TRENT","DMART","ZOMATO",
+    "NAUKRI","PAYTM","BAJAJ-AUTO","TATACONSUM","APOLLOHOSP"
+]
 NIFTY100_SYMBOLS = set([m['symbol'] for m in NIFTY100_TOKENS.values()])
 MIDCAP100_SYMBOLS = set([m['symbol'] for m in MIDCAP100_TOKENS.values()])
 FNO_SYMBOLS = set(FNO_STOCKS)
@@ -133,54 +143,52 @@ def load_master_instruments() -> list[dict]:
     _master_cache_date = today
     return instruments
 
-def apply_single_filter(df_row: dict, filter_condition: dict) -> bool:
-    field = filter_condition.get('field')
-    op = filter_condition.get('operator')
-    val = filter_condition.get('value')
-    actual_val = df_row.get(field)
-    
-    if actual_val is None: return False
-    try:
-        if op == '=':
-            return str(actual_val) == str(val)
-        if op == '!=':
-            return str(actual_val) != str(val)
-        # Numeric comparisons - coerce both to float
-        actual_val = float(actual_val)
-        val = float(val)
-        if op == '>': return actual_val > val
-        if op == '<': return actual_val < val
-        if op == '>=': return actual_val >= val
-        if op == '<=': return actual_val <= val
-    except (ValueError, TypeError):
-        pass
-    return False
+def evaluate_filters(stock: dict, filters: list, logic: str = "AND") -> bool:
+    if not filters:
+        return True
+    outcomes = []
+    for f in filters:
+        field = f.get("field", "")
+        op = f.get("operator", ">")
+        raw_val = f.get("value", 0)
+        stock_val = stock.get(field)
+        if stock_val is None:
+            outcomes.append(False)
+            continue
+        try:
+            if field == "supertrend":
+                outcomes.append(str(stock_val).upper() == str(raw_val).upper())
+                continue
+            sv = float(stock_val)
+            fv = float(raw_val)
+            if op == ">":    outcomes.append(sv > fv)
+            elif op == "<":  outcomes.append(sv < fv)
+            elif op == ">=": outcomes.append(sv >= fv)
+            elif op == "<=": outcomes.append(sv <= fv)
+            elif op == "=":  outcomes.append(sv == fv)
+            elif op == "!=": outcomes.append(sv != fv)
+            else:            outcomes.append(False)
+        except (ValueError, TypeError):
+            outcomes.append(False)
+    if logic == "OR":
+        return any(outcomes)
+    return all(outcomes)
 
-def apply_filters(stocks_data: list[dict], filters: list[dict], logic: str = 'AND') -> list[dict]:
-    if not filters: return stocks_data
-    matched = []
-    for stock in stocks_data:
-        if logic == 'AND':
-            if all(apply_single_filter(stock, f) for f in filters): matched.append(stock)
-        else:
-            if any(apply_single_filter(stock, f) for f in filters): matched.append(stock)
-    return matched
-
-def _get_demo_data(sym: str, days: int = 250) -> pd.DataFrame:
-    np.random.seed(hash(sym) % (2**32))
-    base_price = np.random.uniform(100, 5000)
-    volatility = np.random.uniform(0.01, 0.04)
-    dates = pd.date_range(end=datetime.now(), periods=days, freq='B')
-    returns = np.random.normal(0, volatility, days)
-    prices = base_price * np.exp(np.cumsum(returns))
-    
-    df = pd.DataFrame({'date': dates})
-    df['close'] = prices
-    df['open'] = prices * (1 + np.random.uniform(-0.01, 0.01, days))
-    df['high'] = df[['open', 'close']].max(axis=1) * (1 + np.random.uniform(0, 0.01, days))
-    df['low'] = df[['open', 'close']].min(axis=1) * (1 - np.random.uniform(0, 0.01, days))
-    df['volume'] = np.random.randint(100000, 5000000, days)
-    return df
+def get_demo_stock(i, sym):
+    base_price = 100 + i * 150.5
+    vol = 1000000 + i * 500000
+    return {
+        "symbol": sym, "exchange": "NSE",
+        "last_price": base_price, "pct_change": 2.45 - i * 0.15,
+        "volume": vol, "volume_ratio": 1.5 + i * 0.2,
+        "rsi_14": 35.0 + i * 2.0, "macd_histogram": -1.0 + i * 0.2,
+        "adx_14": 15.0 + i * 1.5, "supertrend": "BUY" if i % 2 == 0 else "SELL",
+        "ema_20": base_price * 0.98, "ema_50": base_price * 0.95, "ema_200": base_price * 0.90,
+        "sma_20": base_price * 0.98, "sma_50": base_price * 0.95,
+        "pct_from_52h": -2.1 - i, "pct_from_52l": 18.4 + i,
+        "bb_pctb": 0.4 + i * 0.03, "atr_14": 15.0 + i,
+        "market_cap": 50000.0 + i * 10000
+    }
 
 async def fetch_and_evaluate(smart, token_info: dict, days: int) -> dict | None:
     sym = token_info['symbol']
@@ -214,63 +222,20 @@ async def run_scan_generator(smart, filters: list[dict], universe: str = 'NSE',
         logger.warning("[Screener] Angel One session invalid, using demo data")
         yield {"results": [], "progress": {"current": 0, "total": 20}}
         await asyncio.sleep(1)
-        demo_stocks = ["RELIANCE-EQ", "TCS-EQ", "HDFCBANK-EQ", "INFY-EQ", "ICICIBANK-EQ", "SBIN-EQ", 
-                       "BAJFINANCE-EQ", "BHARTIARTL-EQ", "ITC-EQ", "ASIANPAINT-EQ", "LT-EQ", 
-                       "AXISBANK-EQ", "HUL-EQ", "MARUTI-EQ", "SUNPHARMA-EQ", "TITAN-EQ", 
-                       "TATASTEEL-EQ", "WIPRO-EQ", "ULTRACEMCO-EQ", "M&M-EQ"]
+        demo_stocks = ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK", "SBIN", 
+                       "BAJFINANCE", "BHARTIARTL", "ITC", "ASIANPAINT", "LT", 
+                       "AXISBANK", "HUL", "MARUTI", "SUNPHARMA", "TITAN", 
+                       "TATASTEEL", "WIPRO", "ULTRACEMCO", "M&M"]
         
         batch_results = []
         for i, sym in enumerate(demo_stocks):
-            df = _get_demo_data(sym, 250)
-            enriched = compute_all_indicators(df)
-            if enriched.empty: continue
-            
-            last_row = enriched.iloc[-1]
-            prev_close = enriched['close'].iloc[-2] if len(enriched) > 1 else last_row['open']
-            price = last_row['close']
-            high_52w = df['high'].max()
-            low_52w = df['low'].min()
-            avg_vol = df['volume'].rolling(20).mean().iloc[-1]
-            
-            stock_data = {
-                'symbol': sym,
-                'name': sym,
-                'price': price,
-                'change_pct': ((price - prev_close) / prev_close) * 100,
-                'volume': last_row['volume'],
-                'vol_ratio': (last_row['volume'] / avg_vol) if avg_vol > 0 else 0,
-                'rsi_14': last_row['rsi_14'],
-                'macd_histogram': last_row['macd_histogram'],
-                'supertrend_direction': last_row['supertrend_direction'],
-                'adx': last_row['adx'],
-                'bb_bandwidth': last_row['bb_bandwidth'],
-                'sector': STOCK_SECTORS.get(sym, 'OTHER'),
-                'is_fno': sym in FNO_SYMBOLS,
-                'price_vs_52w_high': ((price - high_52w) / high_52w) * 100 if high_52w else 0,
-                'price_vs_52w_low': ((price - low_52w) / low_52w) * 100 if low_52w else 0,
-                'price_vs_ema_9': ((price - last_row['ema_9']) / last_row['ema_9']) * 100 if not pd.isna(last_row['ema_9']) else 0,
-                'price_vs_ema_20': ((price - last_row['ema_20']) / last_row['ema_20']) * 100 if not pd.isna(last_row['ema_20']) else 0,
-                'price_vs_ema_50': ((price - last_row['ema_50']) / last_row['ema_50']) * 100 if not pd.isna(last_row['ema_50']) else 0,
-                'price_vs_ema_200': ((price - last_row['ema_200']) / last_row['ema_200']) * 100 if not pd.isna(last_row['ema_200']) else 0,
-                'price_vs_vwap': ((price - last_row['vwap']) / last_row['vwap']) * 100 if not pd.isna(last_row['vwap']) else 0,
-                # New indicator fields
-                'bb_pct_b': float((price - last_row.get('bb_lower', price)) / (last_row.get('bb_upper', price + 1) - last_row.get('bb_lower', price))) if (last_row.get('bb_upper', 0) - last_row.get('bb_lower', 0)) > 0 else 0.5,
-                'atr_14': float(last_row.get('atr_14', 0)) if not pd.isna(last_row.get('atr_14', 0)) else 0,
-                'ema_20': float(last_row.get('ema_20', 0)) if not pd.isna(last_row.get('ema_20', 0)) else 0,
-                'ema_50': float(last_row.get('ema_50', 0)) if not pd.isna(last_row.get('ema_50', 0)) else 0,
-                'ema_200': float(last_row.get('ema_200', 0)) if not pd.isna(last_row.get('ema_200', 0)) else 0,
-                'sma_20': float(df['close'].rolling(20).mean().iloc[-1]) if len(df) >= 20 else 0,
-                'sma_50': float(df['close'].rolling(50).mean().iloc[-1]) if len(df) >= 50 else 0,
-                # Fundamental fields (demo values)
-                'delivery_pct': round(random.uniform(25, 75), 1),
-                'market_cap_cr': round(random.uniform(500, 500000), 0),
-                'pe_ratio': round(random.uniform(5, 80), 1),
-            }
-            batch_results.append(stock_data)
+            stock_data = get_demo_stock(i, sym)
+            if evaluate_filters(stock_data, filters, logic):
+                batch_results.append(stock_data)
             
             if (i + 1) % 5 == 0 or i == len(demo_stocks) - 1:
-                matched = apply_filters(batch_results, filters, logic)
-                yield {"results": matched, "progress": {"current": i + 1, "total": 20}}
+                batch_results = sanitize_for_json(batch_results)
+                yield {"results": batch_results, "progress": {"current": i + 1, "total": 20}}
                 batch_results = []
                 await asyncio.sleep(0.5)
                 
@@ -279,6 +244,9 @@ async def run_scan_generator(smart, filters: list[dict], universe: str = 'NSE',
 
     # Real scan logic
     instruments = load_master_instruments()
+    if not instruments:
+        logger.warning("Master list empty. Using NIFTY100_FALLBACK.")
+        instruments = [{'token': 'dummy', 'symbol': s, 'name': s, 'exchange': 'NSE'} for s in NIFTY100_FALLBACK]
     
     # Reduce Universe for speed
     if universe == 'NSE':
@@ -340,48 +308,35 @@ async def run_scan_generator(smart, filters: list[dict], universe: str = 'NSE',
                 
                 stock_data = {
                     'symbol': sym,
-                    'name': next((x['name'] for x in batch if x['symbol'] == sym), sym),
-                    'price': price,
-                    'change_pct': ((price - prev_close) / prev_close) * 100,
+                    'exchange': next((x.get('exchange', 'NSE') for x in batch if x['symbol'] == sym), 'NSE'),
+                    'last_price': price,
+                    'pct_change': ((price - prev_close) / prev_close) * 100,
                     'volume': last_row['volume'],
-                    'vol_ratio': (last_row['volume'] / avg_vol) if avg_vol > 0 else 0,
+                    'volume_ratio': (last_row['volume'] / avg_vol) if avg_vol > 0 else 0,
                     'rsi_14': last_row['rsi_14'],
                     'macd_histogram': last_row['macd_histogram'],
-                    'supertrend_direction': last_row['supertrend_direction'],
-                    'adx': last_row['adx'],
-                    'bb_bandwidth': last_row['bb_bandwidth'],
-                    'sector': STOCK_SECTORS.get(sym, 'OTHER'),
-                    'is_fno': sym in FNO_SYMBOLS,
-                    'price_vs_52w_high': ((price - high_52w) / high_52w) * 100 if high_52w else 0,
-                    'price_vs_52w_low': ((price - low_52w) / low_52w) * 100 if low_52w else 0,
-                    'price_vs_ema_9': ((price - last_row['ema_9']) / last_row['ema_9']) * 100 if not pd.isna(last_row['ema_9']) else 0,
-                    'price_vs_ema_20': ((price - last_row['ema_20']) / last_row['ema_20']) * 100 if not pd.isna(last_row['ema_20']) else 0,
-                    'price_vs_ema_50': ((price - last_row['ema_50']) / last_row['ema_50']) * 100 if not pd.isna(last_row['ema_50']) else 0,
-                    'price_vs_ema_200': ((price - last_row['ema_200']) / last_row['ema_200']) * 100 if not pd.isna(last_row['ema_200']) else 0,
-                    'price_vs_vwap': ((price - last_row['vwap']) / last_row['vwap']) * 100 if not pd.isna(last_row['vwap']) else 0,
-                    # New indicator fields
-                    'bb_pct_b': float((price - last_row.get('bb_lower', price)) / (last_row.get('bb_upper', price + 1) - last_row.get('bb_lower', price))) if (last_row.get('bb_upper', 0) - last_row.get('bb_lower', 0)) > 0 else 0.5,
+                    'supertrend': last_row.get('supertrend_direction', 'NEUTRAL'),
+                    'adx_14': last_row['adx'],
+                    'pct_from_52h': ((price - high_52w) / high_52w) * 100 if high_52w else 0,
+                    'pct_from_52l': ((price - low_52w) / low_52w) * 100 if low_52w else 0,
+                    'bb_pctb': float((price - last_row.get('bb_lower', price)) / (last_row.get('bb_upper', price + 1) - last_row.get('bb_lower', price))) if (last_row.get('bb_upper', 0) - last_row.get('bb_lower', 0)) > 0 else 0.5,
                     'atr_14': float(last_row.get('atr_14', 0)) if not pd.isna(last_row.get('atr_14', 0)) else 0,
                     'ema_20': float(last_row.get('ema_20', 0)) if not pd.isna(last_row.get('ema_20', 0)) else 0,
                     'ema_50': float(last_row.get('ema_50', 0)) if not pd.isna(last_row.get('ema_50', 0)) else 0,
                     'ema_200': float(last_row.get('ema_200', 0)) if not pd.isna(last_row.get('ema_200', 0)) else 0,
                     'sma_20': float(df['close'].rolling(20).mean().iloc[-1]) if len(df) >= 20 else 0,
                     'sma_50': float(df['close'].rolling(50).mean().iloc[-1]) if len(df) >= 50 else 0,
-                    'delivery_pct': round(random.uniform(25, 75), 1),
-                    'market_cap_cr': round(random.uniform(500, 500000), 0),
-                    'pe_ratio': round(random.uniform(5, 80), 1),
+                    'market_cap': round(random.uniform(500, 500000), 0)
                 }
-                for pat in ['bullish_engulfing', 'bearish_engulfing', 'doji', 'hammer', 'morning_star', 'evening_star']:
-                    stock_data[pat] = bool(last_row.get(pat, False))
-                    
-                batch_parsed.append(stock_data)
+                if evaluate_filters(stock_data, filters, logic):
+                    batch_parsed.append(stock_data)
 
-        matched = apply_filters(batch_parsed, filters, logic)
-        all_matched.extend(matched)
-        total_matched += len(matched)
+        all_matched.extend(batch_parsed)
+        total_matched += len(batch_parsed)
         
+        batch_parsed = sanitize_for_json(batch_parsed)
         yield {
-            "results": matched,
+            "results": batch_parsed,
             "progress": {"current": min(i+batch_size, total_instruments), "total": total_instruments}
         }
 

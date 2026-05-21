@@ -3,23 +3,19 @@ import './screener.css';
 
 const FILTER_FIELDS = [
   // Price
-  { key: 'price', label: 'Last Price (₹)', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
-  { key: 'change_pct', label: '% Change Today', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 2 },
-  { key: 'price_vs_52w_high', label: '% From 52W High', type: 'number', category: 'Price', defaultOp: '<', defaultVal: 5 },
-  { key: 'price_vs_52w_low', label: '% From 52W Low', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 10 },
-  { key: 'price_vs_ema_20', label: 'Price vs EMA20', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
-  { key: 'price_vs_ema_50', label: 'Price vs EMA50', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
-  { key: 'price_vs_ema_200', label: 'Price vs EMA200', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
+  { key: 'last_price', label: 'Last Price (₹)', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 0 },
+  { key: 'pct_change', label: '% Change Today', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 2 },
+  { key: 'pct_from_52h', label: '% From 52W High', type: 'number', category: 'Price', defaultOp: '<', defaultVal: 5 },
+  { key: 'pct_from_52l', label: '% From 52W Low', type: 'number', category: 'Price', defaultOp: '>', defaultVal: 10 },
   // Volume
   { key: 'volume', label: 'Volume (shares)', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 100000 },
-  { key: 'vol_ratio', label: 'Volume Ratio (x avg)', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 2 },
-  { key: 'delivery_pct', label: 'Delivery %', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 40 },
+  { key: 'volume_ratio', label: 'Volume Ratio (x avg)', type: 'number', category: 'Volume', defaultOp: '>', defaultVal: 2 },
   // Technical Indicators
   { key: 'rsi_14', label: 'RSI (14)', type: 'number', category: 'Technical Indicators', defaultOp: '<', defaultVal: 30 },
   { key: 'macd_histogram', label: 'MACD Histogram', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 0 },
-  { key: 'adx', label: 'ADX (14)', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 25 },
-  { key: 'supertrend_direction', label: 'Supertrend Direction', type: 'select', category: 'Technical Indicators', options: [{value: 1, label: 'BUY'}, {value: -1, label: 'SELL'}], defaultOp: '=', defaultVal: 1 },
-  { key: 'bb_pct_b', label: 'Bollinger %B', type: 'number', category: 'Technical Indicators', defaultOp: '<', defaultVal: 0.2 },
+  { key: 'adx_14', label: 'ADX (14)', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 25 },
+  { key: 'supertrend', label: 'Supertrend', type: 'select', category: 'Technical Indicators', options: [{value: 'BUY', label: 'BUY'}, {value: 'SELL', label: 'SELL'}], defaultOp: '=', defaultVal: 'BUY' },
+  { key: 'bb_pctb', label: 'Bollinger %B', type: 'number', category: 'Technical Indicators', defaultOp: '<', defaultVal: 0.2 },
   { key: 'atr_14', label: 'ATR (14)', type: 'number', category: 'Technical Indicators', defaultOp: '>', defaultVal: 0 },
   // Moving Averages
   { key: 'ema_20', label: 'EMA 20', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
@@ -28,14 +24,7 @@ const FILTER_FIELDS = [
   { key: 'sma_20', label: 'SMA 20', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
   { key: 'sma_50', label: 'SMA 50', type: 'number', category: 'Moving Averages', defaultOp: '>', defaultVal: 0 },
   // Fundamentals
-  { key: 'market_cap_cr', label: 'Market Cap (Cr)', type: 'number', category: 'Fundamentals', defaultOp: '>', defaultVal: 1000 },
-  { key: 'pe_ratio', label: 'P/E Ratio', type: 'number', category: 'Fundamentals', defaultOp: '<', defaultVal: 30 },
-  { key: 'sector', label: 'Sector', type: 'select', category: 'Fundamentals', options: [
-    {value:'IT',label:'IT'},{value:'BANKS',label:'Banks'},{value:'PHARMA',label:'Pharma'},
-    {value:'AUTO',label:'Auto'},{value:'FMCG',label:'FMCG'},{value:'METALS',label:'Metals'},
-    {value:'ENERGY',label:'Energy'},{value:'FINANCE',label:'Finance'},{value:'INFRA',label:'Infra'},
-    {value:'TELECOM',label:'Telecom'},{value:'CONSUMER',label:'Consumer'},{value:'REALTY',label:'Realty'}
-  ], defaultOp: '=', defaultVal: 'IT' },
+  { key: 'market_cap', label: 'Market Cap (Cr)', type: 'number', category: 'Fundamentals', defaultOp: '>', defaultVal: 1000 },
 ];
 
 export default function ScreenerPage({ standalone, onStockClick }) {
@@ -58,7 +47,7 @@ export default function ScreenerPage({ standalone, onStockClick }) {
   // Pagination & Sorting
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(50);
-  const [sortConfig, setSortConfig] = useState({ key: 'change_pct', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState({ key: 'pct_change', direction: 'desc' });
 
   // Close dropdown on outside click
   const addFilterRef = useRef(null);
@@ -215,8 +204,8 @@ export default function ScreenerPage({ standalone, onStockClick }) {
   const exportCSV = () => {
     const headers = ['Rank','Symbol','Name','LTP','Change%','VolRatio','RSI','MACD','Signal','Sector'];
     const rows = results.map((r, i) => [
-      i+1, r.symbol, r.name||'', r.price, r.change_pct, r.vol_ratio, 
-      r.rsi_14?.toFixed(1), r.macd_histogram?.toFixed(2), r.supertrend_direction, r.sector
+      i+1, r.symbol, r.name||'', r.last_price, r.pct_change, r.volume_ratio, 
+      r.rsi_14?.toFixed(1), r.macd_histogram?.toFixed(2), r.supertrend, r.sector
     ]);
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -475,33 +464,33 @@ export default function ScreenerPage({ standalone, onStockClick }) {
                   <tr>
                     <th>#</th>
                     <th onClick={() => handleSort('symbol')}>Symbol {sortConfig.key === 'symbol' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('price')}>LTP {sortConfig.key === 'price' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('change_pct')}>Change% {sortConfig.key === 'change_pct' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('vol_ratio')}>Vol Ratio {sortConfig.key === 'vol_ratio' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                    <th onClick={() => handleSort('last_price')}>LTP {sortConfig.key === 'last_price' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                    <th onClick={() => handleSort('pct_change')}>Change% {sortConfig.key === 'pct_change' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                    <th onClick={() => handleSort('volume_ratio')}>Vol Ratio {sortConfig.key === 'volume_ratio' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
                     <th onClick={() => handleSort('rsi_14')}>RSI {sortConfig.key === 'rsi_14' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th onClick={() => handleSort('supertrend_direction')}>Signal {sortConfig.key === 'supertrend_direction' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                    <th onClick={() => handleSort('supertrend')}>Signal {sortConfig.key === 'supertrend' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
                     <th onClick={() => handleSort('sector')}>Sector {sortConfig.key === 'sector' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedResults.map((r, i) => {
                     const rank = (page - 1) * perPage + i + 1;
-                    const isPositive = r.change_pct > 0;
+                    const isPositive = r.pct_change > 0;
                     
                     let signalBadge = <span className="screener-badge neutral">NEUTRAL</span>;
-                    if (r.supertrend_direction === 1) signalBadge = <span className="screener-badge bullish">BULLISH</span>;
-                    if (r.supertrend_direction === -1) signalBadge = <span className="screener-badge bearish">BEARISH</span>;
+                    if (r.supertrend === 'BUY') signalBadge = <span className="screener-badge bullish">BULLISH</span>;
+                    if (r.supertrend === 'SELL') signalBadge = <span className="screener-badge bearish">BEARISH</span>;
                     
-                    const exBadge = r.symbol.includes('.BSE') ? 'bse' : 'nse';
-                    const exLabel = r.symbol.includes('.BSE') ? 'BSE' : 'NSE';
+                    const exBadge = (r.exchange || 'NSE').toLowerCase();
+                    const exLabel = r.exchange || 'NSE';
 
                     return (
                       <tr key={r.symbol} onClick={() => {
                         if (onStockClick) onStockClick({
                           symbol: r.symbol,
-                          price: r.price,
-                          prev_close: r.price / (1 + r.change_pct/100),
-                          change_pct: r.change_pct
+                          price: r.last_price,
+                          prev_close: r.last_price / (1 + r.pct_change/100),
+                          change_pct: r.pct_change
                         });
                       }}>
                         <td style={{ color: 'rgba(255,255,255,0.3)' }}>{rank}</td>
@@ -511,11 +500,11 @@ export default function ScreenerPage({ standalone, onStockClick }) {
                             <span className={`screener-exchange-badge ${exBadge}`}>{exLabel}</span>
                           </div>
                         </td>
-                        <td className="screener-table-price">₹{r.price?.toFixed(2)}</td>
+                        <td className="screener-table-price">₹{r.last_price?.toFixed(2)}</td>
                         <td className={`screener-table-change ${isPositive ? 'positive' : 'negative'}`}>
-                          {isPositive ? '▲' : '▼'} {Math.abs(r.change_pct || 0).toFixed(2)}%
+                          {isPositive ? '▲' : '▼'} {Math.abs(r.pct_change || 0).toFixed(2)}%
                         </td>
-                        <td>{r.vol_ratio ? r.vol_ratio.toFixed(1) + 'x' : '-'}</td>
+                        <td>{r.volume_ratio ? r.volume_ratio.toFixed(1) + 'x' : '-'}</td>
                         <td>{r.rsi_14?.toFixed(1) || '-'}</td>
                         <td>{signalBadge}</td>
                         <td className="screener-sector">{r.sector || '-'}</td>
