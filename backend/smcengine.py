@@ -428,7 +428,7 @@ def _demo_displacement() -> dict:
 
 
 def _demo_liquidity_pools(symbol: str) -> dict:
-    """Generate realistic liquidity pool data for any symbol."""
+    """Generate realistic liquidity pool data (unified pools array format)."""
     base = {
         "BANKNIFTY": 52105.0,
         "NIFTY":     24318.75,
@@ -444,89 +444,23 @@ def _demo_liquidity_pools(symbol: str) -> dict:
 
     def _pct(p, pct): return round(p * (1 + pct / 100), 2)
 
-    pools_above = [
-        {
-            "pool_type":               "EQUAL_HIGHS",
-            "pool_price":              _pct(base, 0.84),
-            "distance_pct":            0.84,
-            "touch_count":             3,
-            "round_number_confluence": True,
-            "nearest_round_number":    round(_pct(base, 0.84) / 500) * 500,
-            "untested":                True,
-            "current_price":           base,
-        },
-        {
-            "pool_type":               "EQUAL_HIGHS",
-            "pool_price":              _pct(base, 1.52),
-            "distance_pct":            1.52,
-            "touch_count":             2,
-            "round_number_confluence": False,
-            "nearest_round_number":    round(_pct(base, 1.52) / 500) * 500,
-            "untested":                True,
-            "current_price":           base,
-        },
-        {
-            "pool_type":               "EQUAL_HIGHS",
-            "pool_price":              _pct(base, 2.34),
-            "distance_pct":            2.34,
-            "touch_count":             4,
-            "round_number_confluence": True,
-            "nearest_round_number":    round(_pct(base, 2.34) / 500) * 500,
-            "untested":                False,
-            "current_price":           base,
-        },
-    ]
-
-    pools_below = [
-        {
-            "pool_type":               "EQUAL_LOWS",
-            "pool_price":              _pct(base, -0.72),
-            "distance_pct":            0.72,
-            "touch_count":             3,
-            "round_number_confluence": False,
-            "nearest_round_number":    round(_pct(base, -0.72) / 500) * 500,
-            "untested":                True,
-            "current_price":           base,
-        },
-        {
-            "pool_type":               "EQUAL_LOWS",
-            "pool_price":              _pct(base, -1.44),
-            "distance_pct":            1.44,
-            "touch_count":             2,
-            "round_number_confluence": True,
-            "nearest_round_number":    round(_pct(base, -1.44) / 500) * 500,
-            "untested":                True,
-            "current_price":           base,
-        },
-        {
-            "pool_type":               "EQUAL_LOWS",
-            "pool_price":              _pct(base, -2.91),
-            "distance_pct":            2.91,
-            "touch_count":             5,
-            "round_number_confluence": True,
-            "nearest_round_number":    round(_pct(base, -2.91) / 500) * 500,
-            "untested":                False,
-            "current_price":           base,
-        },
+    pools = [
+        # EQUAL_HIGHS (above current price)
+        {"pool_type": "EQUAL_HIGHS", "pool_price": _pct(base, 0.84), "distance_pct": 0.84, "touch_count": 3, "round_number_confluence": True,  "untested": True},
+        {"pool_type": "EQUAL_HIGHS", "pool_price": _pct(base, 1.52), "distance_pct": 1.52, "touch_count": 2, "round_number_confluence": False, "untested": True},
+        {"pool_type": "EQUAL_HIGHS", "pool_price": _pct(base, 2.34), "distance_pct": 2.34, "touch_count": 4, "round_number_confluence": True,  "untested": False},
+        # EQUAL_LOWS (below current price)
+        {"pool_type": "EQUAL_LOWS",  "pool_price": _pct(base, -0.72), "distance_pct": 0.72, "touch_count": 3, "round_number_confluence": False, "untested": True},
+        {"pool_type": "EQUAL_LOWS",  "pool_price": _pct(base, -1.44), "distance_pct": 1.44, "touch_count": 2, "round_number_confluence": True,  "untested": True},
+        {"pool_type": "EQUAL_LOWS",  "pool_price": _pct(base, -2.91), "distance_pct": 2.91, "touch_count": 5, "round_number_confluence": True,  "untested": False},
     ]
 
     return {
         "symbol":        symbol,
         "current_price": base,
-        "pools_above":   pools_above,
-        "pools_below":   pools_below,
-        "nearest_above": pools_above[0] if pools_above else None,
-        "nearest_below": pools_below[0] if pools_below else None,
-        "summary": {
-            "above_count":           len(pools_above),
-            "below_count":           len(pools_below),
-            "nearest_above_price":   pools_above[0]["pool_price"] if pools_above else None,
-            "nearest_above_pct":     pools_above[0]["distance_pct"] if pools_above else None,
-            "nearest_below_price":   pools_below[0]["pool_price"] if pools_below else None,
-            "nearest_below_pct":     pools_below[0]["distance_pct"] if pools_below else None,
-        },
-        "timestamp":  _ts(),
-        "demo_mode":  True,
+        "pools":         pools,
+        "timestamp":     _ts(),
+        "demo_mode":     True,
     }
 
 
@@ -1497,22 +1431,20 @@ async def get_liquidity_pools(symbol: str) -> dict:
         nearest_above = above_pools[0] if above_pools else None
         nearest_below = below_pools[0] if below_pools else None
 
+        # Unified pools array — frontend filters by pool_type
+        all_pools = [
+            {**p, "pool_type": "EQUAL_HIGHS"} for p in above_pools[:5]
+        ] + [
+            {**p, "pool_type": "EQUAL_LOWS"} for p in below_pools[:5]
+        ]
+
         result = {
             "symbol":        symbol,
             "current_price": round(current_price, 2),
-            "pools_above":   above_pools[:5],
+            "pools":         all_pools,          # unified array — frontend uses this
+            "pools_above":   above_pools[:5],    # kept for legacy compatibility
             "pools_below":   below_pools[:5],
-            "nearest_above": nearest_above,
-            "nearest_below": nearest_below,
-            "summary": {
-                "above_count":         len(above_pools),
-                "below_count":         len(below_pools),
-                "nearest_above_price": nearest_above["pool_price"]    if nearest_above else None,
-                "nearest_above_pct":   nearest_above["distance_pct"]  if nearest_above else None,
-                "nearest_below_price": nearest_below["pool_price"]    if nearest_below else None,
-                "nearest_below_pct":   nearest_below["distance_pct"]  if nearest_below else None,
-            },
-            "timestamp": _ts(),
+            "timestamp":     _ts(),
         }
 
         with _lp_lock:
