@@ -1201,6 +1201,26 @@ async def api_smc_liquidity_pools(symbol: str = Query("BANKNIFTY", description="
         raise HTTPException(status_code=500, detail={"error": "SMC_LP_ERROR", "message": str(e)})
 
 
+
+@app.get("/api/smc/ping")
+async def api_smc_ping():
+    """
+    Diagnostic endpoint — confirms SMC engine is importable and reachable.
+    Also reports whether live ticks are flowing (market open) or demo mode is active.
+    """
+    from backend.streamer import _tick_store, _store_lock
+    with _store_lock:
+        tick_count = len(_tick_store)
+
+    return {
+        "status":      "ok",
+        "message":     "SMC engine reachable",
+        "live_ticks":  tick_count,
+        "demo_mode":   tick_count == 0,
+        "time":        datetime.now(IST).strftime("%I:%M:%S %p IST"),
+    }
+
+
 # ── Serve React SPA (production build) ───────────────────────────────────────
 BUILD_DIR = os.path.join(os.path.dirname(__file__), "build")
 if os.path.isdir(BUILD_DIR):
