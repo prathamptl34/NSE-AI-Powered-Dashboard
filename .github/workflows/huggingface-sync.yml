@@ -16,4 +16,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git push --force https://PrathamXXX:$HF_TOKEN@huggingface.co/spaces/PrathamXXX/market-plus main
+          git push --force "https://PrathamXXX:$HF_TOKEN@huggingface.co/spaces/PrathamXXX/market-plus" HEAD:main
