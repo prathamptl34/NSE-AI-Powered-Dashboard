@@ -1097,6 +1097,110 @@ async def api_screener_cached_results(scan_id: str):
         return res
     raise HTTPException(status_code=404, detail="Scan results not found or expired")
 
+# ── SMC Intelligence Endpoints ────────────────────────────────────────────────
+from backend.smcengine import (
+    get_opening_range_data,
+    get_sweep_data,
+    get_grade_data,
+    get_oi_pcr_data,
+    get_displacement_data,
+    get_liquidity_pools,
+)
+
+@app.get("/api/smc/opening-range")
+async def api_smc_opening_range():
+    """
+    Feature 1 — Opening Range Manipulation Scanner.
+    Returns ORH/ORL levels for NIFTY and BANKNIFTY and any active BULL/BEAR manipulation alerts.
+    Detected when LTP wicks beyond the 9:15–9:30 AM opening range but closes back inside.
+    """
+    try:
+        data = await get_opening_range_data()
+        return data
+    except Exception as e:
+        logger.error(f"[SMC] opening-range error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "SMC_OR_ERROR", "message": str(e)})
+
+
+@app.get("/api/smc/sweeps")
+async def api_smc_sweeps():
+    """
+    Feature 3 — PDH/PDL Liquidity Sweep Detector.
+    Returns active sweep events across 22 monitored instruments (top F&O + indices).
+    A sweep is an intrabar wick beyond Previous Day/Week High or Low that closes back on the original side.
+    """
+    try:
+        data = await get_sweep_data()
+        return data
+    except Exception as e:
+        logger.error(f"[SMC] sweeps error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "SMC_SWEEP_ERROR", "message": str(e)})
+
+
+@app.get("/api/smc/grades")
+async def api_smc_grades():
+    """
+    Feature 4 — SMC Setup Quality Grader.
+    Scores 6 SMC confluence factors per instrument to produce a 0–100 setup score.
+    Grades: A+ (80+), A (60–79), B (40–59), NO TRADE (<40).
+    Refreshed every 30 seconds by the frontend poller.
+    """
+    try:
+        data = await get_grade_data()
+        return data
+    except Exception as e:
+        logger.error(f"[SMC] grades error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "SMC_GRADE_ERROR", "message": str(e)})
+
+
+@app.get("/api/smc/oi-pcr")
+async def api_smc_oi_pcr():
+    """
+    Feature 5 — OI & PCR Integration.
+    Fetches option chain from NSE public API. Returns PCR, max pain, call wall, put wall,
+    top 3 CE and PE OI buildup strikes, and OI divergence flag for NIFTY and BANKNIFTY.
+    Cached for 3 minutes to respect NSE rate limits.
+    """
+    try:
+        data = await get_oi_pcr_data()
+        return data
+    except Exception as e:
+        logger.error(f"[SMC] oi-pcr error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "SMC_OI_ERROR", "message": str(e)})
+
+
+@app.get("/api/smc/displacement")
+async def api_smc_displacement():
+    """
+    Feature 6 — Displacement Candle Detector.
+    Scans 5M intraday candles for outsized body (>1.5× avg) and volume (>1.3× avg).
+    Flags MSS (Market Structure Shift) confirmed when a sweep event preceded the displacement.
+    Returns last 10 events within the past 30 minutes.
+    """
+    try:
+        data = await get_displacement_data()
+        return data
+    except Exception as e:
+        logger.error(f"[SMC] displacement error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "SMC_DISP_ERROR", "message": str(e)})
+
+
+@app.get("/api/smc/liquidity-pools")
+async def api_smc_liquidity_pools(symbol: str = Query("BANKNIFTY", description="NSE symbol to map liquidity pools for")):
+    """
+    Feature 7 — Liquidity Pool Mapper.
+    Scans last 10 days of 1H OHLCV data to find equal highs and lows (within 0.15%).
+    Returns pools sorted by proximity to current price, with round number confluence and untested flags.
+    Cached per symbol for 5 minutes.
+    """
+    try:
+        data = await get_liquidity_pools(symbol.upper())
+        return data
+    except Exception as e:
+        logger.error(f"[SMC] liquidity-pools error for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail={"error": "SMC_LP_ERROR", "message": str(e)})
+
+
 # ── Serve React SPA (production build) ───────────────────────────────────────
 BUILD_DIR = os.path.join(os.path.dirname(__file__), "build")
 if os.path.isdir(BUILD_DIR):

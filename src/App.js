@@ -8,6 +8,7 @@ import HeatmapPage from "./Heatmap";
 import MoversSection from "./MoversSection";
 import PreMarketIntelligence from "./PreMarketIntelligence";
 import ScreenerPage from "./ScreenerPage";
+import SMCIntelligencePanel from "./SMCIntelligencePanel";
 
 // ── Utility functions ─────────────────────────────────────────────────────────
 
@@ -248,7 +249,8 @@ export default function App() {
     { key: 'screener',   label: 'Screener',            icon: '🔍' },
     { key: 'heatmap',    label: 'Heatmap',            icon: '🔥' },
     { key: 'movers',     label: 'Movers Alert',       icon: '⚡' },
-    { key: 'premarket',  label: 'Pre-Market Intel',   icon: '⚡📡' },
+    { key: 'premarket',  label: 'Pre-Market Intel',   icon: '📡' },
+    { key: 'smc',        label: 'SMC Intelligence',   icon: '🧠' },
   ];
 
   // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -577,7 +579,14 @@ export default function App() {
           </div>
         )}
 
-        {/* SECTION 6: UNIVERSAL SCREENER */}
+        {/* SECTION 6: SMC INTELLIGENCE */}
+        {activeSection === 'smc' && (
+          <div id="section-smc" className="content-fade-in section-content">
+            <SMCIntelligencePanel />
+          </div>
+        )}
+
+        {/* SECTION 7: UNIVERSAL SCREENER */}
         {activeSection === 'screener' && (
           <div id="section-screener" className="content-fade-in section-content">
             <div className="section-page-header">
