@@ -355,9 +355,59 @@
 .kz-countdown  { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: hsla(220, 20%, 55%, 1); margin-top: 3px; }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   FEATURE 3 — SWEEP RADAR TABLE
+   FEATURE 3 — SWEEP RADAR TABLE  (AUDIT-GRADE REWRITE)
    ───────────────────────────────────────────────────────────────────────────── */
 
+/* ── Demo mode banner ── */
+.demo-mode-banner {
+  display:       flex;
+  align-items:   center;
+  gap:           10px;
+  padding:       10px 14px;
+  background:    hsla(38, 92%, 50%, 0.08);
+  border:        1px solid hsla(38, 92%, 50%, 0.2);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size:     12px;
+  color:         #f59e0b;
+  font-family:   'IBM Plex Mono', monospace;
+}
+
+/* ── Live / demo badges ── */
+.live-data-badge {
+  font-size:      10px;
+  font-weight:    700;
+  color:          #10b981;
+  font-family:    'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  animation:      live-pulse 2s ease-in-out infinite;
+}
+.demo-data-badge {
+  font-size:      10px;
+  font-weight:    600;
+  color:          #78716c;
+  font-family:    'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+}
+@keyframes live-pulse {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.5; }
+}
+
+/* ── Card header ── */
+.sweep-card-header {
+  display:         flex;
+  justify-content: space-between;
+  align-items:     flex-start;
+  margin-bottom:   16px;
+}
+.sweep-header-right {
+  display:     flex;
+  align-items: center;
+  padding-top: 2px;
+}
+
+/* ── Sweep table ── */
 .sweep-table {
   width:           100%;
   border-collapse: collapse;
@@ -366,25 +416,122 @@
 .sweep-table th {
   font-family:    'IBM Plex Mono', monospace;
   font-size:      9px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color:          hsla(220, 20%, 45%, 1);
-  padding:        0 12px 10px 0;
+  color:          hsla(220, 20%, 40%, 1);
+  padding:        0 10px 10px 0;
   font-weight:    500;
   border-bottom:  1px solid hsla(0, 0%, 100%, 0.05);
   text-align:     left;
+  white-space:    nowrap;
 }
 .sweep-table td {
-  padding:         10px 12px 10px 0;
-  color:           #C8D4F0;
-  border-bottom:   1px solid hsla(0, 0%, 100%, 0.04);
-  vertical-align:  middle;
+  padding:        11px 10px 11px 0;
+  color:          #C8D4F0;
+  border-bottom:  1px solid hsla(0, 0%, 100%, 0.04);
+  vertical-align: middle;
 }
 .sweep-table tr:last-child td { border-bottom: none; }
-.sweep-table tr:hover td      { background: hsla(222, 47%, 12%, 0.4); }
 
+/* Status-based row border on first cell */
+.sweep-table tr.status-active    td:first-child { border-left: 2px solid #f59e0b; padding-left: 8px; }
+.sweep-table tr.status-confirmed td:first-child { border-left: 2px solid #10b981; padding-left: 8px; }
+.sweep-table tr.status-failed    { opacity: 0.5; }
+.sweep-table tr.status-demo      { opacity: 0.4; font-style: italic; }
+
+/* Legacy row classes kept for compatibility */
 .sweep-row-pdh td:first-child { border-left: 2px solid #f43f5e; padding-left: 8px; }
 .sweep-row-pdl td:first-child { border-left: 2px solid #10b981; padding-left: 8px; }
+
+/* ── Cell type classes ── */
+.sweep-symbol-cell {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size:   13px;
+  font-weight: 600;
+  color:       #E8EEFF;
+  white-space: nowrap;
+}
+.sweep-price-cell {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size:   12px;
+  color:       #C8D4F0;
+  white-space: nowrap;
+}
+.sweep-size-cell {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size:   12px;
+  font-weight: 600;
+  color:       #E8EEFF;
+  white-space: nowrap;
+}
+.sweep-time-cell {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size:   11px;
+  color:       hsla(220, 20%, 45%, 1);
+  white-space: nowrap;
+}
+
+/* ── Mini OHLC in candle column ── */
+.mini-ohlc {
+  display:               grid;
+  grid-template-columns: 1fr 1fr;
+  gap:                   1px 8px;
+  font-family:           'IBM Plex Mono', monospace;
+  font-size:             9px;
+  color:                 hsla(220, 20%, 55%, 1);
+}
+.mini-ohlc strong {
+  color:       #C8D4F0;
+  font-weight: 500;
+}
+
+/* ── Major level star ── */
+.major-level-star {
+  font-size:   9px;
+  margin-left: 3px;
+  color:       #fbbf24;
+}
+
+/* ── Empty state ── */
+.sweep-empty-state {
+  text-align: center;
+  padding:    40px 20px;
+  color:      hsla(220, 20%, 40%, 1);
+}
+.sweep-empty-icon  { font-size: 28px; margin-bottom: 10px; opacity: 0.4; }
+.sweep-empty-state p { font-size: 13px; margin: 4px 0; }
+.sweep-empty-sub   { font-size: 11px; font-family: 'IBM Plex Mono', monospace; }
+
+/* ── Education explainer panel ── */
+.sweep-explainer {
+  margin-top:    16px;
+  border:        1px solid hsla(0, 0%, 100%, 0.06);
+  border-radius: 8px;
+  overflow:      hidden;
+}
+.sweep-explainer summary {
+  padding:        10px 14px;
+  font-size:      11px;
+  color:          hsla(217, 91%, 60%, 0.8);
+  font-family:    'IBM Plex Mono', monospace;
+  cursor:         pointer;
+  letter-spacing: 0.05em;
+  background:     hsla(217, 91%, 60%, 0.05);
+  list-style:     none;
+  user-select:    none;
+}
+.sweep-explainer summary::-webkit-details-marker { display: none; }
+.sweep-explainer summary:hover { background: hsla(217, 91%, 60%, 0.08); }
+.sweep-explainer-body {
+  padding:    14px 16px;
+  font-size:  12px;
+  color:      hsla(220, 20%, 65%, 1);
+  line-height: 1.7;
+  background: hsla(222, 47%, 7%, 0.6);
+}
+.sweep-explainer-body p       { margin: 0 0 8px 0; }
+.sweep-explainer-body p:last-child { margin-bottom: 0; }
+.sweep-explainer-body strong  { color: #E8EEFF; font-weight: 600; }
 
 /* ─────────────────────────────────────────────────────────────────────────────
    FEATURE 4 — SETUP QUALITY GRADER

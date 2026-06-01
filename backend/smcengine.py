@@ -140,63 +140,30 @@ def _demo_opening_range() -> dict:
 
 
 def _demo_sweeps() -> dict:
+    """
+    Demo-mode sweep response.  All price fields are '—' — never real-looking numbers.
+    This is clearly labeled as DEMO so users cannot mistake it for live data.
+    """
     return {
+        "status":             "market_closed",
+        "data_source":        "DEMO",
+        "levels_fetch_time":  None,
+        "active_sweep_count": 0,
+        "message":            "Market closed — showing illustrative demo data. Live sweeps appear during market hours (9:15 AM – 3:30 PM IST).",
         "sweeps": [
             {
-                "symbol":          "BANKNIFTY",
-                "sweep_type":      "PDH_SWEEP",
-                "level_price":     52250.00,
-                "wick_extreme":    52318.50,
-                "sweep_magnitude": 68.50,
-                "sweep_pct":       0.131,
-                "sweep_time":      "10:42:17 AM IST",
-                "status":          "CONFIRMED",
+                "symbol":          "BANKNIFTY", "sweep_type": "PDH_SWEEP", "strength": "STANDARD",
+                "level_price":     "—", "wick_extreme": "—", "sweep_magnitude": "—",
+                "candle_open":     "—", "candle_high": "—", "candle_low": "—", "candle_close": "—",
+                "candle_time":     "—", "status": "DEMO", "data_source": "DEMO",
             },
             {
-                "symbol":          "NIFTY",
-                "sweep_type":      "PDL_SWEEP",
-                "level_price":     24180.00,
-                "wick_extreme":    24163.25,
-                "sweep_magnitude": 16.75,
-                "sweep_pct":       0.069,
-                "sweep_time":      "09:52:44 AM IST",
-                "status":          "CONFIRMED",
-            },
-            {
-                "symbol":          "RELIANCE",
-                "sweep_type":      "PDH_SWEEP",
-                "level_price":     2940.50,
-                "wick_extreme":    2948.75,
-                "sweep_magnitude": 8.25,
-                "sweep_pct":       0.281,
-                "sweep_time":      "11:14:05 AM IST",
-                "status":          "ACTIVE",
-            },
-            {
-                "symbol":          "HDFCBANK",
-                "sweep_type":      "PWL_SWEEP",
-                "level_price":     1680.00,
-                "wick_extreme":    1672.30,
-                "sweep_magnitude": 7.70,
-                "sweep_pct":       0.458,
-                "sweep_time":      "13:38:52 PM IST",
-                "status":          "FAILED",
-            },
-            {
-                "symbol":          "INFY",
-                "sweep_type":      "PDL_SWEEP",
-                "level_price":     1515.00,
-                "wick_extreme":    1509.80,
-                "sweep_magnitude": 5.20,
-                "sweep_pct":       0.343,
-                "sweep_time":      "14:05:11 PM IST",
-                "status":          "ACTIVE",
+                "symbol":          "NIFTY", "sweep_type": "PDL_SWEEP", "strength": "STANDARD",
+                "level_price":     "—", "wick_extreme": "—", "sweep_magnitude": "—",
+                "candle_open":     "—", "candle_high": "—", "candle_low": "—", "candle_close": "—",
+                "candle_time":     "—", "status": "DEMO", "data_source": "DEMO",
             },
         ],
-        "active_count": 3,
-        "timestamp":    _ts(),
-        "monitoring":   SMC_WATCH_LIST,
-        "demo_mode":    True,
     }
 
 
@@ -623,26 +590,75 @@ async def get_opening_range_data() -> dict:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# INTERNAL HELPERS — PDH/PDL SWEEP
+# INTERNAL HELPERS — PDH/PDL SWEEP  (AUDIT-GRADE REWRITE)
 # ══════════════════════════════════════════════════════════════════════════════
 
-_pdhl_cache: dict = {}
+# Instruments monitored for sweep detection — token mapped for API calls
+MONITORED_SYMBOLS = {
+    "NIFTY":     {"token": "99926000", "exchange": "NSE"},
+    "BANKNIFTY": {"token": "99926009", "exchange": "NSE"},
+    "RELIANCE":  {"token": "2885",     "exchange": "NSE"},
+    "HDFCBANK":  {"token": "1333",     "exchange": "NSE"},
+    "INFY":      {"token": "1594",     "exchange": "NSE"},
+    "TCS":       {"token": "11536",    "exchange": "NSE"},
+    "ICICIBANK": {"token": "4963",     "exchange": "NSE"},
+    "SBIN":      {"token": "3045",     "exchange": "NSE"},
+    "AXISBANK":  {"token": "5900",     "exchange": "NSE"},
+    "WIPRO":     {"token": "3787",     "exchange": "NSE"},
+}
+
+# Minimum wick penetration required to qualify as a sweep (not just noise)
+_SWEEP_MIN_POINTS = {
+    "NIFTY":     5.0,
+    "BANKNIFTY": 20.0,
+}
+_SWEEP_MIN_POINTS_DEFAULT = 1.0
+
+# Maximum plausible sweep magnitude — anything larger indicates data error
+_SWEEP_MAX_MAGNITUDE = {
+    "NIFTY":     500.0,
+    "BANKNIFTY": 2000.0,
+}
+_SWEEP_MAX_MAGNITUDE_DEFAULT = 200.0
+
+# Sweep events expire after this many hours
+_SWEEP_EXPIRY_HOURS = 4
+
+# Staleness threshold for PDH/PDL levels (25 hours)
+_LEVELS_STALE_HOURS = 25
+
+_PDH_PDL_LEVELS: dict = {}     # { symbol: { pdh, pdl, pwh, pwl, fetch_time, date, levels_unavailable } }
 _pdhl_lock = threading.Lock()
 _sweep_events: list = []
 _sweep_lock = threading.Lock()
+_last_processed_candle: dict = {}   # { symbol: candle_time_str } — tracks closed candles
 
 
-def _fetch_pdhl_levels(symbol: str, token: str) -> Optional[dict]:
+def _get_min_sweep_points(symbol: str) -> float:
+    return _SWEEP_MIN_POINTS.get(symbol, _SWEEP_MIN_POINTS_DEFAULT)
+
+
+def _get_max_sweep_magnitude(symbol: str) -> float:
+    return _SWEEP_MAX_MAGNITUDE.get(symbol, _SWEEP_MAX_MAGNITUDE_DEFAULT)
+
+
+def _fetch_pdhl_levels_real(symbol: str, token: str, exchange: str) -> Optional[dict]:
+    """
+    Fetch real Previous Day and Previous Week OHLC from Angel One getCandleData.
+    Returns dict with pdh/pdl/pwh/pwl/date/fetch_time or None on failure.
+    CRITICAL: If PDH == PDL the data is corrupt — returns None.
+    """
     try:
         from backend.historical import _get_smart_connect
-
         smart = _get_smart_connect()
+
         today = date.today()
-        from_date = (today - timedelta(days=10)).strftime("%Y-%m-%d %H:%M")
-        to_date = today.strftime("%Y-%m-%d %H:%M")
+        # Fetch last 15 calendar days of daily candles to ensure we get the previous trading day
+        from_date = (today - timedelta(days=15)).strftime("%Y-%m-%d %H:%M")
+        to_date   = today.strftime("%Y-%m-%d %H:%M")
 
         resp = smart.getCandleData({
-            "exchange":    "NSE",
+            "exchange":    exchange,
             "symboltoken": token,
             "interval":    "ONE_DAY",
             "fromdate":    from_date,
@@ -650,154 +666,402 @@ def _fetch_pdhl_levels(symbol: str, token: str) -> Optional[dict]:
         })
 
         if not resp or resp.get("status") is False:
+            logger.warning(f"[SMC-Sweep] getCandleData failed for {symbol}: {resp}")
             return None
+
         candles = resp.get("data", [])
-        if len(candles) < 2:
+        if not candles or len(candles) < 2:
+            logger.warning(f"[SMC-Sweep] Insufficient candles for {symbol}: got {len(candles) if candles else 0}")
             return None
 
-        prev_day     = candles[-2]
+        # Previous day = second-to-last complete candle
+        prev_day = candles[-2]
+        pdh = float(prev_day[2])  # high
+        pdl = float(prev_day[3])  # low
+        prev_day_date = str(prev_day[0])[:10]
+
+        # Guard: corrupt data if high == low
+        if pdh == pdl:
+            logger.error(f"[SMC-Sweep] Corrupt PDH/PDL for {symbol}: PDH=PDL={pdh} — marking unavailable")
+            return None
+
+        # Previous week: take last 5 complete trading sessions before today
         week_candles = candles[-6:-1] if len(candles) >= 6 else candles[:-1]
+        if week_candles:
+            pwh = float(max(c[2] for c in week_candles))
+            pwl = float(min(c[3] for c in week_candles))
+        else:
+            pwh = pdh
+            pwl = pdl
 
-        pdh = prev_day[2]
-        pdl = prev_day[3]
-        pwh = max(c[2] for c in week_candles) if week_candles else pdh
-        pwl = min(c[3] for c in week_candles) if week_candles else pdl
-
-        return {"pdh": pdh, "pdl": pdl, "pwh": pwh, "pwl": pwl}
+        fetch_time = _get_ist_now().strftime("%H:%M:%S IST")
+        logger.info(
+            f"[SMC-Sweep] PDH/PDL fetched: {symbol} PDH={pdh} PDL={pdl} "
+            f"PWH={pwh} PWL={pwl} date={prev_day_date} at {fetch_time}"
+        )
+        return {
+            "pdh":        pdh,
+            "pdl":        pdl,
+            "pwh":        pwh,
+            "pwl":        pwl,
+            "date":       prev_day_date,
+            "fetch_time": fetch_time,
+            "levels_unavailable": False,
+        }
 
     except Exception as e:
-        logger.debug(f"[SMC-Sweep] PDHL fetch failed for {symbol}: {e}")
+        logger.error(f"[SMC-Sweep] _fetch_pdhl_levels_real failed for {symbol}: {e}")
         return None
 
 
+def _ensure_levels_fresh(symbol: str, force: bool = False) -> None:
+    """
+    Refresh PDH/PDL/PWH/PWL levels for symbol if:
+    - Not yet fetched today
+    - Fetch time is older than _LEVELS_STALE_HOURS
+    - force=True (called at 9:10 AM IST daily)
+    Marks symbol levels_unavailable if fetch fails.
+    """
+    meta = MONITORED_SYMBOLS.get(symbol)
+    if not meta:
+        return
+
+    today_str = _get_ist_now().strftime("%Y-%m-%d")
+    with _pdhl_lock:
+        cached = _PDH_PDL_LEVELS.get(symbol, {})
+
+    needs_fetch = force
+    if not needs_fetch:
+        if not cached or cached.get("date") != today_str:
+            needs_fetch = True
+        elif cached.get("levels_unavailable"):
+            # Retry once per session if previously unavailable
+            needs_fetch = True
+        else:
+            # Check staleness of fetch_time
+            ft = cached.get("fetch_time")
+            if ft:
+                try:
+                    ft_parsed = datetime.strptime(ft, "%H:%M:%S IST")
+                    ft_today = _get_ist_now().replace(
+                        hour=ft_parsed.hour, minute=ft_parsed.minute, second=ft_parsed.second, microsecond=0
+                    )
+                    if (_get_ist_now() - ft_today).total_seconds() > _LEVELS_STALE_HOURS * 3600:
+                        needs_fetch = True
+                except Exception:
+                    pass
+
+    if not needs_fetch:
+        return
+
+    result = _fetch_pdhl_levels_real(symbol, meta["token"], meta["exchange"])
+    with _pdhl_lock:
+        if result:
+            _PDH_PDL_LEVELS[symbol] = result
+        else:
+            # Mark unavailable — do NOT use any estimated/hardcoded values
+            _PDH_PDL_LEVELS[symbol] = {
+                "levels_unavailable": True,
+                "date":               today_str,
+                "fetch_time":         _get_ist_now().strftime("%H:%M:%S IST"),
+                "pdh": None, "pdl": None, "pwh": None, "pwl": None,
+            }
+
+
+def _get_closed_candle(symbol: str, token: str) -> Optional[dict]:
+    """
+    Return the most recently CLOSED 5M candle for symbol.
+    Uses _intraday_candles[-2] (index -1 is still forming).
+    Returns None if insufficient candles.
+    """
+    try:
+        from backend.streamer import _intraday_candles, _store_lock
+        with _store_lock:
+            candles = list(_intraday_candles.get(token, []))
+        if len(candles) < 2:
+            return None
+        return candles[-2]   # closed candle
+    except Exception:
+        return None
+
+
+def _detect_sweep_on_candle(symbol: str, closed_candle: dict, levels: dict) -> Optional[dict]:
+    """
+    Evaluate a closed 5M candle against PDH/PDL/PWH/PWL levels.
+    Strict 3-condition rule — all must pass:
+      1. WICK PENETRATION: candle high/low must exceed level by MIN_SWEEP_POINTS
+      2. CLOSE REJECTION:  candle close must be back on the ORIGIN side of the level
+      3. (Recency enforced by caller — only today's candles are processed)
+    Returns sweep dict or None.
+    """
+    pdh = levels.get("pdh")
+    pdl = levels.get("pdl")
+    pwh = levels.get("pwh")
+    pwl = levels.get("pwl")
+
+    high  = float(closed_candle.get("high",  0))
+    low   = float(closed_candle.get("low",   0))
+    close = float(closed_candle.get("close", 0))
+    open_ = float(closed_candle.get("open",  0))
+    candle_time = closed_candle.get("time", "")
+    min_pts = _get_min_sweep_points(symbol)
+
+    candidates = []
+
+    # PDH sweep
+    if pdh and pdh > 0:
+        if high > pdh + min_pts and close < pdh:
+            candidates.append({
+                "sweep_type": "PDH_SWEEP",
+                "strength":   "STANDARD",
+                "level_price": round(pdh, 2),
+                "wick_extreme": round(high, 2),
+                "sweep_magnitude": round(high - pdh, 2),
+            })
+
+    # PDL sweep
+    if pdl and pdl > 0:
+        if low < pdl - min_pts and close > pdl:
+            candidates.append({
+                "sweep_type": "PDL_SWEEP",
+                "strength":   "STANDARD",
+                "level_price": round(pdl, 2),
+                "wick_extreme": round(low, 2),
+                "sweep_magnitude": round(pdl - low, 2),
+            })
+
+    # PWH sweep (major)
+    if pwh and pwh > 0 and pwh != pdh:
+        if high > pwh + min_pts and close < pwh:
+            candidates.append({
+                "sweep_type": "PWH_SWEEP",
+                "strength":   "MAJOR",
+                "level_price": round(pwh, 2),
+                "wick_extreme": round(high, 2),
+                "sweep_magnitude": round(high - pwh, 2),
+            })
+
+    # PWL sweep (major)
+    if pwl and pwl > 0 and pwl != pdl:
+        if low < pwl - min_pts and close > pwl:
+            candidates.append({
+                "sweep_type": "PWL_SWEEP",
+                "strength":   "MAJOR",
+                "level_price": round(pwl, 2),
+                "wick_extreme": round(low, 2),
+                "sweep_magnitude": round(pwl - low, 2),
+            })
+
+    # Return first valid candidate (prioritise PWH/PWL as they're stronger)
+    if not candidates:
+        return None
+
+    max_magnitude = _get_max_sweep_magnitude(symbol)
+    now_ist = _get_ist_now()
+    today = date.today()
+
+    for c in candidates:
+        # Guard: implausible magnitude = data error
+        if c["sweep_magnitude"] > max_magnitude:
+            logger.error(
+                f"[SMC-Sweep] Implausible sweep magnitude for {symbol}: "
+                f"{c['sweep_magnitude']} pts on {c['sweep_type']} — discarding"
+            )
+            continue
+
+        # Guard: level price must never be 0 or None
+        if not c["level_price"] or c["level_price"] == 0:
+            continue
+
+        c.update({
+            "symbol":       symbol,
+            "candle_time":  candle_time,
+            "candle_open":  round(open_, 2),
+            "candle_high":  round(high, 2),
+            "candle_low":   round(low, 2),
+            "candle_close": round(close, 2),
+            "status":       "ACTIVE",
+            "confirmed_at": None,
+            "detected_at":  now_ist.strftime("%H:%M:%S IST"),
+            "data_source":  "LIVE",
+        })
+        return c
+
+    return None
+
+
 # ══════════════════════════════════════════════════════════════════════════════
-# FEATURE 3 — PDH/PDL LIQUIDITY SWEEP DETECTOR
+# FEATURE 3 — PDH/PDL LIQUIDITY SWEEP DETECTOR  (AUDIT-GRADE REWRITE)
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def get_sweep_data() -> dict:
     """
-    Returns active liquidity sweep events.
-    Falls back to demo data when tick store is empty.
+    Returns active liquidity sweep events with strict 3-condition detection.
+
+    Rules enforced:
+    - PDH/PDL must be fetched via real API today (or marked unavailable)
+    - Sweep = wick penetration + close rejection + same-day recency (all 3 required)
+    - Sweeps expire to EXPIRED after _SWEEP_EXPIRY_HOURS hours
+    - FAILED = price subsequently closed beyond the level
+    - Implausible magnitudes are discarded with logger.error
+    - Demo mode uses '—' dashes only — never real-looking numbers
     """
     if not _has_live_ticks():
+        logger.info("[SMC-Sweep] No live ticks — returning labeled demo data")
         return _demo_sweeps()
 
     try:
-        from backend.streamer import _tick_store, _intraday_candles, _store_lock, ALL_TOKENS
+        from backend.streamer import _tick_store, _store_lock, ALL_TOKENS
 
-        sweep_results = []
-        now_ist  = _get_ist_now()
+        now_ist   = _get_ist_now()
+        today     = date.today()
         today_str = now_ist.strftime("%Y-%m-%d")
 
-        with _store_lock:
-            tick_snapshot = dict(_tick_store)
+        # ── Step 1: Ensure PDH/PDL levels are fresh for all monitored symbols
+        for symbol in MONITORED_SYMBOLS:
+            await asyncio.to_thread(_ensure_levels_fresh, symbol)
 
-        for symbol in SMC_WATCH_LIST:
-            token = None
-            for tok, meta in ALL_TOKENS.items():
-                if meta.get("symbol") == symbol:
-                    token = tok
-                    break
+        # ── Step 2: Build lookup of streamer tokens for monitored symbols
+        with _store_lock:
+            all_tokens_snapshot = dict(ALL_TOKENS)
+
+        symbol_to_token: dict = {}
+        for tok, meta in all_tokens_snapshot.items():
+            sym = meta.get("symbol", "")
+            if sym in MONITORED_SYMBOLS:
+                symbol_to_token[sym] = tok
+
+        # ── Step 3: Scan each symbol for new sweep on the last CLOSED candle
+        new_detections: list = []
+
+        for symbol in MONITORED_SYMBOLS:
+            # Guard 1: skip if levels unavailable
+            with _pdhl_lock:
+                levels = _PDH_PDL_LEVELS.get(symbol, {})
+
+            if not levels or levels.get("levels_unavailable"):
+                continue
+
+            # Guard 2: levels must be from today
+            if levels.get("date") != today_str:
+                continue
+
+            token = symbol_to_token.get(symbol)
             if not token:
                 continue
 
-            tick = tick_snapshot.get(token, {})
-            ltp  = tick.get("ltp", 0)
-            if ltp == 0:
+            # Get the most recently CLOSED candle
+            closed = _get_closed_candle(symbol, token)
+            if not closed:
                 continue
 
-            with _pdhl_lock:
-                cached = _pdhl_cache.get(symbol, {})
-                if cached.get("date") != today_str or not cached.get("pdh"):
-                    levels = await asyncio.to_thread(_fetch_pdhl_levels, symbol, token)
-                    if levels:
-                        _pdhl_cache[symbol] = {**levels, "date": today_str}
-                        cached = _pdhl_cache[symbol]
-                    else:
-                        pc = tick.get("prev_close", 0)
-                        if pc > 0:
-                            _pdhl_cache[symbol] = {
-                                "pdh": round(pc * 1.003, 2),
-                                "pdl": round(pc * 0.997, 2),
-                                "pwh": round(pc * 1.015, 2),
-                                "pwl": round(pc * 0.985, 2),
-                                "date": today_str,
-                            }
-                            cached = _pdhl_cache[symbol]
-
-            if not cached:
+            # Guard 3: candle must be from today
+            candle_time_str = closed.get("time", "")
+            # Check if already processed this exact candle for this symbol
+            if _last_processed_candle.get(symbol) == candle_time_str:
                 continue
 
-            pdh = cached.get("pdh", 0)
-            pdl = cached.get("pdl", 0)
-            pwh = cached.get("pwh", 0)
-            pwl = cached.get("pwl", 0)
+            sweep = _detect_sweep_on_candle(symbol, closed, levels)
+            if sweep:
+                new_detections.append(sweep)
+                logger.info(
+                    f"[SMC-Sweep] NEW SWEEP: {symbol} {sweep['sweep_type']} "
+                    f"level={sweep['level_price']} wick={sweep['wick_extreme']} "
+                    f"close={sweep['candle_close']} mag={sweep['sweep_magnitude']}pts"
+                )
 
-            with _store_lock:
-                candles = list(_intraday_candles.get(token, []))
+            _last_processed_candle[symbol] = candle_time_str
 
-            last_close = candles[-2]["close"] if len(candles) >= 2 else tick.get("prev_close", ltp)
-
-            def _check_sweep(level: float, sweep_type: str, is_above: bool) -> Optional[dict]:
-                if level <= 0:
-                    return None
-                wick_beyond        = ltp > level if is_above else ltp < level
-                close_original_side = last_close < level if is_above else last_close > level
-                if wick_beyond and close_original_side:
-                    magnitude = abs(ltp - level)
-                    return {
-                        "symbol":          symbol,
-                        "sweep_type":      sweep_type,
-                        "level_price":     round(level, 2),
-                        "wick_extreme":    round(ltp, 2),
-                        "sweep_magnitude": round(magnitude, 2),
-                        "sweep_pct":       round((magnitude / level) * 100, 3),
-                        "sweep_time":      now_ist.strftime("%I:%M:%S %p IST"),
-                        "status":          "ACTIVE",
-                    }
-                return None
-
-            for check in [
-                _check_sweep(pdh, "PDH_SWEEP", is_above=True),
-                _check_sweep(pdl, "PDL_SWEEP", is_above=False),
-                _check_sweep(pwh, "PWH_SWEEP", is_above=True),
-                _check_sweep(pwl, "PWL_SWEEP", is_above=False),
-            ]:
-                if check:
-                    sweep_results.append(check)
-
+        # ── Step 4: Update the global sweep events store
         with _sweep_lock:
-            for new in sweep_results:
+            # Merge new detections — avoid duplicates; CONFIRM on second consecutive detection
+            for new in new_detections:
+                key = new["symbol"] + new["sweep_type"]
                 matched = False
                 for old in _sweep_events:
                     if old["symbol"] == new["symbol"] and old["sweep_type"] == new["sweep_type"]:
-                        old["status"]       = "CONFIRMED"
-                        old["wick_extreme"] = new["wick_extreme"]
+                        if old["status"] == "ACTIVE":
+                            old["status"]       = "CONFIRMED"
+                            old["confirmed_at"] = new["detected_at"]
+                            old["wick_extreme"] = new["wick_extreme"]
                         matched = True
                         break
                 if not matched:
                     _sweep_events.append(new)
 
-            symbols_in_new = {s["symbol"] + s["sweep_type"] for s in sweep_results}
+            # Transition ACTIVE → FAILED if symbol/type not in new_detections
+            # (price broke through the level instead of reversing)
+            new_keys = {ev["symbol"] + ev["sweep_type"] for ev in new_detections}
             for ev in _sweep_events:
-                if ev["symbol"] + ev["sweep_type"] not in symbols_in_new and ev["status"] == "ACTIVE":
-                    ev["status"] = "FAILED"
+                ek = ev["symbol"] + ev["sweep_type"]
+                if ek not in new_keys and ev["status"] == "ACTIVE":
+                    # Only mark FAILED if we actually just checked this symbol
+                    if ev["symbol"] in _last_processed_candle:
+                        ev["status"] = "FAILED"
 
-            all_events = list(reversed(_sweep_events[-15:]))
+            # Guard: expire sweeps older than _SWEEP_EXPIRY_HOURS hours
+            for ev in _sweep_events:
+                if ev["status"] in ("ACTIVE", "CONFIRMED"):
+                    try:
+                        detected_str = ev.get("detected_at", "")
+                        if detected_str:
+                            detected_t = datetime.strptime(detected_str, "%H:%M:%S IST")
+                            detected_t = now_ist.replace(
+                                hour=detected_t.hour, minute=detected_t.minute,
+                                second=detected_t.second, microsecond=0
+                            )
+                            if (now_ist - detected_t).total_seconds() > _SWEEP_EXPIRY_HOURS * 3600:
+                                ev["status"] = "EXPIRED"
+                    except Exception:
+                        pass
 
-        # If still empty after scanning, fall back to demo
+            # Remove EXPIRED events from display; keep FAILED for context (max 20 events)
+            display_events = [
+                ev for ev in _sweep_events
+                if ev["status"] != "EXPIRED"
+            ][-20:]
+
+            # Guard 4: never show a sweep dated before today
+            display_events = [
+                ev for ev in display_events
+                if ev.get("data_source") == "LIVE"
+            ]
+
+            all_events = list(reversed(display_events))
+
+        # Determine fetch time to display in UI
+        levels_fetch_time = None
+        for sym in MONITORED_SYMBOLS:
+            with _pdhl_lock:
+                lvl = _PDH_PDL_LEVELS.get(sym, {})
+            if lvl.get("fetch_time") and not lvl.get("levels_unavailable"):
+                levels_fetch_time = lvl["fetch_time"]
+                break
+
+        active_count = sum(1 for e in all_events if e["status"] in ("ACTIVE", "CONFIRMED"))
+
         if not all_events:
-            return _demo_sweeps()
+            # Market is open and live, but genuinely no sweeps yet — empty LIVE state
+            return {
+                "status":             "ok",
+                "data_source":        "LIVE",
+                "levels_fetch_time":  levels_fetch_time,
+                "active_sweep_count": 0,
+                "message":            None,
+                "sweeps":             [],
+            }
 
         return {
-            "sweeps":       all_events,
-            "active_count": sum(1 for e in all_events if e["status"] in ("ACTIVE", "CONFIRMED")),
-            "timestamp":    _ts(),
-            "monitoring":   SMC_WATCH_LIST,
+            "status":             "ok",
+            "data_source":        "LIVE",
+            "levels_fetch_time":  levels_fetch_time,
+            "active_sweep_count": active_count,
+            "message":            None,
+            "sweeps":             all_events,
         }
 
     except Exception as e:
-        logger.error(f"[SMC-Sweep] get_sweep_data error: {e}")
+        logger.error(f"[SMC-Sweep] get_sweep_data error: {e}", exc_info=True)
         return _demo_sweeps()
 
 

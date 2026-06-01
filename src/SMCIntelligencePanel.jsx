@@ -60,15 +60,25 @@ const FB_OR = {
 };
 
 const FB_SWEEPS = {
+  status: "market_closed",
+  data_source: "DEMO",
+  levels_fetch_time: null,
+  active_sweep_count: 0,
+  message: "Market closed — showing illustrative demo data. Live sweeps appear during market hours.",
   sweeps: [
-    { symbol: "BANKNIFTY", sweep_type: "PDH_SWEEP", level_price: 52250.00, wick_extreme: 52318.50, sweep_magnitude: 68.50, sweep_time: "10:42 AM", status: "CONFIRMED" },
-    { symbol: "NIFTY",     sweep_type: "PDL_SWEEP", level_price: 24180.00, wick_extreme: 24163.25, sweep_magnitude: 16.75, sweep_time: "09:52 AM", status: "CONFIRMED" },
-    { symbol: "RELIANCE",  sweep_type: "PDH_SWEEP", level_price: 2940.50,  wick_extreme: 2948.75,  sweep_magnitude: 8.25,  sweep_time: "11:14 AM", status: "ACTIVE" },
-    { symbol: "HDFCBANK",  sweep_type: "PWL_SWEEP", level_price: 1680.00,  wick_extreme: 1672.30,  sweep_magnitude: 7.70,  sweep_time: "13:38 PM", status: "FAILED" },
-    { symbol: "INFY",      sweep_type: "PDL_SWEEP", level_price: 1515.00,  wick_extreme: 1509.80,  sweep_magnitude: 5.20,  sweep_time: "14:05 PM", status: "ACTIVE" },
+    {
+      symbol: "BANKNIFTY", sweep_type: "PDH_SWEEP", strength: "STANDARD",
+      level_price: "—", wick_extreme: "—", sweep_magnitude: "—",
+      candle_open: "—", candle_high: "—", candle_low: "—", candle_close: "—",
+      candle_time: "—", status: "DEMO", data_source: "DEMO",
+    },
+    {
+      symbol: "NIFTY", sweep_type: "PDL_SWEEP", strength: "STANDARD",
+      level_price: "—", wick_extreme: "—", sweep_magnitude: "—",
+      candle_open: "—", candle_high: "—", candle_low: "—", candle_close: "—",
+      candle_time: "—", status: "DEMO", data_source: "—",
+    },
   ],
-  active_count: 3,
-  timestamp: "Demo Mode",
 };
 
 const FB_GRADES = {
@@ -410,64 +420,193 @@ const KillZoneTimer = memo(() => {
   );
 });
 
+// Level type badge config
+const getLevelBadge = (sweep_type, strength) => {
+  const colors = {
+    PDH_SWEEP: { bg: "hsla(343,90%,60%,0.15)", color: "#f43f5e", border: "hsla(343,90%,60%,0.35)", label: "PDH" },
+    PDL_SWEEP: { bg: "hsla(160,84%,39%,0.15)", color: "#10b981", border: "hsla(160,84%,39%,0.35)", label: "PDL" },
+    PWH_SWEEP: { bg: "hsla(343,90%,60%,0.25)", color: "#ff6b8a", border: "hsla(343,90%,60%,0.5)",  label: "PWH" },
+    PWL_SWEEP: { bg: "hsla(160,84%,39%,0.25)", color: "#34d399", border: "hsla(160,84%,39%,0.5)",  label: "PWL" },
+  };
+  return colors[sweep_type] || colors.PDH_SWEEP;
+};
+
+const getStatusStyle = (status) => ({
+  ACTIVE:    { bg: "hsla(38,92%,50%,0.15)",  color: "#f59e0b", border: "hsla(38,92%,50%,0.3)",  dot: true  },
+  CONFIRMED: { bg: "hsla(160,84%,39%,0.15)", color: "#10b981", border: "hsla(160,84%,39%,0.3)", dot: false },
+  FAILED:    { bg: "hsla(220,20%,20%,0.4)",  color: "#64748b", border: "hsla(220,20%,40%,0.2)", dot: false },
+  EXPIRED:   { bg: "hsla(220,20%,15%,0.4)",  color: "#475569", border: "hsla(220,20%,30%,0.2)", dot: false },
+  DEMO:      { bg: "hsla(38,92%,50%,0.08)",  color: "#78716c", border: "hsla(38,92%,50%,0.15)", dot: false },
+}[status] || {});
+
+const MONITORED_SYMBOL_COUNT = 10;
+
 // ─── FEATURE 3 — PDH/PDL SWEEP RADAR ────────────────────────────────────────
 const SweepRadar = memo(() => {
-  const [data, setData] = useState(FB_SWEEPS);
+  const [sweepData, setSweepData] = useState(FB_SWEEPS);
 
   const doFetch = useCallback(async () => {
     const d = await apiFetch("/api/smc/sweeps");
-    if (d && (d.sweeps || d.active_count != null)) setData(d);
+    if (d) {
+      if (process.env.NODE_ENV === "development") {
+        console.log("[SweepRadar] Raw API response:", d);
+      }
+      if (d.sweeps != null || d.active_sweep_count != null) setSweepData(d);
+    }
   }, []);
 
   useEffect(() => { doFetch(); const id = setInterval(doFetch, 5000); return () => clearInterval(id); }, [doFetch]);
 
-  const sweeps = data.sweeps ?? [];
-
-  const rowCls  = (t) => (t === "PDH_SWEEP" || t === "PWH_SWEEP") ? "sweep-row-pdh" : "sweep-row-pdl";
-  const typeCol = (t) => (t === "PDH_SWEEP" || t === "PWH_SWEEP") ? "#f43f5e" : "#10b981";
-  const statusCls = (s) => s === "ACTIVE" ? "badge-amber" : s === "CONFIRMED" ? "badge-emerald" : "badge-grey";
+  const sweeps    = sweepData.sweeps ?? [];
+  const isDemo    = sweepData.data_source === "DEMO";
+  const isLive    = sweepData.data_source === "LIVE";
 
   return (
     <div className="smc-panel-card">
-      <div className="smc-card-title">PDH / PDL Liquidity Sweep Radar</div>
-      <div className="smc-card-subtitle">
-        {(data.active_count ?? 0) > 0
-          ? `${data.active_count} Active Sweep${data.active_count > 1 ? "s" : ""} Detected`
-          : "Monitoring 22 instruments for intrabar liquidity sweeps"}
+      {/* Card Header */}
+      <div className="sweep-card-header">
+        <div>
+          <h3 className="smc-card-title">PDH / PDL Liquidity Sweep Radar</h3>
+          <p className="smc-card-subtitle">
+            LEVELS FETCHED: {sweepData.levels_fetch_time ?? "—"}&nbsp;·&nbsp;
+            {sweepData.active_sweep_count ?? 0} ACTIVE SWEEPS
+          </p>
+        </div>
+        <div className="sweep-header-right">
+          {isLive
+            ? <span className="live-data-badge">● LIVE</span>
+            : <span className="demo-data-badge">◌ DEMO</span>
+          }
+        </div>
       </div>
 
-      {sweeps.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "#4b5563", fontSize: 13 }}>
-          <div style={{ fontSize: 28, marginBottom: 10, opacity: 0.5 }}>🔍</div>
-          No sweeps detected across 22 instruments
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div className="demo-mode-banner">
+          <span className="demo-icon">⚠️</span>
+          <span>Demo mode — illustrative data only. Live sweeps activate during market hours (9:15 AM – 3:30 PM IST).</span>
         </div>
-      ) : (
+      )}
+
+      {/* Empty state for live with no sweeps */}
+      {sweeps.length === 0 && isLive && (
+        <div className="sweep-empty-state">
+          <div className="sweep-empty-icon">◎</div>
+          <p>No sweeps detected this session</p>
+          <p className="sweep-empty-sub">Monitoring PDH/PDL/PWH/PWL across {MONITORED_SYMBOL_COUNT} instruments · Checks every 5M candle close</p>
+        </div>
+      )}
+
+      {/* Sweep table */}
+      {sweeps.length > 0 && (
         <div style={{ overflowX: "auto" }}>
           <table className="sweep-table">
             <thead>
               <tr>
-                <th>Symbol</th><th>Level</th><th>Level Price</th>
-                <th>Wick</th><th>Size</th><th>Status</th><th>Time</th>
+                <th style={{ width: 110 }}>Symbol</th>
+                <th style={{ width: 100 }}>Level Type</th>
+                <th style={{ width: 110 }}>Level Price</th>
+                <th style={{ width: 110 }}>Wick Extreme</th>
+                <th style={{ width: 90  }}>Sweep Size</th>
+                <th style={{ width: 180 }}>Candle</th>
+                <th style={{ width: 90  }}>Status</th>
+                <th style={{ width: 70  }}>Time</th>
               </tr>
             </thead>
             <tbody>
-              {sweeps.map((s, i) => (
-                <tr key={i} className={rowCls(s.sweep_type)}>
-                  <td style={{ fontFamily: "IBM Plex Mono, monospace", fontWeight: 700, color: "#e8eeff" }}>{s.symbol}</td>
-                  <td><span className={`badge ${typeCol(s.sweep_type) === "#f43f5e" ? "badge-rose" : "badge-emerald"}`}>{s.sweep_type}</span></td>
-                  <td style={{ fontFamily: "IBM Plex Mono, monospace" }}>₹{formatINR(s.level_price)}</td>
-                  <td style={{ fontFamily: "IBM Plex Mono, monospace" }}>₹{formatINR(s.wick_extreme)}</td>
-                  <td style={{ fontFamily: "IBM Plex Mono, monospace" }}>{formatINR(s.sweep_magnitude)} pts</td>
-                  <td><span className={`badge ${statusCls(s.status)}`}>{s.status}</span></td>
-                  <td style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 10, color: "#6b7280" }}>{s.sweep_time}</td>
-                </tr>
-              ))}
+              {sweeps.map((s, i) => {
+                const lvlBadge    = getLevelBadge(s.sweep_type, s.strength);
+                const statusStyle = getStatusStyle(s.status);
+                const rowStatus   = s.status?.toLowerCase() ?? "";
+                const isMajor     = s.strength === "MAJOR";
+                const mag         = typeof s.sweep_magnitude === "number" ? `${s.sweep_magnitude.toFixed(2)} pts` : s.sweep_magnitude;
+
+                return (
+                  <tr
+                    key={i}
+                    className={`status-${rowStatus}`}
+                    style={{ opacity: s.status === "FAILED" ? 0.5 : 1 }}
+                  >
+                    {/* Symbol */}
+                    <td className="sweep-symbol-cell">{s.symbol}</td>
+
+                    {/* Level Type badge */}
+                    <td>
+                      <span className="badge" style={{
+                        background: lvlBadge.bg,
+                        color:      lvlBadge.color,
+                        border:     `1px solid ${lvlBadge.border}`,
+                        fontSize:   10,
+                      }}>
+                        {lvlBadge.label}
+                        {isMajor && <span className="major-level-star">★</span>}
+                      </span>
+                    </td>
+
+                    {/* Level price */}
+                    <td className="sweep-price-cell">
+                      {typeof s.level_price === "number" ? `₹${formatINR(s.level_price)}` : s.level_price}
+                    </td>
+
+                    {/* Wick extreme */}
+                    <td className="sweep-price-cell">
+                      {typeof s.wick_extreme === "number" ? `₹${formatINR(s.wick_extreme)}` : s.wick_extreme}
+                    </td>
+
+                    {/* Sweep size */}
+                    <td className="sweep-size-cell">{mag}</td>
+
+                    {/* Mini OHLC */}
+                    <td>
+                      <div className="mini-ohlc">
+                        <span className="ohlc-o">O <strong>{typeof s.candle_open  === "number" ? s.candle_open.toFixed(2)  : s.candle_open  ?? "—"}</strong></span>
+                        <span className="ohlc-h" style={{ color: "#f43f5e" }}>H <strong>{typeof s.candle_high  === "number" ? s.candle_high.toFixed(2)  : s.candle_high  ?? "—"}</strong></span>
+                        <span className="ohlc-l" style={{ color: "#10b981" }}>L <strong>{typeof s.candle_low   === "number" ? s.candle_low.toFixed(2)   : s.candle_low   ?? "—"}</strong></span>
+                        <span className="ohlc-c">C <strong>{typeof s.candle_close === "number" ? s.candle_close.toFixed(2) : s.candle_close ?? "—"}</strong></span>
+                      </div>
+                    </td>
+
+                    {/* Status badge */}
+                    <td>
+                      <span className="badge" style={{
+                        background: statusStyle.bg,
+                        color:      statusStyle.color,
+                        border:     `1px solid ${statusStyle.border}`,
+                        fontSize:   9,
+                        display:    "inline-flex",
+                        alignItems: "center",
+                        gap:        4,
+                      }}>
+                        {statusStyle.dot && (
+                          <span style={{ width: 5, height: 5, borderRadius: "50%", background: statusStyle.color, animation: "pulse-dot 1.5s ease-in-out infinite" }} />
+                        )}
+                        {s.status}
+                      </span>
+                    </td>
+
+                    {/* Time */}
+                    <td className="sweep-time-cell">{s.candle_time ?? "—"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
-      <div className="smc-refresh-hint">↻ 5s · Last: {data.timestamp}</div>
+      {/* Education tooltip */}
+      <details className="sweep-explainer">
+        <summary>What is a Liquidity Sweep? How to trade it?</summary>
+        <div className="sweep-explainer-body">
+          <p><strong>A sweep</strong> occurs when price wicks beyond a key level (PDH/PDL) to hunt stop-losses, then immediately reverses and closes back inside. This is institutional manipulation — not a real breakout.</p>
+          <p><strong>CONFIRMED sweep</strong> = Two consecutive candles closed back on origin side. Highest probability reversal. Enter on FVG retracement.</p>
+          <p><strong>ACTIVE sweep</strong> = Single candle sweep. Await next candle close for confirmation before entering.</p>
+          <p><strong>FAILED sweep</strong> = Price broke through and closed beyond the level. Likely a genuine breakout — do not counter-trade.</p>
+          <p><strong>PWH/PWL (★ Major)</strong> = Previous Week levels. These attract significantly more institutional activity than daily levels.</p>
+        </div>
+      </details>
+
+      <div className="smc-refresh-hint">↻ 5s &middot; {sweepData.levels_fetch_time ? `Levels: ${sweepData.levels_fetch_time}` : isDemo ? "Demo Mode" : "Fetching levels..."}</div>
     </div>
   );
 });
