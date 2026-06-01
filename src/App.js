@@ -9,6 +9,7 @@ import MoversSection from "./MoversSection";
 import PreMarketIntelligence from "./PreMarketIntelligence";
 import ScreenerPage from "./ScreenerPage";
 import SMCIntelligencePanel from "./SMCIntelligencePanel";
+import ForexSMCIntelligencePanel from "./ForexSMCIntelligencePanel";
 
 // ── Utility functions ─────────────────────────────────────────────────────────
 
@@ -251,6 +252,7 @@ export default function App() {
     { key: 'movers',     label: 'Movers Alert',       icon: '⚡' },
     { key: 'premarket',  label: 'Pre-Market Intel',   icon: '📡' },
     { key: 'smc',        label: 'SMC Intelligence',   icon: '🧠' },
+    { key: 'forex_smc',  label: 'Forex SMC',          icon: '🌍' },
   ];
 
   // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -583,6 +585,13 @@ export default function App() {
         {activeSection === 'smc' && (
           <div id="section-smc" className="content-fade-in section-content">
             <SMCIntelligencePanel />
+          </div>
+        )}
+
+        {/* SECTION 6.5: FOREX SMC INTELLIGENCE */}
+        {activeSection === 'forex_smc' && (
+          <div id="section-forex-smc" className="content-fade-in section-content">
+            <ForexSMCIntelligencePanel />
           </div>
         )}
 

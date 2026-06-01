@@ -179,6 +179,10 @@ async def lifespan(app: FastAPI):
     task = asyncio.create_task(streamer.run())
     logger.info("MarketStreamer started.")
     
+    # Start Forex Streamer
+    from backend.forex_streamer import start_forex_streamer, stop_forex_streamer
+    start_forex_streamer()
+    
     # Start TradingView MCP Server
     await start_tv_mcp_server()
     
@@ -253,6 +257,7 @@ async def lifespan(app: FastAPI):
     ai_insight_task.cancel()
     screener_cache_task.cancel()
     await stop_tv_mcp_server()
+    stop_forex_streamer()
     streamer.stop()
     task.cancel()
     try:
@@ -1219,6 +1224,74 @@ async def api_smc_ping():
         "demo_mode":   tick_count == 0,
         "time":        datetime.now(IST).strftime("%I:%M:%S %p IST"),
     }
+
+
+# ── Forex SMC Intelligence Endpoints ─────────────────────────────────────────
+from backend.forex_smcengine import (
+    get_forex_opening_range,
+    detect_forex_sweeps,
+    grade_forex_setup,
+    get_forex_sentiment,
+    detect_forex_displacement,
+    map_forex_liquidity_pools,
+    calculate_mtf_bias,
+)
+
+@app.get("/api/forex/smc/opening-range")
+async def api_forex_opening_range():
+    try:
+        return await get_forex_opening_range()
+    except Exception as e:
+        logger.error(f"[ForexSMC] opening-range error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "FOREX_SMC_OR_ERROR", "message": str(e)})
+
+@app.get("/api/forex/smc/sweeps")
+async def api_forex_sweeps():
+    try:
+        return await detect_forex_sweeps()
+    except Exception as e:
+        logger.error(f"[ForexSMC] sweeps error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "FOREX_SMC_SWEEP_ERROR", "message": str(e)})
+
+@app.get("/api/forex/smc/grades")
+async def api_forex_grades():
+    try:
+        return await grade_forex_setup()
+    except Exception as e:
+        logger.error(f"[ForexSMC] grades error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "FOREX_SMC_GRADE_ERROR", "message": str(e)})
+
+@app.get("/api/forex/smc/sentiment")
+async def api_forex_sentiment():
+    try:
+        return await get_forex_sentiment()
+    except Exception as e:
+        logger.error(f"[ForexSMC] sentiment error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "FOREX_SMC_SENTIMENT_ERROR", "message": str(e)})
+
+@app.get("/api/forex/smc/displacement")
+async def api_forex_displacement():
+    try:
+        return await detect_forex_displacement()
+    except Exception as e:
+        logger.error(f"[ForexSMC] displacement error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "FOREX_SMC_DISP_ERROR", "message": str(e)})
+
+@app.get("/api/forex/smc/liquidity-pools")
+async def api_forex_liquidity_pools(symbol: str = Query("XAUUSD", description="Symbol to map liquidity pools for")):
+    try:
+        return await map_forex_liquidity_pools(symbol.upper())
+    except Exception as e:
+        logger.error(f"[ForexSMC] liquidity-pools error for {symbol}: {e}")
+        raise HTTPException(status_code=500, detail={"error": "FOREX_SMC_LP_ERROR", "message": str(e)})
+
+@app.get("/api/forex/smc/mtf-bias")
+async def api_forex_mtf_bias():
+    try:
+        return await calculate_mtf_bias()
+    except Exception as e:
+        logger.error(f"[ForexSMC] mtf-bias error: {e}")
+        raise HTTPException(status_code=500, detail={"error": "FOREX_SMC_MTF_ERROR", "message": str(e)})
 
 
 # ── Serve React SPA (production build) ───────────────────────────────────────
