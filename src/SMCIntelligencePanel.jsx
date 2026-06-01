@@ -312,106 +312,117 @@ const OpeningRangePanel = memo(() => {
 });
 
 // ─── FEATURE 2 — SESSION KILL ZONE TIMER ────────────────────────────────────
-const MARKET_OPEN_MIN  = 9 * 60;
-const MARKET_CLOSE_MIN = 15 * 60 + 30;
-const MARKET_SPAN_MIN  = MARKET_CLOSE_MIN - MARKET_OPEN_MIN;
+const MARKET_OPEN_MIN  = 9 * 60;       // 540
+const MARKET_CLOSE_MIN = 15 * 60 + 30; // 930
+const MARKET_SPAN_MIN  = MARKET_CLOSE_MIN - MARKET_OPEN_MIN; // 390
 
+// Timeline segments with correct proportional widths (in minutes)
 const KZ_SEGMENTS = [
-  { start: 9 * 60,       end: 9 * 60 + 15,  cls: "kz-seg-dead",   label: "",       zone: null },
-  { start: 9 * 60 + 15,  end: 9 * 60 + 30,  cls: "kz-seg-or",     label: "OR",     zone: "opening" },
-  { start: 9 * 60 + 30,  end: 11 * 60,      cls: "kz-seg-prime",  label: "PRIME",  zone: "prime" },
-  { start: 11 * 60,      end: 13 * 60,      cls: "kz-seg-dead",   label: "DEAD",   zone: null },
-  { start: 13 * 60,      end: 13 * 60 + 30, cls: "kz-seg-dead",   label: "",       zone: null },
-  { start: 13 * 60 + 30, end: 14 * 60 + 30, cls: "kz-seg-london", label: "LONDON", zone: "london" },
-  { start: 14 * 60 + 30, end: 15 * 60 + 30, cls: "kz-seg-danger", label: "EXIT",   zone: "closing" },
+  { start: 540, end: 555, cls: "kz-seg-dead",   label: "PRE",    zone: "pre" },     // 15 min
+  { start: 555, end: 570, cls: "kz-seg-or",     label: "OR",     zone: "opening" }, // 15 min
+  { start: 570, end: 660, cls: "kz-seg-prime",  label: "PRIME",  zone: "prime" },   // 90 min
+  { start: 660, end: 810, cls: "kz-seg-dead",   label: "DEAD",   zone: "dead" },    // 150 min
+  { start: 810, end: 870, cls: "kz-seg-london", label: "LONDON", zone: "london" },  // 60 min
+  { start: 870, end: 930, cls: "kz-seg-danger", label: "EXIT",   zone: "closing" }, // 60 min
 ];
 
-const KZ_ZONES = [
-  { key: "opening", start: [9,15],  end: [9,30],   label: "Opening Range Formation",   icon: "🔔", color: "#f59e0b" },
-  { key: "prime",   start: [9,30],  end: [11,0],   label: "Prime Intraday Window",     icon: "🎯", color: "#10b981" },
-  { key: "dead",    start: [11,0],  end: [13,0],   label: "Dead Zone — Avoid Trading", icon: "⛔", color: "#6b7280" },
-  { key: "london",  start: [13,30], end: [15,0],   label: "London Overlap Kill Zone",  icon: "🌍", color: "#60a5fa" },
-  { key: "closing", start: [14,30], end: [15,30],  label: "Options Exit Deadline",     icon: "⏰", color: "#f43f5e" },
-];
-
-function getISTNow() {
+// Correct IST conversion using UTC offset
+const getISTTime = () => {
   const now = new Date();
-  return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-}
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const ist = new Date(utc + (5.5 * 3600000));
+  const totalMinutes = ist.getHours() * 60 + ist.getMinutes();
+  return {
+    hours: ist.getHours(),
+    minutes: ist.getMinutes(),
+    seconds: ist.getSeconds(),
+    totalMinutes,
+    display: ist.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }),
+  };
+};
 
-function getNeedlePct(ist) {
-  const totalMin = (ist.getHours() - 9) * 60 + ist.getMinutes() + ist.getSeconds() / 60;
-  return Math.min(100, Math.max(0, (totalMin / MARKET_SPAN_MIN) * 100));
-}
+const getActiveZoneByMinutes = (t) => {
+  if (t < 540 || t >= 930) return { key: 'CLOSED',  label: 'Market Closed',                color: '#475569', emoji: '🌙', zoneEnd: null };
+  if (t >= 540 && t < 555)  return { key: 'PRE',     label: 'Pre-Market Window',            color: '#94a3b8', emoji: '🔔', zoneEnd: 555 };
+  if (t >= 555 && t < 570)  return { key: 'OR',      label: 'Opening Range Formation',      color: '#f59e0b', emoji: '⚡', zoneEnd: 570 };
+  if (t >= 570 && t < 660)  return { key: 'PRIME',   label: 'Prime Intraday Window',        color: '#10b981', emoji: '🎯', zoneEnd: 660 };
+  if (t >= 660 && t < 810)  return { key: 'DEAD',    label: 'Dead Zone — Avoid New Entries',color: '#64748b', emoji: '🚫', zoneEnd: 810 };
+  if (t >= 810 && t < 870)  return { key: 'LONDON',  label: 'London Overlap Kill Zone',     color: '#60a5fa', emoji: '🌍', zoneEnd: 870 };
+  return                          { key: 'EXIT',    label: 'Options Exit Deadline',        color: '#f43f5e', emoji: '⚠️', zoneEnd: 930 };
+};
 
-function getActiveZone(ist) {
-  const mins = ist.getHours() * 60 + ist.getMinutes();
-  for (const z of [...KZ_ZONES].reverse()) {
-    const s = z.start[0] * 60 + z.start[1];
-    const e = z.end[0] * 60 + z.end[1];
-    if (mins >= s && mins < e) return z;
-  }
-  return { key: "closed", label: "Market Closed", icon: "🌙", color: "#4b5563" };
-}
+const getNeedlePctFromMinutes = (totalMinutes) => {
+  const clamped = Math.min(Math.max(totalMinutes, MARKET_OPEN_MIN), MARKET_CLOSE_MIN);
+  return ((clamped - MARKET_OPEN_MIN) / MARKET_SPAN_MIN) * 100;
+};
+
+const getCountdown = (zoneEndMinutes, totalMinutes, seconds) => {
+  if (!zoneEndMinutes) return null;
+  const remainingSeconds = (zoneEndMinutes - totalMinutes) * 60 - seconds;
+  if (remainingSeconds <= 0) return '00:00';
+  const m = Math.floor(remainingSeconds / 60).toString().padStart(2, '0');
+  const s = (remainingSeconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+};
 
 const KillZoneTimer = memo(() => {
-  const [ist, setIst] = useState(getISTNow);
+  const [istTime, setIstTime] = useState(getISTTime);
 
   useEffect(() => {
-    const id = setInterval(() => setIst(getISTNow()), 1000);
+    const id = setInterval(() => setIstTime(getISTTime()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const needlePct  = useMemo(() => getNeedlePct(ist), [ist]);
-  const activeZone = useMemo(() => getActiveZone(ist), [ist]);
-  const istMins    = ist.getHours() * 60 + ist.getMinutes();
-
-  const remainingSecs = useMemo(() => {
-    if (!activeZone.end) return 0;
-    const endMin = activeZone.end[0] * 60 + activeZone.end[1];
-    return Math.max(0, (endMin - istMins) * 60);
-  }, [activeZone, istMins]);
+  const { totalMinutes, seconds } = istTime;
+  const needlePct  = useMemo(() => getNeedlePctFromMinutes(totalMinutes), [totalMinutes]);
+  const activeZone = useMemo(() => getActiveZoneByMinutes(totalMinutes), [totalMinutes]);
+  const countdown  = useMemo(() => getCountdown(activeZone.zoneEnd, totalMinutes, seconds), [activeZone.zoneEnd, totalMinutes, seconds]);
 
   return (
     <div className="smc-panel-card">
       <div className="smc-card-title">Session Kill Zone Timer</div>
-      <div className="smc-card-subtitle">Live NSE IST Trading Windows</div>
+      <div className="smc-card-subtitle">Live NSE IST Trading Windows · {istTime.display}</div>
 
       <div className="kz-timeline-bar">
         {KZ_SEGMENTS.map((seg, i) => {
           const w = ((seg.end - seg.start) / MARKET_SPAN_MIN) * 100;
-          const isActive = seg.zone && activeZone.key === seg.zone;
+          const isActive = seg.zone && activeZone.key.toLowerCase() === seg.zone.toLowerCase();
           return (
             <div key={i} className={`kz-segment ${seg.cls}${isActive ? " kz-seg-active" : ""}`} style={{ width: `${w}%` }}>
               {seg.label}
             </div>
           );
         })}
-        <div className="kz-needle" style={{ left: `${needlePct}%` }} />
+        <div className="kz-needle" style={{ left: `${needlePct}%`, transition: 'left 1s linear' }} />
       </div>
       <div className="kz-time-labels">
-        <span>9:00</span><span>9:30</span><span>11:00</span>
-        <span>13:00</span><span>13:30</span><span>14:30</span><span>15:30</span>
+        <span>9:00</span><span>9:15</span><span>9:30</span>
+        <span>11:00</span><span>1:30</span><span>2:30</span><span>3:30</span>
       </div>
 
       <div className="kz-active-zone" style={{ borderColor: `${activeZone.color}44`, background: `${activeZone.color}0d` }}>
         <div>
-          <div className="kz-zone-name" style={{ color: activeZone.color }}>{activeZone.label}</div>
-          {activeZone.key !== "closed" && remainingSecs > 0 && (
+          <div className="kz-zone-name" style={{ color: activeZone.color }}>
+            {activeZone.emoji} {activeZone.label}
+          </div>
+          {countdown && (
             <div className="kz-countdown">
-              Ends in: <span style={{ color: activeZone.color, fontWeight: 700 }}>{formatMMSS(remainingSecs)}</span>
+              Ends in: <span style={{ color: activeZone.color, fontWeight: 700 }}>{countdown}</span>
             </div>
           )}
+          {activeZone.key === 'CLOSED' && (
+            <div className="kz-countdown">Next session opens at 9:15 AM IST</div>
+          )}
         </div>
-        <span style={{ fontSize: 28 }}>{activeZone.icon}</span>
+        <span style={{ fontSize: 28 }}>{activeZone.emoji}</span>
       </div>
 
-      {activeZone.key === "dead" && (
+      {activeZone.key === "DEAD" && (
         <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: "hsla(220,20%,12%,0.8)", border: "1px solid hsla(220,20%,30%,0.4)", fontSize: 12, color: "#6b7280" }}>
-          🚫 Dead Zone — High probability of false signals. Avoid new entries.
+          🚫 Dead Zone (11:00 AM – 1:30 PM IST) — High probability of false signals. Avoid new entries.
         </div>
       )}
-      {activeZone.key === "closing" && (
+      {activeZone.key === "EXIT" && (
         <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 8, background: "hsla(343,90%,60%,0.08)", border: "1px solid hsla(343,90%,60%,0.3)", fontSize: 12, color: "#f43f5e" }}>
           ⚠️ Options Exit Deadline — Close open positions to avoid theta decay.
         </div>
@@ -668,7 +679,7 @@ const SetupGrader = memo(() => {
     if (d && d.grades) setData(d);
   }, []);
 
-  useEffect(() => { doFetch(); const id = setInterval(doFetch, 30000); return () => clearInterval(id); }, [doFetch]);
+  useEffect(() => { doFetch(); const id = setInterval(doFetch, 8000); return () => clearInterval(id); }, [doFetch]);
 
   const allGrades = data?.grades ?? [];
   const filteredGrades = allGrades.filter(g => {
@@ -688,7 +699,7 @@ const SetupGrader = memo(() => {
   return (
     <div className="smc-panel-card">
       <div className="smc-card-title">SMC Setup Quality Grader</div>
-      <div className="smc-card-subtitle">6-Factor Confluence Scoring · Refreshes every 30s</div>
+      <div className="smc-card-subtitle">6-Factor Confluence Scoring · Refreshes every 8s</div>
 
       <div className="filter-row">
         {filters.map(f => (
@@ -791,7 +802,7 @@ const OIPCRPanel = memo(() => {
 
   useEffect(() => {
     doFetch();
-    const fetchId = setInterval(doFetch, 180000);
+    const fetchId = setInterval(doFetch, 90000);
     const cdId    = setInterval(() => setCd(c => Math.max(0, c - 1)), 1000);
     return () => { clearInterval(fetchId); clearInterval(cdId); };
   }, [doFetch]);
@@ -816,7 +827,7 @@ const DisplacementFeed = memo(() => {
     if (d && d.alerts) setData(d);
   }, []);
 
-  useEffect(() => { doFetch(); const id = setInterval(doFetch, 15000); return () => clearInterval(id); }, [doFetch]);
+  useEffect(() => { doFetch(); const id = setInterval(doFetch, 10000); return () => clearInterval(id); }, [doFetch]);
 
   const alerts = data.alerts ?? [];
 
@@ -856,7 +867,7 @@ const DisplacementFeed = memo(() => {
         <span style={{ color: "#f59e0b" }}>Displacement Only</span> = Await additional confluence before entering.
       </div>
 
-      <div className="smc-refresh-hint">↻ 15s · Last: {data.timestamp}</div>
+      <div className="smc-refresh-hint">↻ 10s · Last: {data.timestamp}</div>
     </div>
   );
 });
