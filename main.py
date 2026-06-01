@@ -311,6 +311,26 @@ async def websocket_stream(websocket: WebSocket):
         connected_clients.discard(websocket)
 
 
+@app.websocket("/ws/forex/prices")
+async def websocket_forex_prices(websocket: WebSocket):
+    await websocket.accept()
+    from backend.forex_streamer import get_all_forex_ticks
+    try:
+        while True:
+            ticks = get_all_forex_ticks()
+            # Send simplified tick object containing only XAUUSD, BTCUSD, etc or everything
+            # Format requested: { "XAUUSD": { "ltp": 4527.10, "change_pct": -0.77 }, ... }
+            payload = {}
+            for k, v in ticks.items():
+                payload[k] = { "ltp": v.get("ltp"), "change_pct": v.get("change_pct") }
+            await websocket.send_json(payload)
+            await asyncio.sleep(0.5)
+    except WebSocketDisconnect:
+        pass
+    except Exception as e:
+        logger.error(f"Forex prices WebSocket error: {e}")
+
+
 @app.get("/api/cache-status")
 async def get_cache_status():
     """Returns the status of the background metadata scavenger."""
@@ -1248,7 +1268,22 @@ async def api_forex_opening_range():
 @app.get("/api/forex/smc/sweeps")
 async def api_forex_sweeps():
     try:
-        return await detect_forex_sweeps()
+        res = await detect_forex_sweeps()
+        # Add summary object as requested
+        if isinstance(res, dict) and "data" in res and "sweeps" in res["data"]:
+            sweeps = res["data"]["sweeps"]
+            active_count = sum(1 for s in sweeps if s.get("status") == "ACTIVE")
+            confirmed_count = sum(1 for s in sweeps if s.get("status") == "CONFIRMED")
+            buy_side = sum(1 for s in sweeps if "L" in s.get("level_category", ""))
+            sell_side = sum(1 for s in sweeps if "H" in s.get("level_category", ""))
+            bias = "BULLISH" if buy_side > sell_side else "BEARISH" if sell_side > buy_side else "NEUTRAL"
+            
+            res["summary"] = {
+                "active_count": active_count,
+                "confirmed_count": confirmed_count,
+                "market_bias": bias
+            }
+        return res
     except Exception as e:
         logger.error(f"[ForexSMC] sweeps error: {e}")
         raise HTTPException(status_code=500, detail={"error": "FOREX_SMC_SWEEP_ERROR", "message": str(e)})

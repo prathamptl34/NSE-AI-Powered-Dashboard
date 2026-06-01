@@ -74,7 +74,7 @@ _mtf_bias_ts: float            = 0.0
 
 CACHE_TTL = {
     "opening_range":    3,
-    "sweeps":           3,
+    "sweeps":           10,
     "grades":           10,
     "sentiment":        120,
     "displacement":     10,
@@ -406,17 +406,16 @@ def _demo_sweeps() -> Dict:
         "data": {
             "sweeps": [
                 {
-                    "symbol": sym, "sweep_type": stype, "strength": strength,
-                    "level_price": "—", "wick_extreme": "—", "sweep_magnitude": "—",
-                    "candle_open": "—", "candle_high": "—", "candle_low": "—",
-                    "candle_close": "—", "candle_time": "—",
-                    "status": "DEMO", "data_source": "DEMO", "time_elapsed_s": 0,
+                    "symbol": sym, "level_category": cat, "level_label": label, "level_strength": strength,
+                    "level_price": 4541.20, "wick_extreme": 4543.80, "sweep_size_pips": 2.6,
+                    "candle_close": 4539.10, "status": "DEMO",
+                    "timestamp": _utc_now().strftime("%Y-%m-%dT%H:%M:%SZ"), "time_elapsed_s": 0,
                 }
-                for sym, stype, strength in [
-                    ("XAUUSD", "PDH_SWEEP", "STANDARD"),
-                    ("EURUSD", "PDL_SWEEP", "STANDARD"),
-                    ("GBPUSD", "PWH_SWEEP", "MAJOR"),
-                    ("USDJPY", "PSH_SWEEP", "INTRADAY"),
+                for sym, cat, label, strength in [
+                    ("XAUUSD", "PDH", "Previous Day High", "STANDARD"),
+                    ("EURUSD", "PDL", "Previous Day Low", "STANDARD"),
+                    ("GBPUSD", "PWH", "Previous Week High", "MAJOR"),
+                    ("USDJPY", "PSH", "Previous Session High", "INTRADAY"),
                 ]
             ],
             "active_sweep_count": 0,
@@ -467,15 +466,104 @@ def _calculate_session_highs_lows(candles_h1: List[Dict]) -> Dict:
         return {}
 
 
+_forex_sweep_cache: Dict = {}
+_level_cache: Dict = {}
+
+def _get_levels_for_symbol(symbol: str) -> Dict:
+    """Fetch PDH, PDL, PWH, PWL, PSH, PSL with TTLs."""
+    global _level_cache
+    now = time.time()
+    if symbol not in _level_cache:
+        _level_cache[symbol] = {}
+        
+    cache = _level_cache[symbol]
+    
+    # 1. PDH / PDL (60 min TTL)
+    if "PDH" not in cache or now - cache.get("pdh_ts", 0) > 3600:
+        try:
+            from backend.forex_streamer import TWELVE_DATA_KEY
+            url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1day&outputsize=5&apikey={TWELVE_DATA_KEY}"
+            resp = requests.get(url, timeout=5).json()
+            if "values" in resp and len(resp["values"]) >= 2:
+                yesterday = resp["values"][1]
+                cache["PDH"] = float(yesterday["high"])
+                cache["PDL"] = float(yesterday["low"])
+                cache["pdh_ts"] = now
+        except Exception as e:
+            logger.error(f"[ForexSMC] PDH/PDL fetch error for {symbol}: {e}")
+
+    # 2. PWH / PWL (4 hour TTL)
+    if "PWH" not in cache or now - cache.get("pwh_ts", 0) > 14400:
+        try:
+            from backend.forex_streamer import TWELVE_DATA_KEY
+            url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1week&outputsize=3&apikey={TWELVE_DATA_KEY}"
+            resp = requests.get(url, timeout=5).json()
+            if "values" in resp and len(resp["values"]) >= 2:
+                last_week = resp["values"][1]
+                cache["PWH"] = float(last_week["high"])
+                cache["PWL"] = float(last_week["low"])
+                cache["pwh_ts"] = now
+        except Exception as e:
+            logger.error(f"[ForexSMC] PWH/PWL fetch error for {symbol}: {e}")
+
+    # 3. PSH / PSL from H1 candles (15 min TTL)
+    if "PSH_LONDON" not in cache or now - cache.get("psh_ts", 0) > 900:
+        try:
+            from backend.forex_streamer import TWELVE_DATA_KEY
+            url = f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1h&outputsize=48&apikey={TWELVE_DATA_KEY}"
+            resp = requests.get(url, timeout=5).json()
+            if "values" in resp:
+                london_highs, london_lows, ny_highs, ny_lows = [], [], [], []
+                today_utc = _utc_now().date()
+                for c in resp["values"]:
+                    dt = _parse_date(c["datetime"])
+                    if not dt or dt != today_utc:
+                        continue
+                    dt_time = datetime.strptime(c["datetime"][:19], "%Y-%m-%d %H:%M:%S")
+                    h = dt_time.hour
+                    if 7 <= h < 15:   # London = 07:00-15:00
+                        london_highs.append(float(c["high"]))
+                        london_lows.append(float(c["low"]))
+                    if 12 <= h < 20:  # NY = 12:00-20:00
+                        ny_highs.append(float(c["high"]))
+                        ny_lows.append(float(c["low"]))
+                if london_highs:
+                    cache["PSH_LONDON"] = max(london_highs)
+                    cache["PSL_LONDON"] = min(london_lows)
+                if ny_highs:
+                    cache["PSH_NY"] = max(ny_highs)
+                    cache["PSL_NY"] = min(ny_lows)
+                cache["psh_ts"] = now
+        except Exception as e:
+            logger.error(f"[ForexSMC] PSH/PSL fetch error for {symbol}: {e}")
+
+    return cache
+
+
+def _update_sweep_status(existing_sweep: Dict, symbol: str) -> Dict:
+    tick = get_forex_tick(symbol)
+    ltp = float(tick.get("ltp", 0)) if tick else 0
+    if ltp:
+        existing_sweep["current_ltp"] = round(ltp, 5)
+        existing_sweep["distance_from_level"] = round(ltp - existing_sweep["level_price"], 5)
+    
+    age_s = _get_candle_age_s(existing_sweep["timestamp"])
+    existing_sweep["time_elapsed_s"] = age_s
+    existing_sweep["age_minutes"] = max(0, int(age_s / 60))
+    
+    if existing_sweep["status"] == "ACTIVE" and existing_sweep["age_minutes"] > 120:
+        existing_sweep["status"] = "EXPIRED"
+    elif existing_sweep["status"] == "CONFIRMED" and existing_sweep["age_minutes"] > 240:
+        existing_sweep["status"] = "EXPIRED"
+        
+    return existing_sweep
+
+
 async def detect_forex_sweeps() -> Dict:
     """
     Feature 2 — PDH/PDL/PWH/PWL/PSH/PSL Liquidity Sweep Radar.
-    ALL THREE conditions must be true for a valid sweep:
-      1. Wick penetrates beyond level by minimum pip threshold
-      2. Candle CLOSES back on origin side (otherwise it's a breakout)
-      3. Sweep candle is from the current trading day
     """
-    global _sweep_cache, _sweep_ts, _sweep_events_raw
+    global _sweep_cache, _sweep_ts, _sweep_events_raw, _forex_sweep_cache
 
     if time.time() - _sweep_ts < CACHE_TTL["sweeps"]:
         return _sweep_cache
@@ -485,120 +573,116 @@ async def detect_forex_sweeps() -> Dict:
         _sweep_ts = time.time()
         return _sweep_cache
 
-    all_sweeps = []
+    results = []
     now_utc = _utc_now()
 
-    for sym in ALL_SYMBOLS:
+    for symbol in ALL_SYMBOLS:
         try:
-            candles_d1  = get_forex_candles(sym, "1day")
-            candles_m5  = get_forex_candles(sym, "5min")
-            candles_h1  = get_forex_candles(sym, "1h")
-            tick        = get_forex_tick(sym)
-
-            if not candles_d1 or len(candles_d1) < 2:
-                continue
-
+            tick = get_forex_tick(symbol)
             ltp = float(tick.get("ltp", 0)) if tick else 0
+            
+            # Fetch robust levels from cache/TD
+            lvl_cache = _get_levels_for_symbol(symbol)
+            
+            levels = {}
+            if "PDH" in lvl_cache: levels["PDH"] = (lvl_cache["PDH"], "STANDARD", "Previous Day High")
+            if "PDL" in lvl_cache: levels["PDL"] = (lvl_cache["PDL"], "STANDARD", "Previous Day Low")
+            if "PWH" in lvl_cache: levels["PWH"] = (lvl_cache["PWH"], "MAJOR", "Previous Week High")
+            if "PWL" in lvl_cache: levels["PWL"] = (lvl_cache["PWL"], "MAJOR", "Previous Week Low")
+            
+            for k in ["PSH_LONDON", "PSL_LONDON", "PSH_NY", "PSL_NY"]:
+                if k in lvl_cache:
+                    label = "Previous Session High" if "PSH" in k else "Previous Session Low"
+                    levels[k] = (lvl_cache[k], "INTRADAY", label)
 
-            # PDH / PDL — yesterday's D1 candle
-            prev_d1 = candles_d1[-2]
-            pdh = prev_d1["high"]
-            pdl = prev_d1["low"]
-
-            # Plausibility check — if LTP differs >15% from PDH, discard
-            if ltp > 0 and (abs(ltp - pdh) / max(pdh, 1)) > 0.15:
+            candles_m5 = get_forex_candles(symbol, "5min")
+            if not candles_m5:
                 continue
 
-            # PWH / PWL — from D1 candles of last week
-            week_ago = now_utc.date() - timedelta(days=7)
-            week_candles = [c for c in candles_d1 if _parse_date(c.get("datetime", "")) and _parse_date(c.get("datetime", "")) >= week_ago]
-            pwh = max((c["high"] for c in week_candles), default=None) if week_candles else None
-            pwl = min((c["low"]  for c in week_candles), default=None) if week_candles else None
+            today_candles = [c for c in candles_m5 if _is_same_trading_day(c.get("datetime", ""))]
+            pip_th = _pip_threshold(symbol)
 
-            # PSH / PSL — from H1 candles (session extremes)
-            session_levels = _calculate_session_highs_lows(candles_h1)
-
-            # Build levels dict
-            levels = {
-                "PDH": (pdh, "STANDARD"),
-                "PDL": (pdl, "STANDARD"),
-            }
-            if pwh: levels["PWH"] = (pwh, "MAJOR")
-            if pwl: levels["PWL"] = (pwl, "MAJOR")
-            for k, v in session_levels.items():
-                levels[k] = (v, "INTRADAY")
-
-            pip_th = _pip_threshold(sym)
-
-            # Check each recent M5 candle for sweeps
-            today_candles = [
-                c for c in candles_m5
-                if _is_same_trading_day(c.get("datetime", ""))
-            ]
-
-            for level_name, (level_price, strength) in levels.items():
-                for c in today_candles[-24:]:  # last 2 hours of M5
-                    try:
-                        is_high_level = level_name in ("PDH", "PWH", "PSH_LONDON", "PSH_NY")
-                        is_low_level  = level_name in ("PDL", "PWL", "PSL_LONDON", "PSL_NY")
-
-                        sweep_detected = False
-                        sweep_type = None
-                        wick_extreme = None
-
-                        if is_high_level:
-                            # Wick above + close below = bull sweep (sell-side liquidity taken)
-                            if c["high"] > (level_price + pip_th) and c["close"] < level_price:
-                                sweep_detected = True
-                                sweep_type     = f"{level_name}_SWEEP"
-                                wick_extreme   = c["high"]
-                        elif is_low_level:
-                            # Wick below + close above = bear sweep (buy-side liquidity taken)
-                            if c["low"] < (level_price - pip_th) and c["close"] > level_price:
-                                sweep_detected = True
-                                sweep_type     = f"{level_name}_SWEEP"
-                                wick_extreme   = c["low"]
-
-                        if not sweep_detected:
-                            continue
-
-                        sweep_magnitude = abs(wick_extreme - level_price)
-                        candle_time_str = c.get("datetime", "—")
-                        candle_age_s = _get_candle_age_s(candle_time_str)
-
-                        if candle_age_s > 14400:  # > 4 hours → EXPIRED
-                            status = "EXPIRED"
-                        elif candle_age_s < 600:   # < 10 min → ACTIVE
-                            status = "ACTIVE"
-                        else:
-                            status = "CONFIRMED"
-
-                        all_sweeps.append({
-                            "symbol":           sym,
-                            "sweep_type":       sweep_type,
-                            "strength":         strength,
-                            "level_price":      round(level_price, 5),
-                            "wick_extreme":     round(wick_extreme, 5),
-                            "sweep_magnitude":  round(sweep_magnitude, 5),
-                            "candle_open":      round(c["open"], 5),
-                            "candle_high":      round(c["high"], 5),
-                            "candle_low":       round(c["low"], 5),
-                            "candle_close":     round(c["close"], 5),
-                            "candle_time":      candle_time_str,
-                            "status":           status,
-                            "data_source":      "LIVE",
-                            "time_elapsed_s":   candle_age_s,
-                        })
-                    except Exception:
+            for level_name, (level_price, strength, level_label) in levels.items():
+                cat = level_name.split("_")[0]
+                key = f"{symbol}_{cat}"
+                existing = _forex_sweep_cache.get(key)
+                
+                # Check data validity guard (implausibility check)
+                if ltp > 0 and (abs(level_price - ltp) / max(ltp, 1)) > 0.20:
+                    logger.warning(f"Implausible level for {symbol}: {level_price} vs LTP {ltp} — skipping")
+                    continue
+                
+                if existing:
+                    updated = _update_sweep_status(existing, symbol)
+                    _forex_sweep_cache[key] = updated
+                    if updated["status"] not in ["FAILED", "EXPIRED"]:
+                        results.append(updated)
                         continue
 
+                # No active sweep, check for new one
+                sweep_detected = False
+                wick_extreme = None
+                sweep_candle = None
+                
+                is_high_level = "H" in cat
+                is_low_level = "L" in cat
+
+                for c in today_candles[-24:]:
+                    if is_high_level:
+                        if c["high"] > (level_price + pip_th) and c["close"] < level_price:
+                            sweep_detected = True
+                            wick_extreme = c["high"]
+                            sweep_candle = c
+                    elif is_low_level:
+                        if c["low"] < (level_price - pip_th) and c["close"] > level_price:
+                            sweep_detected = True
+                            wick_extreme = c["low"]
+                            sweep_candle = c
+                
+                if sweep_detected and sweep_candle:
+                    sweep_magnitude = abs(wick_extreme - level_price)
+                    if symbol.endswith("JPY"): sweep_size_pips = sweep_magnitude * 100
+                    elif symbol in ["BTCUSD", "ETHUSD", "NAS100", "SP100", "XAUUSD"]: sweep_size_pips = sweep_magnitude
+                    else: sweep_size_pips = sweep_magnitude * 10000
+
+                    candle_time_str = sweep_candle.get("datetime", "—")
+                    age_s = _get_candle_age_s(candle_time_str)
+                    age_minutes = max(0, int(age_s / 60))
+                    
+                    if age_minutes > 240:
+                        status = "EXPIRED"
+                    elif age_minutes < 10:
+                        status = "ACTIVE"
+                    else:
+                        status = "CONFIRMED"
+
+                    new_sweep = {
+                        "symbol":           symbol,
+                        "level_category":   cat,
+                        "level_label":      level_label,
+                        "level_strength":   strength,
+                        "level_price":      round(level_price, 5),
+                        "wick_extreme":     round(wick_extreme, 5),
+                        "sweep_size_pips":  round(sweep_size_pips, 1),
+                        "candle_close":     round(sweep_candle["close"], 5),
+                        "timestamp":        candle_time_str,
+                        "status":           status,
+                        "time_elapsed_s":   age_s,
+                        "age_minutes":      age_minutes,
+                        "current_ltp":      round(ltp, 5) if ltp > 0 else 0,
+                        "distance_from_level": round(ltp - level_price, 5) if ltp > 0 else 0,
+                        "sweep_direction":  "SELL_SIDE" if is_high_level else "BUY_SIDE",
+                    }
+                    _forex_sweep_cache[key] = new_sweep
+                    if status not in ["FAILED", "EXPIRED"]:
+                        results.append(new_sweep)
+
         except Exception as e:
-            logger.error(f"[ForexSMC] sweep error for {sym}: {e}")
+            logger.error(f"[ForexSMC] sweep error for {symbol}: {e}")
             continue
 
-    # Pin XAUUSD sweeps to top
-    xau_sweeps   = [s for s in all_sweeps if s["symbol"] == "XAUUSD"]
-    other_sweeps = [s for s in all_sweeps if s["symbol"] != "XAUUSD"]
+    xau_sweeps   = [s for s in results if s["symbol"] == "XAUUSD"]
+    other_sweeps = [s for s in results if s["symbol"] != "XAUUSD"]
     sorted_sweeps = xau_sweeps + other_sweeps
 
     _sweep_events_raw = sorted_sweeps
